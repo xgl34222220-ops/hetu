@@ -55759,7 +55759,7 @@ index b914f23..2793b39 100644
          private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
          private const val MAX_EXTRACTED = 128L * 1024L * 1024L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..6c9b708 100644
+index 5ae93b3..562df3f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -53,34 +53,50 @@ internal class ProxyDashboardRepository(context: Context) {
@@ -56137,7 +56137,17 @@ index 5ae93b3..6c9b708 100644
      suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
-@@ -564,3 +751,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -478,7 +665,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+             try {
+                 val code = connection.responseCode
+                 coroutineContext.ensureActive()
+-                if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
++                // generate_204 targets must answer 204 (a hijack/portal page is not a measurement).
++                if (hxProbeAnswered(url, code)) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+             } finally {
+                 runCatching { connection.inputStream?.close() }
+                 connection.disconnect()
+@@ -564,3 +752,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
  }
@@ -56218,6 +56228,44 @@ index 48280df..b453abf 100644
 +        if (record.time != before) put(name, if (record.delay > 0L) record.delay else failure)
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargets.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargets.kt
+index e94e425..8754616 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargets.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargets.kt
+@@ -12,22 +12,28 @@ internal object ProxyLatencyTargets {
+     private const val URL_PREFIX = "proxyLatencyTargetUrl"
+     private const val LAST_PREFIX = "proxyUiLastDelayTarget"
+
++    /**
++     * The Google target measures google.com itself. www.gstatic.com is served from mainland
++     * China as well, so it answered without a proxy and read as "Google reachable".
++     */
+     val defaults = listOf(
+         ProxyLatencyTarget("Baidu", "https://www.baidu.com/"),
+         ProxyLatencyTarget("Cloudflare", "https://cp.cloudflare.com/generate_204"),
+-        ProxyLatencyTarget("Google", "https://www.gstatic.com/generate_204"),
++        ProxyLatencyTarget("Google", "https://www.google.com/generate_204"),
+     )
+
++    /** The former Google default; a saved copy of it (written with the other targets) is migrated. */
++    internal const val LEGACY_GOOGLE_URL = "https://www.gstatic.com/generate_204"
++
+     fun load(context: Context): List<ProxyLatencyTarget> =
+         load(context.getSharedPreferences("hetu", Context.MODE_PRIVATE))
+
+     fun load(prefs: SharedPreferences): List<ProxyLatencyTarget> =
+         (0 until COUNT).map { index ->
+             val fallback = defaults[index]
+-            ProxyLatencyTarget(
+-                prefs.getString("$NAME_PREFIX$index", fallback.name).orEmpty().trim().ifBlank { fallback.name },
+-                prefs.getString("$URL_PREFIX$index", fallback.url).orEmpty().trim().ifBlank { fallback.url },
+-            )
++            val name = prefs.getString("$NAME_PREFIX$index", fallback.name).orEmpty().trim().ifBlank { fallback.name }
++            val url = prefs.getString("$URL_PREFIX$index", fallback.url).orEmpty().trim().ifBlank { fallback.url }
++            ProxyLatencyTarget(name, if (name == fallback.name && url == LEGACY_GOOGLE_URL && fallback.name == "Google") fallback.url else url)
+         }
+
+     fun save(prefs: SharedPreferences, values: List<ProxyLatencyTarget>) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 index 2c5e10f..d1ec88c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
@@ -63269,10 +63317,14 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..7dbef43 100644
+index 250b8a8..11edaad 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-@@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
+@@ -16,11 +16,14 @@ import androidx.lifecycle.AndroidViewModel
+ import androidx.lifecycle.viewModelScope
+ import io.github.xgl34222220.hetu.ui.HetuComposeController
+ import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
  import kotlinx.coroutines.Job
  import kotlinx.coroutines.async
  import kotlinx.coroutines.awaitAll
@@ -63283,7 +63335,7 @@ index 250b8a8..7dbef43 100644
  import kotlinx.coroutines.flow.MutableSharedFlow
  import kotlinx.coroutines.flow.SharedFlow
  import kotlinx.coroutines.isActive
-@@ -73,6 +75,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -73,6 +76,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          get() = tabState
          set(value) { tabState = value }
 
@@ -63299,7 +63351,7 @@ index 250b8a8..7dbef43 100644
      /** Open a live panel section from home cards, tools or deep links. */
      fun openPanel(section: String) {
          val requested = section.ifBlank { "overview" }
-@@ -80,6 +91,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -80,6 +92,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          tabState = HxTab.Panel
      }
 
@@ -63315,7 +63367,7 @@ index 250b8a8..7dbef43 100644
      fun setDefaultPanelSection(section: String) {
          val value = section.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
          prefs.edit().putString("defaultPanelSection", value).apply()
-@@ -142,6 +162,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -142,10 +163,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      /* ---------------- runtime state ---------------- */
@@ -63324,7 +63376,13 @@ index 250b8a8..7dbef43 100644
      var state by mutableStateOf(initialState())
          private set
      var runtime by mutableStateOf(initialRuntime())
-@@ -212,15 +234,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         private set
++    /** Public address as apps see it (through the proxy while running, direct while stopped). */
++    private val publicIp = HxPublicIpLookup(app) { view -> runtime = hxWithPublicIp(runtime, view, state.running) }
+     var upRate by mutableLongStateOf(0L)
+         private set
+     var downRate by mutableLongStateOf(0L)
+@@ -212,15 +237,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var providersUpdatingAll by mutableStateOf(false)
          private set
 
@@ -63366,7 +63424,7 @@ index 250b8a8..7dbef43 100644
 
      /* ---------------- polling ---------------- */
      private var pollJob: Job? = null
-@@ -339,6 +384,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -339,6 +387,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          return request.takeIf { state.running && operation == null }
      }
 
@@ -63377,7 +63435,7 @@ index 250b8a8..7dbef43 100644
      private fun currentRuntimeRequest(request: RuntimeRequest, requireRunning: Boolean = true): Boolean {
          syncRequestSettings()
          return request.generation == runtimeRequestGeneration &&
-@@ -369,6 +418,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -369,6 +421,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              latestNodeProbe[node] = owner
              delays[node] = value
              measuredAt[node] = stamp
@@ -63401,7 +63459,7 @@ index 250b8a8..7dbef43 100644
          }
      }
 
-@@ -398,8 +464,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -398,8 +467,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -63410,6 +63468,10 @@ index 250b8a8..7dbef43 100644
 +                if (operation == null) {
 +                    refreshNow()
 +                    maybeVerifyEgress()
++                    if (operation == null) {
++                        publicIp.request(state.running, force = false)
++                        maybeAutoProbeSites(this)
++                    }
 +                }
 +                // Stopped and idle: probe Root every 8 s instead of every 2 s, but wake within a
 +                // second when a tile / boot / network-match start flips the cached running hint.
@@ -63425,7 +63487,7 @@ index 250b8a8..7dbef43 100644
              }
          }
          ProxyStatusNotificationService.refresh(app)
-@@ -412,19 +491,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,20 +498,79 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -63482,6 +63544,7 @@ index 250b8a8..7dbef43 100644
          )
      }
 
+-    private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
 +    /** True while the cards still show the restored list rather than a fresh controller read. */
 +    private fun showingRestoredGroups(): Boolean {
 +        val restored = restoredGroups ?: return false
@@ -63496,10 +63559,18 @@ index 250b8a8..7dbef43 100644
 +        return true
 +    }
 +
-     private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
++    private fun initialRuntime(): ProxyRuntimeSnapshot = initialRuntimeCached().let { cached ->
++        // The cached address was the proxy exit; with the proxy stopped it is not the device's address.
++        if (cached.running) cached else cached.copy(wanAddress = "—", wanCountryCode = "", wanCountry = "—", wanRegion = "—",
++            wanCity = "—", wanIsp = "—", wanAsn = "—", wanOrganization = "—", wanIpType = "—", wanTimezone = "—",
++            wanCoordinates = "—", wanState = "idle")
++    }
++
++    private fun initialRuntimeCached(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
-@@ -449,15 +580,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         rssBytes = prefs.getLong("proxyUiLastRss", 0L),
+@@ -449,15 +594,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -63535,7 +63606,7 @@ index 250b8a8..7dbef43 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +657,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +671,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -63563,7 +63634,16 @@ index 250b8a8..7dbef43 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -550,6 +717,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -535,7 +716,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             }
+             lastProcessTicks = sampled.processTicks
+             lastSystemTicks = sampled.systemTicks
+-            runtime = sampled
++            runtime = hxWithPublicIp(sampled, publicIp.view, next.running)
+
+             if (!next.running) {
+                 providers = emptyList()
+@@ -550,6 +731,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                      if (owner == latestProviderRead && currentRuntimeRequest(request, requireRunning = false)) {
                          lastProviderRefreshAt = now
                          if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
@@ -63571,7 +63651,7 @@ index 250b8a8..7dbef43 100644
                      }
                  }
                  if (coreVersion.isBlank()) {
-@@ -560,17 +728,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +742,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -63589,7 +63669,7 @@ index 250b8a8..7dbef43 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +736,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +750,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -63597,7 +63677,7 @@ index 250b8a8..7dbef43 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +747,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +761,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -63608,7 +63688,15 @@ index 250b8a8..7dbef43 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -636,6 +795,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -626,6 +799,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             refreshing = true
+             try {
+                 refreshNow()
++                if (operation == null) publicIp.request(state.running, force = true)
+                 val request = activeRuntimeRequest()
+                 if (request != null) {
+                     val providerOwner = beginProviderRead()
+@@ -636,6 +810,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          p.await()?.let {
                              if (providerOwner == latestProviderRead && currentRuntimeRequest(request)) {
                                  providers = it
@@ -63616,7 +63704,7 @@ index 250b8a8..7dbef43 100644
                                  lastProviderRefreshAt = SystemClock.elapsedRealtime()
                              }
                          }
-@@ -664,7 +824,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -664,7 +839,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          viewModelScope.launch {
              try { toast(controller.setAutoStart(enabled)) }
              catch (cancel: CancellationException) { throw cancel }
@@ -63625,7 +63713,7 @@ index 250b8a8..7dbef43 100644
              finally { autoStartBusy = false; bumpSettings() }
          }
      }
-@@ -674,24 +834,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -674,24 +849,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          val stopping = state.running
          invalidateRuntimeRequests()
          operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
@@ -63668,7 +63756,7 @@ index 250b8a8..7dbef43 100644
                          "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                      } else if (configProblem) {
                          reason
-@@ -700,7 +873,47 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -700,7 +888,47 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                      }
                  } else {
@@ -63717,7 +63805,7 @@ index 250b8a8..7dbef43 100644
                  }
              } finally {
                  operation = null
-@@ -727,14 +940,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -727,14 +955,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              operationText = "正在重启…"
              ProxyRuntimeSettings.beginApply(prefs)
              try {
@@ -63735,7 +63823,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -746,6 +959,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +974,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -63749,7 +63837,7 @@ index 250b8a8..7dbef43 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -755,7 +975,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -755,7 +990,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -63758,7 +63846,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -764,8 +984,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +999,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -63793,7 +63881,7 @@ index 250b8a8..7dbef43 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,19 +1019,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,19 +1034,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -63829,7 +63917,7 @@ index 250b8a8..7dbef43 100644
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
          if (current.now == node || current.nodes.none { it.name == node }) return
-@@ -827,13 +1086,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,13 +1101,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -63851,7 +63939,7 @@ index 250b8a8..7dbef43 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1107,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1122,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -63890,7 +63978,7 @@ index 250b8a8..7dbef43 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1142,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1157,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -63911,7 +63999,7 @@ index 250b8a8..7dbef43 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1164,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1179,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -63967,7 +64055,7 @@ index 250b8a8..7dbef43 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,22 +1240,81 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,22 +1255,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -64015,6 +64103,37 @@ index 250b8a8..7dbef43 100644
 +    /** Audit4 G5: results of the last direct 本机直测 made while the proxy was stopped (memory only). */
 +    var directSiteDelays by mutableStateOf<Map<String, Long>>(emptyMap())
 +        private set
++    private var directSiteAt = 0L
++    private var siteAutoAt = 0L
++    private var siteAutoGeneration = -1L
++
++    /**
++     * 网络延迟 keeps itself current while 首页 is open, so it never shows an old or other-path
++     * number: once per runtime (start, restart, network change) and every five minutes through the
++     * proxy while it runs; a direct test right after stopping and every two minutes while stopped.
++     */
++    private fun maybeAutoProbeSites(scope: CoroutineScope) {
++        if (operation != null || siteTesting || tab != HxTab.Home) return
++        val now = SystemClock.elapsedRealtime()
++        if (state.running) {
++            if (!state.panelReady) return
++            if (siteAutoGeneration == runtimeRequestGeneration && now - siteAutoAt < 300_000L) return
++            siteAutoGeneration = runtimeRequestGeneration
++            siteAutoAt = now
++            // Children of the foreground poll: leaving the app cancels them.
++            scope.launch { measureSitesQuietly() }
++        } else {
++            if (directSiteDelays.isNotEmpty() && now - directSiteAt < 120_000L) return
++            if (siteAutoAt > 0L && now - siteAutoAt < 20_000L) return
++            siteAutoAt = now
++            measureSitesDirect(quiet = true, scope = scope)
++        }
++    }
++
++    override fun onCleared() {
++        publicIp.close()
++        super.onCleared()
++    }
 +
 +    /** Home ↻: the proxy-path probe while running; a direct test while stopped (Audit4 G5). */
 +    fun probeSites() {
@@ -64026,22 +64145,23 @@ index 250b8a8..7dbef43 100644
 +     * runtime-bound [measureSites] path and its probe identity are unchanged. Nothing is persisted:
 +     * the saved last results stay those of the proxy path.
 +     */
-+    fun measureSitesDirect() {
++    fun measureSitesDirect(quiet: Boolean = false, scope: CoroutineScope = viewModelScope) {
 +        if (state.running || operation != null || siteTesting) return
 +        val owner = beginSiteRead()
 +        siteProbeOwner = owner
 +        siteTesting = true
-+        viewModelScope.launch {
++        scope.launch {
 +            try {
 +                val measured = hxDirectSiteLatencies(app)
 +                if (owner == latestSiteRead && !state.running && operation == null && measured.isNotEmpty()) {
 +                    directSiteDelays = measured
-+                    if (measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
++                    directSiteAt = SystemClock.elapsedRealtime()
++                    if (!quiet && measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
 +                }
 +            } catch (cancel: CancellationException) {
 +                throw cancel
 +            } catch (error: Exception) {
-+                if (owner == latestSiteRead) toastAs(HxTone.Bad, errorText(error, "测速失败"))
++                if (owner == latestSiteRead && !quiet) toastAs(HxTone.Bad, errorText(error, "测速失败"))
 +            } finally {
 +                if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
 +            }
@@ -64051,7 +64171,7 @@ index 250b8a8..7dbef43 100644
      fun measureSites() {
          val request = activeRuntimeRequest() ?: return
          if (siteTesting) return
-@@ -964,7 +1332,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1379,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64060,7 +64180,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1349,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1396,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64069,7 +64189,7 @@ index 250b8a8..7dbef43 100644
              }
          }
      }
-@@ -995,7 +1363,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1410,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64078,7 +64198,7 @@ index 250b8a8..7dbef43 100644
              }
          }
      }
-@@ -1014,7 +1382,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1429,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64087,7 +64207,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1401,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1448,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64096,7 +64216,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1409,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1456,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -64105,7 +64225,7 @@ index 250b8a8..7dbef43 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1441,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1488,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -64114,7 +64234,7 @@ index 250b8a8..7dbef43 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1502,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1549,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64123,7 +64243,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1153,18 +1521,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1153,18 +1568,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val fresh = repo.providers()
                  if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                      providers = fresh
@@ -64145,7 +64265,7 @@ index 250b8a8..7dbef43 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1175,6 +1544,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1175,6 +1591,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                  beginProviderRead()
                  if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
@@ -64153,7 +64273,7 @@ index 250b8a8..7dbef43 100644
                  providerTasks[name] = HxTask(ok = true, message = "已更新")
                  refreshNow()
              } catch (cancel: CancellationException) {
-@@ -1193,7 +1563,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1610,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -64162,7 +64282,7 @@ index 250b8a8..7dbef43 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1239,6 +1609,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1239,6 +1656,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                  if (readOwner == latestProviderRead) {
                      providers = fresh
@@ -64170,7 +64290,7 @@ index 250b8a8..7dbef43 100644
                      lastProviderRefreshAt = SystemClock.elapsedRealtime()
                  }
                  toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
-@@ -1246,7 +1617,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1246,7 +1664,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64179,7 +64299,7 @@ index 250b8a8..7dbef43 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1263,6 +1634,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1681,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -64767,7 +64887,7 @@ index 0000000..2763314
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index e337597..97aaad6 100644
+index e337597..77f09a4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -271,8 +271,8 @@ internal fun HxPage(
@@ -64781,6 +64901,15 @@ index e337597..97aaad6 100644
 
      val stagger = rememberHomeStagger()
      val entrance = remember(stagger) { HxEntrance(stagger) }
+@@ -313,7 +313,7 @@ internal fun HxPage(
+                 list()
+             }
+
+-            HomeBarBackdrop(glass, Modifier.fillMaxWidth().height(statusTop + barHeight))
++            HomeBarBackdrop(glass, Modifier.fillMaxWidth().height(statusTop + barHeight), canvas = canvasColor)
+             Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).heightIn(min = barHeight)) {
+                 val twoLine = !largeTitle && shownSubtitle != null
+                 HxBarRow(
 @@ -466,7 +466,9 @@ private fun HxEmbeddedPage(
  @Composable
  internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
@@ -64815,10 +64944,10 @@ index e337597..97aaad6 100644
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt
 new file mode 100644
-index 0000000..c38ac4b
+index 0000000..96449d6
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,68 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -64831,14 +64960,14 @@ index 0000000..c38ac4b
 +import kotlinx.coroutines.ensureActive
 +import kotlinx.coroutines.withContext
 +import java.net.HttpURLConnection
-+import java.net.Proxy
 +import java.net.URL
 +import kotlin.coroutines.coroutineContext
 +
 +/**
-+ * Audit4 G5: 本机直测 while the proxy is stopped. A plain direct request (Proxy.NO_PROXY) to the
-+ * same three targets, deliberately separate from ProxyDashboardRepository.siteLatencies, whose
-+ * runtime-bound probe identity stays untouched. Same timeouts and success range as that probe.
++ * 网络延迟 while the proxy is stopped: the same three targets over the device's ordinary route
++ * (what any other app gets with Hetu off). Deliberately separate from
++ * ProxyDashboardRepository.siteLatencies, whose runtime-bound probe identity stays untouched.
++ * Same timeouts and success rule ([hxProbeAnswered]) as that probe.
 + * Results: name → ms (> 0), -1 = failed or timed out.
 + */
 +internal suspend fun hxDirectSiteLatencies(context: Context): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -64848,12 +64977,24 @@ index 0000000..c38ac4b
 +    }
 +}
 +
++/**
++ * Whether [code] is a real answer from [url]. A generate_204 endpoint must answer 204: a captive
++ * portal, a DNS-hijack page or an interception box answers 200/302 for any host, which used to
++ * count as "reachable". Other targets accept 2xx/3xx as before.
++ */
++internal fun hxProbeAnswered(url: String, code: Int): Boolean {
++    val path = runCatching { URL(url).path.orEmpty() }.getOrDefault("")
++    return if (path.trimEnd('/').endsWith("generate_204")) code == 204 else code in 200..399
++}
++
 +private suspend fun hxDirectLatency(url: String): Long {
 +    coroutineContext.ensureActive()
 +    return try {
 +        val started = SystemClock.elapsedRealtime()
-+        val connection = (URL(url).openConnection(Proxy.NO_PROXY) as HttpURLConnection).apply {
++        // The default route, not Proxy.NO_PROXY: a stopped Hetu measures exactly what other apps see.
++        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
 +            instanceFollowRedirects = true
++            useCaches = false
 +            connectTimeout = 3_000
 +            readTimeout = 3_000
 +            requestMethod = "GET"
@@ -64863,7 +65004,7 @@ index 0000000..c38ac4b
 +        try {
 +            val code = connection.responseCode
 +            coroutineContext.ensureActive()
-+            if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
++            if (hxProbeAnswered(url, code)) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
 +        } finally {
 +            runCatching { connection.inputStream?.close() }
 +            connection.disconnect()
@@ -65458,6 +65599,363 @@ index 0000000..f3d1e7c
 +
 +    fun delayMs(homeOrPanel: Boolean, running: Boolean, operationActive: Boolean, runningHint: Boolean): Long =
 +        if (running || operationActive || runningHint) activeDelayMs(homeOrPanel) else IdleDelayMs
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPublicIp.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPublicIp.kt
+new file mode 100644
+index 0000000..4a99e90
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPublicIp.kt
+@@ -0,0 +1,351 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.content.SharedPreferences
++import android.net.ConnectivityManager
++import android.os.Handler
++import android.os.Looper
++import android.os.SystemClock
++import org.json.JSONObject
++import java.net.HttpURLConnection
++import java.net.InetSocketAddress
++import java.net.Proxy
++import java.net.URL
++import java.util.Locale
++import java.util.concurrent.ExecutorService
++import java.util.concurrent.Executors
++
++/**
++ * Public address as other apps see it, for the WAN card and 公网 IP 详情.
++ *
++ * - Proxy running (Root): through the core's local policy listener, which applies the same rules
++ *   transparent interception applies to apps (Hetu's own UID is exempt from interception).
++ * - Proxy stopped: the device's ordinary route, the address any app sees with Hetu off.
++ *
++ * Several independent sources are asked in parallel (mainland-reachable ones included); the first
++ * answer is shown at once and a later one with location details fills them in. A failed refresh
++ * keeps the last good answer of the same path, marked stale with its time.
++ */
++internal enum class HxIpPath { Proxy, Direct }
++
++internal data class HxPublicIpView(
++    /** Null until the first request: nothing to overlay. */
++    val path: HxIpPath? = null,
++    val info: WanRuntimeInfo? = null,
++    /** idle | loading | success | stale | failed (the ProxyRuntimeSnapshot.wanState words). */
++    val state: String = "idle",
++    /** Wall-clock ms when [info] was obtained; 0 when unknown. */
++    val checkedAt: Long = 0L,
++    val error: String = "",
++    val source: String = "",
++)
++
++internal class HxIpSource(
++    val id: String,
++    val url: String,
++    /** Carries location / operator details, not just the address. */
++    val rich: Boolean,
++    val userAgent: String = "Mozilla/5.0 (Linux; Android) Hetu-Android",
++    val parse: (String) -> WanRuntimeInfo,
++)
++
++internal object HxIpSources {
++    private const val CURL = "curl/8.5.0"
++    val all: List<HxIpSource> = listOf(
++        HxIpSource("myip.ipip.net", "https://myip.ipip.net/json", true, parse = ::hxParseIpipNet),
++        HxIpSource("ip.sb", "https://api.ip.sb/geoip", true, parse = ::hxParseIpSbGeo),
++        HxIpSource("ipwho.is", "https://ipwho.is/?fields=success,ip,type,country_code,country,region,city,connection,timezone,latitude,longitude", true, parse = ::parseWanRuntimeInfo),
++        HxIpSource("cip.cc", "https://cip.cc/", true, CURL, ::hxParseCipCc),
++        HxIpSource("ipinfo.io", "https://ipinfo.io/json", true, parse = ::hxParseIpInfo),
++        HxIpSource("ip.3322.net", "https://ip.3322.net/", false, CURL, ::hxParsePlainIp),
++        HxIpSource("ipw.cn", "https://4.ipw.cn/", false, CURL, ::hxParsePlainIp),
++        HxIpSource("ipify", "https://api.ipify.org/", false, parse = ::hxParsePlainIp),
++    )
++}
++
++private val ipv4Literal = Regex("""^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$""")
++private val ipv6Literal = Regex("""^[0-9A-Fa-f:]{2,39}$""")
++
++/** A bare address literal, never a host name (nothing is resolved). */
++internal fun hxIpLiteral(text: String?): String? {
++    val value = text?.trim().orEmpty()
++    return value.takeIf { ipv4Literal.matches(it) || (it.contains(':') && ipv6Literal.matches(it)) }
++}
++
++private fun ipTypeOf(address: String) = if (address.contains(':')) "IPv6" else "IPv4"
++
++private fun field(obj: JSONObject?, key: String): String =
++    obj?.optString(key, "")?.trim()?.takeUnless { it.isEmpty() || it == "null" || it == "—" } ?: "—"
++
++private fun coordinates(latitude: Double, longitude: Double): String =
++    if (latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0)
++        String.format(Locale.US, "%.4f, %.4f", latitude, longitude) else "—"
++
++private val chineseCountryCodes = mapOf(
++    "中国" to "CN", "香港" to "HK", "中国香港" to "HK", "澳门" to "MO", "中国澳门" to "MO", "台湾" to "TW", "中国台湾" to "TW",
++    "日本" to "JP", "韩国" to "KR", "新加坡" to "SG", "美国" to "US", "英国" to "GB", "德国" to "DE", "法国" to "FR",
++    "加拿大" to "CA", "澳大利亚" to "AU", "俄罗斯" to "RU", "荷兰" to "NL", "马来西亚" to "MY", "泰国" to "TH", "越南" to "VN",
++)
++
++internal fun hxParsePlainIp(body: String): WanRuntimeInfo {
++    val address = requireNotNull(hxIpLiteral(body.lineSequence().firstOrNull())) { "No address" }
++    return WanRuntimeInfo(address = address, ipType = ipTypeOf(address))
++}
++
++/** myip.ipip.net/json: {"ret":"ok","data":{"ip":"…","location":["中国","江西","赣州","","电信"]}} */
++internal fun hxParseIpipNet(body: String): WanRuntimeInfo {
++    val json = JSONObject(body)
++    require(json.optString("ret") == "ok") { "Lookup failed" }
++    val data = json.optJSONObject("data")
++    val address = requireNotNull(hxIpLiteral(data?.optString("ip"))) { "No address" }
++    val location = data?.optJSONArray("location")
++    fun part(index: Int) = location?.optString(index, "")?.trim().orEmpty().takeUnless { it.isEmpty() || it == "null" } ?: "—"
++    val country = part(0)
++    return WanRuntimeInfo(address = address, countryCode = chineseCountryCodes[country].orEmpty(), country = country,
++        region = part(1), city = part(2), isp = part(4), ipType = ipTypeOf(address))
++}
++
++/** api.ip.sb/geoip */
++internal fun hxParseIpSbGeo(body: String): WanRuntimeInfo {
++    val json = JSONObject(body)
++    val address = requireNotNull(hxIpLiteral(json.optString("ip"))) { "No address" }
++    val asn = json.optLong("asn", 0L).takeIf { it > 0L }?.let { "AS$it" } ?: "—"
++    return WanRuntimeInfo(address = address, countryCode = field(json, "country_code").takeUnless { it == "—" }.orEmpty(),
++        country = field(json, "country"), region = field(json, "region"), city = field(json, "city"),
++        isp = field(json, "isp"), asn = asn, organization = field(json, "organization").takeUnless { it == "—" } ?: field(json, "asn_organization"),
++        ipType = ipTypeOf(address), timezone = field(json, "timezone"),
++        coordinates = coordinates(json.optDouble("latitude", Double.NaN), json.optDouble("longitude", Double.NaN)))
++}
++
++/** ipinfo.io/json: org is "AS4134 CHINANET…", loc is "lat,lon". */
++internal fun hxParseIpInfo(body: String): WanRuntimeInfo {
++    val json = JSONObject(body)
++    val address = requireNotNull(hxIpLiteral(json.optString("ip"))) { "No address" }
++    val org = field(json, "org")
++    val asn = org.substringBefore(' ').takeIf { org != "—" && it.startsWith("AS") && it.drop(2).all(Char::isDigit) } ?: "—"
++    val operator = if (asn != "—") org.substringAfter(' ', "").trim().ifEmpty { "—" } else org
++    val loc = field(json, "loc").split(',')
++    return WanRuntimeInfo(address = address, countryCode = field(json, "country").takeIf { it.length == 2 }.orEmpty(),
++        region = field(json, "region"), city = field(json, "city"), isp = operator, asn = asn, organization = operator,
++        ipType = ipTypeOf(address), timezone = field(json, "timezone"),
++        coordinates = coordinates(loc.getOrNull(0)?.trim()?.toDoubleOrNull() ?: Double.NaN, loc.getOrNull(1)?.trim()?.toDoubleOrNull() ?: Double.NaN))
++}
++
++/** cip.cc (curl text): "IP\t: 1.2.3.4", "地址\t: 中国 江西 赣州", "运营商\t: 电信". */
++internal fun hxParseCipCc(body: String): WanRuntimeInfo {
++    val lines = body.lineSequence().mapNotNull { line ->
++        val key = line.substringBefore(':', "").trim()
++        if (key.isEmpty()) null else key to line.substringAfter(':').trim()
++    }.toMap()
++    val address = requireNotNull(hxIpLiteral(lines["IP"])) { "No address" }
++    val place = lines["地址"].orEmpty().split(' ', '\t').map { it.trim() }.filter { it.isNotEmpty() }
++    val country = place.getOrNull(0) ?: "—"
++    return WanRuntimeInfo(address = address, countryCode = chineseCountryCodes[country].orEmpty(), country = country,
++        region = place.getOrNull(1) ?: "—", city = place.getOrNull(2) ?: "—",
++        isp = lines["运营商"]?.takeIf { it.isNotBlank() } ?: "—", ipType = ipTypeOf(address))
++}
++
++/** Location/operator fields a plain answer lacks are taken from [details] when it reports the same address. */
++internal fun hxMergeWan(base: WanRuntimeInfo, details: WanRuntimeInfo): WanRuntimeInfo {
++    if (base.address != details.address) return details
++    fun pick(a: String, b: String) = if (a.isBlank() || a == "—") b else a
++    return base.copy(countryCode = base.countryCode.ifBlank { details.countryCode }, country = pick(base.country, details.country),
++        region = pick(base.region, details.region), city = pick(base.city, details.city), isp = pick(base.isp, details.isp),
++        asn = pick(base.asn, details.asn), organization = pick(base.organization, details.organization),
++        ipType = pick(base.ipType, details.ipType), timezone = pick(base.timezone, details.timezone),
++        coordinates = pick(base.coordinates, details.coordinates))
++}
++
++private fun WanRuntimeInfo.detailed(): Boolean = listOf(country, region, city, isp).any { it.isNotBlank() && it != "—" }
++
++/**
++ * One lookup per view model. [request] is called from the main thread (the foreground poll and
++ * the refresh actions); every result is applied on the main thread and reported to [onChange].
++ * Nothing runs until the first [request], so a view model that is never shown makes no request.
++ */
++internal class HxPublicIpLookup(
++    context: Context,
++    private val sources: List<HxIpSource> = HxIpSources.all,
++    private val onChange: (HxPublicIpView) -> Unit,
++) {
++    private val app = context.applicationContext
++    private val prefs: SharedPreferences = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private val main = Handler(Looper.getMainLooper())
++    private var pool: ExecutorService? = null
++    private var key = ""
++    private var generation = 0L
++    private var inFlight = false
++    private var lastAttemptAt = 0L
++    private var lastSuccessAt = 0L
++    private var failures = 0
++    private var bestRich = false
++
++    var view = HxPublicIpView()
++        private set
++
++    fun request(running: Boolean, force: Boolean) {
++        val viaRoot = running && ProxyStatusBridge.rootProxyRunning(app)
++        val path = if (running) HxIpPath.Proxy else HxIpPath.Direct
++        val controllerPort = prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)
++        val port = if (viaRoot) MihomoStartupConfig.egressProbePort(controllerPort) else 0
++        val network = runCatching {
++            (app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.activeNetwork?.networkHandle
++        }.getOrNull()
++        val nextKey = listOf(path.name, port.toString(), if (running) prefs.getLong("proxyRootLastStartupAt", 0L).toString() else "",
++            if (running) prefs.getString("proxyRootAppliedSettings", "").orEmpty() else "", network?.toString() ?: "offline").joinToString("|")
++        val now = SystemClock.elapsedRealtime()
++        if (nextKey != key) {
++            key = nextKey
++            generation++
++            inFlight = false
++            lastSuccessAt = 0L
++            lastAttemptAt = 0L
++            failures = 0
++            bestRich = false
++            // The last good answer of this path, marked with its time, until the new one lands.
++            val saved = loadSaved(path)
++            publish(HxPublicIpView(path, saved?.first, if (saved != null) "stale" else "loading", saved?.second ?: 0L))
++        } else {
++            if (inFlight) return
++            val due = force || (lastSuccessAt == 0L && now - lastAttemptAt >= retryDelay()) ||
++                (lastSuccessAt > 0L && now - lastSuccessAt >= REFRESH_MS)
++            if (!due) return
++        }
++        if (network == null) {
++            lastAttemptAt = now
++            failures++
++            publish(view.copy(path = path, state = if (view.info != null) "stale" else "failed", error = "当前没有可用网络"))
++            return
++        }
++        start(path, port.takeIf { viaRoot })
++    }
++
++    private fun retryDelay(): Long = (RETRY_MS shl failures.coerceAtMost(2)).coerceAtMost(60_000L)
++
++    private fun start(path: HxIpPath, port: Int?) {
++        inFlight = true
++        lastAttemptAt = SystemClock.elapsedRealtime()
++        bestRich = false
++        if (view.info == null) publish(view.copy(path = path, state = "loading", error = ""))
++        val ticket = generation
++        val executor = pool ?: Executors.newFixedThreadPool(4) { task ->
++            Thread(task, "hetu-public-ip").apply { isDaemon = true }
++        }.also { pool = it }
++        var pending = sources.size
++        var answered = false
++        sources.forEach { source ->
++            val task = Runnable {
++                val info = runCatching { fetch(source, port) }.getOrNull()
++                main.post {
++                    if (ticket != generation) return@post
++                    pending--
++                    if (info != null) {
++                        val first = !answered
++                        answered = true
++                        val current = view.info
++                        val better = first || (source.rich && !bestRich)
++                        if (better) {
++                            val merged = if (!first && current != null && current.address == info.address) hxMergeWan(info, current) else info
++                            bestRich = bestRich || (source.rich && info.detailed())
++                            val at = System.currentTimeMillis()
++                            lastSuccessAt = SystemClock.elapsedRealtime()
++                            failures = 0
++                            publish(HxPublicIpView(path, merged, "success", at, "", source.id))
++                            save(path, merged, at)
++                        }
++                    }
++                    if (pending == 0) {
++                        inFlight = false
++                        if (!answered) {
++                            failures++
++                            publish(view.copy(path = path, state = if (view.info != null) "stale" else "failed", error = "所有查询源均无响应，稍后自动重试"))
++                        }
++                    }
++                }
++            }
++            try { executor.execute(task) } catch (_: Exception) { main.post { if (ticket == generation) { pending--; if (pending == 0) inFlight = false } } }
++        }
++    }
++
++    private fun fetch(source: HxIpSource, port: Int?): WanRuntimeInfo {
++        val target = URL(source.url)
++        val opened = if (port != null) target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))) else target.openConnection()
++        val connection = (opened as HttpURLConnection).apply {
++            instanceFollowRedirects = false
++            useCaches = false
++            connectTimeout = 4_000
++            readTimeout = 4_000
++            requestMethod = "GET"
++            setRequestProperty("User-Agent", source.userAgent)
++            setRequestProperty("Accept", "application/json, text/plain, */*")
++            setRequestProperty("Connection", "close")
++        }
++        try {
++            if (connection.responseCode !in 200..299) error("HTTP ${connection.responseCode}")
++            val body = connection.inputStream.bufferedReader().use { reader ->
++                val text = StringBuilder()
++                val buffer = CharArray(2_048)
++                while (true) {
++                    val count = reader.read(buffer)
++                    if (count < 0) break
++                    if (text.length + count > 16_384) error("Response exceeds limit")
++                    text.append(buffer, 0, count)
++                }
++                text.toString()
++            }
++            return source.parse(body)
++        } finally {
++            connection.disconnect()
++        }
++    }
++
++    private fun publish(next: HxPublicIpView) {
++        view = next
++        onChange(next)
++    }
++
++    private fun prefKey(path: HxIpPath) = "hxPublicIpLast." + path.name.lowercase(Locale.ROOT)
++
++    private fun save(path: HxIpPath, info: WanRuntimeInfo, at: Long) {
++        val json = JSONObject().put("at", at).put("ip", info.address).put("cc", info.countryCode).put("country", info.country)
++            .put("region", info.region).put("city", info.city).put("isp", info.isp).put("asn", info.asn)
++            .put("org", info.organization).put("type", info.ipType).put("tz", info.timezone).put("coords", info.coordinates)
++        prefs.edit().putString(prefKey(path), json.toString()).apply()
++    }
++
++    private fun loadSaved(path: HxIpPath): Pair<WanRuntimeInfo, Long>? = runCatching {
++        val json = JSONObject(prefs.getString(prefKey(path), null) ?: return null)
++        val address = hxIpLiteral(json.optString("ip")) ?: return null
++        fun s(name: String) = json.optString(name, "—").ifBlank { "—" }
++        WanRuntimeInfo(address = address, countryCode = json.optString("cc", ""), country = s("country"), region = s("region"),
++            city = s("city"), isp = s("isp"), asn = s("asn"), organization = s("org"), ipType = s("type"),
++            timezone = s("tz"), coordinates = s("coords")) to json.optLong("at", 0L)
++    }.getOrNull()
++
++    fun close() {
++        generation++
++        pool?.shutdownNow()
++        pool = null
++    }
++
++    private companion object {
++        const val REFRESH_MS = 10 * 60_000L
++        const val RETRY_MS = 15_000L
++    }
++}
++
++/** The public-address fields of [snapshot] replaced by [view] when it belongs to the current path. */
++internal fun hxWithPublicIp(snapshot: ProxyRuntimeSnapshot, view: HxPublicIpView, running: Boolean): ProxyRuntimeSnapshot {
++    val path = view.path ?: return snapshot
++    if ((path == HxIpPath.Proxy) != running) return snapshot
++    val info = view.info
++    // Nothing of our own yet: keep what the runtime inspector found through the core.
++    if (info == null && running && snapshot.wanAddress != "—" && snapshot.wanState in setOf("success", "stale")) return snapshot
++    val wan = info ?: WanRuntimeInfo()
++    return snapshot.copy(
++        wanAddress = wan.address, wanCountryCode = wan.countryCode, wanCountry = wan.country, wanRegion = wan.region,
++        wanCity = wan.city, wanIsp = wan.isp, wanAsn = wan.asn, wanOrganization = wan.organization, wanIpType = wan.ipType,
++        wanTimezone = wan.timezone, wanCoordinates = wan.coordinates,
++        wanState = view.state, wanCheckedAt = view.checkedAt, wanError = view.error,
++    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt
 new file mode 100644
@@ -68152,7 +68650,7 @@ index 0000000..078ba90
 +/** Joins row state: the latency row and the unlock check of the same service finish independently. */
 +internal fun mergeUnlockRegion(traceRegion: String?, unlock: UnlockResult?): String? = unlock?.region ?: traceRegion
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-index df92493..da12bdd 100644
+index df92493..f724733 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 @@ -1,6 +1,7 @@
@@ -68180,7 +68678,18 @@ index df92493..da12bdd 100644
      HetuHomeV2(
          data = CompactHomeData(
              running = vm.state.running, busy = vm.operation != null,
-@@ -37,11 +45,11 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+@@ -24,7 +32,9 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+             refreshing = vm.refreshing, testing = vm.siteTesting,
+             uptimeSeconds = rt.elapsedSeconds, core = vm.state.core,
+             mode = vm.state.mode, config = vm.state.config, message = vm.state.message,
+-            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(), delays = vm.siteDelays,
++            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(),
++            // Proxy-path numbers only while that path exists; stopped, the card shows the direct test.
++            delays = if (vm.state.running) vm.siteDelays else emptyMap(),
+             latencyTargets = ProxyLatencyTargets.load(vm.prefs).map { it.name },
+             wan = rt.wanAddress, lan = rt.lanAddress, countryCode = rt.wanCountryCode,
+             region = rt.wanRegion.ifBlank { listOf(rt.wanCountry, rt.wanCity).filter { it.isNotBlank() }.distinct().joinToString(" · ") },
+@@ -37,11 +47,11 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
          groups = vm.state.groups, trafficMode = vm.state.trafficMode,
          startupError = vm.startupError, corePid = rt.pid, coreVersion = vm.coreVersion,
          bottomPadding = bottom, onToggle = vm::toggle, onReload = vm::reload,
@@ -68194,8 +68703,12 @@ index df92493..da12bdd 100644
          onViewConfig = { nav.push(HxRoute.ConfigEditor) },
          onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
          cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
-@@ -52,12 +60,21 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
-             state = rt.wanState, error = rt.wanError,
+@@ -49,15 +59,24 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+         wanExtras = HomeWanExtras(
+             city = rt.wanCity, organization = rt.wanOrganization, ipType = rt.wanIpType,
+             timezone = rt.wanTimezone, coordinates = rt.wanCoordinates,
+-            state = rt.wanState, error = rt.wanError,
++            state = rt.wanState, error = rt.wanError, checkedAt = rt.wanCheckedAt,
          ),
          operationText = vm.operationText,
 +        onUpdateProviders = vm::updateAllProviders,
@@ -71238,7 +71751,7 @@ index 0000000..c824968
 +    private fun spaces(n: Int): String = " ".repeat(n)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-index 0ceaa23..fef6a49 100644
+index 0ceaa23..2f6e885 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 @@ -94,6 +94,15 @@ internal fun HetuHomeV2(
@@ -71252,28 +71765,29 @@ index 0ceaa23..fef6a49 100644
 +    /** Audit4 U3: 控制接口异常 › 设置密钥 / 诊断工具; both fall back to [onOpenNode] when the host has no deeper link. */
 +    onOpenControllerKey: () -> Unit = onOpenNode,
 +    onOpenDiagnostics: () -> Unit = onOpenNode,
-+    /** Audit4 G5: results of a direct (no proxy) 本机直测 made while the proxy is stopped. */
++    /** Results of a direct 网络延迟 measurement made while the proxy is stopped (the device's own route). */
 +    directProbes: Map<String, Long> = emptyMap(),
  ) {
      val context = LocalContext.current
      val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
-@@ -128,6 +137,15 @@ internal fun HetuHomeV2(
+@@ -128,6 +137,12 @@ internal fun HetuHomeV2(
      )
      val state = mapped.copy(
          connection = connection,
 +        lastGood = lastGood,
 +        lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
-+        probes = if (!status.isLive && directProbes.isNotEmpty()) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]?.let { if (it > 0L) it else HomeDelay.Timeout }) } else mapped.probes,
-+        probeSource = when {
-+            status.isLive -> HomeProbeSource.Live
-+            directProbes.isNotEmpty() -> HomeProbeSource.Direct
-+            mapped.probes.any { it.delayMs != null } -> HomeProbeSource.Last
-+            else -> HomeProbeSource.Live
-+        },
++        // Stopped, only a direct measurement of the device's own route is shown; the proxy path's
++        // last numbers are never carried over (they described a path that no longer exists).
++        probes = if (!status.isLive) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]?.let { if (it > 0L) it else HomeDelay.Timeout }) } else mapped.probes,
++        probeSource = if (status.isLive) HomeProbeSource.Live else HomeProbeSource.Direct,
          statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
          wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
              city = wanExtras.city.known(),
-@@ -140,16 +158,34 @@ internal fun HetuHomeV2(
+@@ -137,19 +152,38 @@ internal fun HetuHomeV2(
+             coordinates = wanExtras.coordinates.known(),
+             state = HomeWanState.fromId(wanExtras.state),
+             error = wanExtras.error.known(),
++            checkedAt = wanExtras.checkedAt,
          ),
      )
 
@@ -71317,7 +71831,7 @@ index 0ceaa23..fef6a49 100644
              onNetSideChange = { side ->
                  netSide = side
                  prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
-@@ -158,31 +194,37 @@ internal fun HetuHomeV2(
+@@ -158,31 +192,37 @@ internal fun HetuHomeV2(
                  speedSource = source
                  prefs.edit().putString(PrefSpeedSource, source.id).apply()
              },
@@ -71371,6 +71885,15 @@ index 0ceaa23..fef6a49 100644
          ) {
              HomeRoute(
                  state = state.copy(ipRefreshing = data.refreshing),
+@@ -210,6 +250,8 @@ internal data class HomeWanExtras(
+     /** `ProxyRuntimeSnapshot.wanState`: idle, loading, success, stale or failed. */
+     val state: String = "",
+     val error: String = "",
++    /** `ProxyRuntimeSnapshot.wanCheckedAt` (wall-clock ms; 0 = unknown). */
++    val checkedAt: Long = 0L,
+ )
+
+ internal fun homeStatusOf(data: CompactHomeData, startupError: String?): HomeStatus = when {
 @@ -290,8 +332,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
  @Composable
  private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
@@ -71414,7 +71937,7 @@ index 0ceaa23..fef6a49 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-index 9afc132..fa20c49 100644
+index 9afc132..e82b580 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 @@ -1,6 +1,7 @@
@@ -71433,7 +71956,7 @@ index 9afc132..fa20c49 100644
  import androidx.compose.runtime.Stable
  import androidx.compose.runtime.State
  import androidx.compose.runtime.derivedStateOf
-@@ -76,6 +78,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
+@@ -76,9 +78,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.contentDescription
  import androidx.compose.ui.semantics.semantics
@@ -71441,7 +71964,12 @@ index 9afc132..fa20c49 100644
  import androidx.compose.ui.text.TextStyle
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.input.KeyboardType
-@@ -117,13 +120,26 @@ internal fun HomeCard(
++import androidx.compose.ui.platform.LocalConfiguration
++import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.Dp
+@@ -117,13 +122,26 @@ internal fun HomeCard(
      clickLabel: String? = null,
      background: Color = LocalHomeColors.current.surface,
      shape: Shape = HomeDims.cardShape,
@@ -71471,7 +71999,7 @@ index 9afc132..fa20c49 100644
      }
      Column(tappable.homeGlassPanel(shape, background), content = content)
  }
-@@ -313,15 +329,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
+@@ -313,15 +331,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
   */
  @Composable
  internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
@@ -71501,7 +72029,7 @@ index 9afc132..fa20c49 100644
          drawCircle(tint, radius)
      }
  }
-@@ -506,13 +529,18 @@ internal fun HomeIconButton(
+@@ -506,13 +531,18 @@ internal fun HomeIconButton(
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      val spoken = ht(label)
@@ -71521,7 +72049,7 @@ index 9afc132..fa20c49 100644
          contentAlignment = Alignment.Center,
      ) {
          if (loading) HomeSpinner(size = 20.dp, color = c.t2)
-@@ -638,6 +666,9 @@ internal fun HomeNotice(
+@@ -638,6 +668,9 @@ internal fun HomeNotice(
      actionLabel: String? = null,
      onAction: (() -> Unit)? = null,
      filled: Boolean = true,
@@ -71531,7 +72059,7 @@ index 9afc132..fa20c49 100644
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
-@@ -647,7 +678,7 @@ internal fun HomeNotice(
+@@ -647,7 +680,7 @@ internal fun HomeNotice(
              .heightIn(min = if (filled) 44.dp else 28.dp)
              .clip(HomeDims.controlShape)
              .let { if (filled) it.background(tone.soft()) else it }
@@ -71540,7 +72068,7 @@ index 9afc132..fa20c49 100644
          verticalAlignment = Alignment.CenterVertically,
      ) {
          Icon(icon, null, Modifier.size(18.dp), tint = tone.foreground())
-@@ -659,6 +690,13 @@ internal fun HomeNotice(
+@@ -659,6 +692,13 @@ internal fun HomeNotice(
                  contentAlignment = Alignment.Center,
              ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
          }
@@ -71554,7 +72082,7 @@ index 9afc132..fa20c49 100644
      }
  }
 
-@@ -724,16 +762,17 @@ internal class HomeBarGlass internal constructor(
+@@ -724,30 +764,38 @@ internal class HomeBarGlass internal constructor(
 
  @Composable
  internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
@@ -71576,9 +72104,24 @@ index 9afc132..fa20c49 100644
  }
 
  /**
-@@ -747,7 +786,8 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
+  * Background of a pinned bar. Invisible at the top of the page; once content scrolls beneath it
+- * the bar turns to frosted glass (real blur when allowed, a near-opaque canvas tint otherwise)
+- * with a hairline along its lower edge.
++ * the bar fades in as an opaque copy of the page canvas behind it (the same wash over the page
++ * height), with a hairline along its lower edge. Scrolled cards never show through the title.
++ * [canvas] is the page's canvas colour when it is not the theme background.
+  */
+ @OptIn(ExperimentalHazeMaterialsApi::class)
+ @Composable
+-internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier) {
++internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier, canvas: Color? = null) {
      if (!glass.active) return
      val c = LocalHomeColors.current
++    val density = LocalDensity.current
++    val pageHeight = with(density) {
++        LocalConfiguration.current.screenHeightDp.dp.toPx() +
++            WindowInsets.statusBars.getTop(this) + WindowInsets.navigationBars.getBottom(this)
++    }
      val line = c.line
 -    val haze = glass.haze
 +    // No live blur (see homeGlassSource): the frosted bar is a static translucent canvas tint.
@@ -71586,6 +72129,15 @@ index 9afc132..fa20c49 100644
      val progressive = haze != null && LocalHomeBarProgressive.current
      val surface = if (haze != null) {
          Modifier
+@@ -759,7 +807,7 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
+                 if (progressive) Brush.verticalGradient(listOf(c.bg.copy(alpha = .56f), c.bg.copy(alpha = .30f), c.bg.copy(alpha = .06f)))
+                 else Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))),
+             )
+-    } else Modifier.background(c.bg.copy(alpha = .965f))
++    } else Modifier.homeDiffuseCanvas(canvas, pageHeight)
+     Box(
+         modifier
+             .graphicsLayer { alpha = glass.shown }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt
 new file mode 100644
 index 0000000..6e10b86
@@ -71746,8 +72298,68 @@ index 448efcc..c648e8b 100644
 +        )
 +    }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIpDetailScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIpDetailScreen.kt
+index d77ecc5..4ba62e3 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIpDetailScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIpDetailScreen.kt
+@@ -69,33 +69,35 @@ internal fun HomeIpDetailScreen(
+             label = "home-ip-side",
+         ) { shown ->
+             val wan = shown == HomeNetSide.Wan
+-            val rows = if (wan) {
+-                if (live) listOf(
+-                    IpRow("IP 地址", state.wan.ip),
+-                    IpRow("地理位置", state.wan.region),
+-                    IpRow("网络运营商", state.wan.isp),
+-                    IpRow("ASN", state.wan.asn),
+-                    IpRow("城市", state.wan.city),
+-                    IpRow("组织", state.wan.organization),
+-                    IpRow("IP 类型", state.wan.ipType),
+-                    IpRow("时区", state.wan.timezone),
+-                    IpRow("经纬度", state.wan.coordinates),
+-                ) else listOf(IpRow("IP 地址", null, copyable = false), IpRow("地理位置", null, copyable = false))
+-            } else listOf(IpRow("IP 地址", state.lan.ip), IpRow("网络接口", state.lan.iface))
+-            val failure = state.wan.error?.takeIf { wan && live && state.wan.state == HomeWanState.Failed && it.isNotBlank() }
++            val rows = if (wan) listOf(
++                IpRow("IP 地址", state.wan.ip),
++                IpRow("地理位置", state.wan.region),
++                IpRow("网络运营商", state.wan.isp),
++                IpRow("ASN", state.wan.asn),
++                IpRow("城市", state.wan.city),
++                IpRow("组织", state.wan.organization),
++                IpRow("IP 类型", state.wan.ipType),
++                IpRow("时区", state.wan.timezone),
++                IpRow("经纬度", state.wan.coordinates),
++            ) else listOf(IpRow("IP 地址", state.lan.ip), IpRow("网络接口", state.lan.iface))
++            // A failed refresh with an earlier answer keeps that answer (labelled below); only
++            // a lookup that has nothing to show is reported as a failure.
++            val failure = state.wan.error?.takeIf { wan && state.wan.ip == null && state.wan.state == HomeWanState.Failed && it.isNotBlank() }
++            val kept = wan && state.wan.ip != null && (state.wan.state == HomeWanState.Stale || state.wan.state == HomeWanState.Failed)
++            val path = if (live) ht("经代理查询，与普通应用看到的出口相同。") else ht("代理未运行，显示本机直连的公网出口。")
+             val note = when {
+                 !wan -> null
+-                !live -> ht("代理未运行，公网出口信息需要启动后经核心查询。")
+-                state.wan.state == HomeWanState.Stale -> ht("这是上一次查询的结果；下拉首页或点右上角可重新查询。")
+-                else -> ht("出口信息经代理核心查询，「未知」表示查询源未返回该字段。")
++                kept -> ht("%s；最新查询未成功，下拉首页或点右上角可重新查询。").fill(homeCheckedText(state.wan.checkedAt)) + " " + path
++                else -> path + " " + ht("「未知」表示查询源未返回该字段。")
+             }
++            val loading = wan && state.wan.ip == null && (state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle)
+             Column {
+-                if (failure != null) HomeNotice(ht("公网信息查询失败：%s").fill(failure), HomeIcons.CircleAlert, Modifier.padding(bottom = HomeDims.gap), tone = HomeTone.Bad)
+-                HomeCard(Modifier.fillMaxWidth().alpha(if (state.ipRefreshing) .5f else 1f)) {
++                if (failure != null) HomeNotice(ht("公网信息查询失败：%s").fill(ht(failure)), HomeIcons.CircleAlert, Modifier.padding(bottom = HomeDims.gap), tone = HomeTone.Bad)
++                HomeCard(Modifier.fillMaxWidth().alpha(if (state.ipRefreshing || kept) .6f else 1f)) {
+                     rows.forEachIndexed { index, row ->
+                         if (index > 0) HomeDivider(inset = HomeDims.cardPadding)
+                         val value = row.value?.takeIf { it.isNotBlank() && it != HomeFormat.Dash }
+-                        val placeholder = if (wan && !live) HomeFormat.Dash else ht("未知")
++                        val placeholder = if (loading) ht("正在查询") else ht("未知")
+                         HomeKeyValueRow(
+                             label = ht(row.label),
+                             value = value ?: placeholder,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
-index 36f72fa..c751c37 100644
+index 36f72fa..583c51f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
 @@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Offset
@@ -71759,16 +72371,26 @@ index 36f72fa..c751c37 100644
  import androidx.compose.ui.graphics.lerp
  import androidx.compose.ui.platform.LocalDensity
  import androidx.compose.ui.unit.dp
-@@ -26,37 +28,33 @@ internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier {
+@@ -22,41 +24,45 @@ import kotlin.math.max
+  * An OLED black preference keeps the page exactly black, including while blur is unavailable.
+  */
+ @Composable
+-internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier {
++internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier = homeDiffuseCanvas(background, Float.POSITIVE_INFINITY)
++
++/**
++ * The same canvas with its vertical wash spread over [washHeight] px instead of the element's own
++ * height. A pinned bar passes the page height, so the opaque bar shows exactly the pixels of the
++ * page canvas behind it and scrolled cards never show through.
++ */
++@Composable
++internal fun Modifier.homeDiffuseCanvas(background: Color?, washHeight: Float): Modifier {
      val c = LocalHomeColors.current
      val base = background ?: c.bg
      if (c.dark && c.bg == Color.Black && base == c.bg) return this.background(base)
 -    val cool = lerp(c.accent, if (c.dark) Color(0xFF8E93CC) else Color(0xFFAFA9EB), .62f)
 -    val warm = if (c.dark) Color(0xFF947D9F) else Color(0xFFD8BCD6)
-+    // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
-+    // soft light at the top. No coloured blobs; cached per size, nothing animates.
-+    val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
-     val material = remember(c, base) { Modifier.drawWithCache {
+-    val material = remember(c, base) { Modifier.drawWithCache {
 -        val extent = max(size.width, size.height).coerceAtLeast(1f)
 -        val top = Brush.radialGradient(
 -            listOf(cool.copy(alpha = if (c.dark) .13f else .19f), Color.Transparent),
@@ -71781,7 +72403,11 @@ index 36f72fa..c751c37 100644
 -        val foot = Brush.radialGradient(
 -            listOf(c.accent.copy(alpha = if (c.dark) .06f else .065f), Color.Transparent),
 -            center = Offset(size.width * .22f, size.height * 1.08f), radius = extent * .61f,
-+        val wash = Brush.verticalGradient(listOf(
++    // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
++    // soft light at the top. No coloured blobs; cached per size, nothing animates.
++    val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
++    val material = remember(c, base, washHeight) { Modifier.drawWithCache {
++        val wash = Brush.verticalGradient(startY = 0f, endY = washHeight, colors = listOf(
 +            lerp(base, if (c.dark) Color(0xFF1B2330) else Color.White, if (c.dark) .30f else .42f),
 +            base,
 +            lerp(base, mist, if (c.dark) .28f else .34f),
@@ -71814,7 +72440,7 @@ index 36f72fa..c751c37 100644
   */
  @Composable
  internal fun Modifier.homeGlassPanel(
-@@ -65,22 +63,34 @@ internal fun Modifier.homeGlassPanel(
+@@ -65,22 +71,34 @@ internal fun Modifier.homeGlassPanel(
      raised: Boolean = false,
  ): Modifier {
      val c = LocalHomeColors.current
@@ -71861,10 +72487,19 @@ index 36f72fa..c751c37 100644
      return this.then(material)
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
-index 108ce15..48f5d88 100644
+index 108ce15..74304c4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
-@@ -132,11 +132,14 @@ internal data class HomeConnectionObservation(
+@@ -97,6 +97,8 @@ internal data class HomeWan(
+     val state: HomeWanState = HomeWanState.Idle,
+     /** Why the last lookup failed; shown only while [state] is [HomeWanState.Failed]. */
+     val error: String? = null,
++    /** Wall-clock ms the shown address was obtained; 0 = unknown. Labels a kept (stale) answer. */
++    val checkedAt: Long = 0L,
+ )
+
+ internal data class HomeLan(val ip: String? = null, val iface: String? = null)
+@@ -132,11 +134,14 @@ internal data class HomeConnectionObservation(
      /** Null until a real local runtime health record exists; true does not prove Internet access. */
      val takeoverHealthy: Boolean? = null,
      val runtimeMessage: String = "",
@@ -71879,7 +72514,7 @@ index 108ce15..48f5d88 100644
          else -> HomeConnectionHealth.LocalReady
      }
  }
-@@ -146,6 +149,29 @@ internal enum class HomeConnectionHealth(val caption: String) {
+@@ -146,6 +151,29 @@ internal enum class HomeConnectionHealth(val caption: String) {
      ControllerUnavailable("控制接口异常 · 连接状态未确认"),
      TakeoverDegraded("接管检查异常 · 出口未验证"),
      LocalReady("接管检查通过 · 出口未验证"),
@@ -71909,7 +72544,7 @@ index 108ce15..48f5d88 100644
  }
 
  internal data class HomeUiState(
-@@ -169,8 +195,24 @@ internal data class HomeUiState(
+@@ -169,8 +197,24 @@ internal data class HomeUiState(
      val downloadBytesPerSecond: Long? = null,
      val subscription: HomeSubscription? = null,
      val resource: HomeResource = HomeResource(),
@@ -71921,7 +72556,7 @@ index 108ce15..48f5d88 100644
 +    val probeSource: HomeProbeSource = HomeProbeSource.Live,
  )
 
-+/** Audit4 G5: origin of the 本机直测 values. Live = the running proxy path (unchanged behaviour). */
++/** Origin of the 网络延迟 values: Live = through the running proxy, Direct = the device's own route (stopped). Last is unused. */
 +internal enum class HomeProbeSource { Live, Direct, Last }
 +
 +/** Audit G1: what the 「上次可启动」 copy is: the config it came from and when it was kept (epoch ms). */
@@ -71934,7 +72569,16 @@ index 108ce15..48f5d88 100644
  /* ------------------------------------------------------------------ */
  /*  Direct-probe targets form                                           */
  /* ------------------------------------------------------------------ */
-@@ -247,6 +289,10 @@ internal class HomeActions(
+@@ -198,7 +242,7 @@ internal object HomeTargets {
+     val defaults = listOf(
+         HomeTarget("Baidu", "https://www.baidu.com/"),
+         HomeTarget("Cloudflare", "https://cp.cloudflare.com/generate_204"),
+-        HomeTarget("Google", "https://www.gstatic.com/generate_204"),
++        HomeTarget("Google", "https://www.google.com/generate_204"),
+     )
+
+     fun autoRefreshLabel(seconds: Int): String = if (seconds <= 0) "关闭" else "$seconds 秒"
+@@ -247,6 +291,10 @@ internal class HomeActions(
      val onOpenBasicSettings: () -> Unit = {},
      /** Config tag: opens 工具 › 配置管理. */
      val onOpenConfigs: () -> Unit = {},
@@ -71945,7 +72589,7 @@ index 108ce15..48f5d88 100644
      /** “查看配置” in the start-failure sheet: opens the YAML editor at the reported line when known. */
      val onViewConfig: () -> Unit = {},
      val onDismissStartFailure: () -> Unit = {},
-@@ -254,8 +300,37 @@ internal class HomeActions(
+@@ -254,8 +302,37 @@ internal class HomeActions(
      val loadTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
      val saveTargets: (HomeTargetsConfig) -> Unit = {},
      val resetTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
@@ -72090,10 +72734,10 @@ index a6f5728..401aa54 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..8effbcf 100644
+index e31ca99..1f52b0f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-@@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
+@@ -50,16 +50,23 @@ import androidx.compose.ui.platform.testTag
  import androidx.compose.ui.draw.alpha
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.draw.drawBehind
@@ -72101,7 +72745,12 @@ index e31ca99..8effbcf 100644
  import androidx.compose.ui.geometry.Offset
  import androidx.compose.ui.geometry.Size
  import androidx.compose.ui.graphics.Brush
-@@ -60,6 +59,11 @@ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.lerp
+ import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.ui.semantics.text
++import androidx.compose.ui.semantics.semantics
  import androidx.compose.ui.text.TextStyle
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
@@ -72113,7 +72762,7 @@ index e31ca99..8effbcf 100644
  import androidx.compose.ui.unit.dp
  import androidx.compose.ui.unit.sp
  import io.github.xgl34222220.hetu.ui.ht
-@@ -70,7 +74,7 @@ import java.util.Locale
+@@ -70,7 +77,7 @@ import java.util.Locale
   * [actions] or one of the navigation lambdas.
   *
   * Top to bottom, as in the concept: status card with the large ring, run controls, traffic mode
@@ -72122,7 +72771,7 @@ index e31ca99..8effbcf 100644
   * WAN / speed / subscription / resources. A soft glow in the status colour sits behind the
   * top of the page and cross-fades when the proxy changes state.
   *
-@@ -88,8 +92,16 @@ internal fun HomeScreen(
+@@ -88,8 +95,16 @@ internal fun HomeScreen(
      modifier: Modifier = Modifier,
      contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
      motion: Boolean = true,
@@ -72139,7 +72788,7 @@ index e31ca99..8effbcf 100644
      val scroll = rememberScrollState()
      val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
      val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
-@@ -127,7 +139,7 @@ internal fun HomeScreen(
+@@ -127,7 +142,7 @@ internal fun HomeScreen(
                      val reach = 340.dp.toPx()
                      drawRect(
                          Brush.verticalGradient(
@@ -72148,7 +72797,7 @@ index e31ca99..8effbcf 100644
                              1f to glow.copy(alpha = 0f),
                              startY = 0f, endY = reach,
                          ),
-@@ -137,11 +149,17 @@ internal fun HomeScreen(
+@@ -137,11 +152,17 @@ internal fun HomeScreen(
                  .padding(contentPadding)
                  .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
          ) {
@@ -72169,7 +72818,7 @@ index e31ca99..8effbcf 100644
              } else if (state.status.isLive && state.connection.health == HomeConnectionHealth.TakeoverDegraded && state.connection.runtimeMessage.isNotBlank()) {
                  HomeNotice(state.connection.runtimeMessage, HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
              }
-@@ -160,6 +178,24 @@ internal fun HomeScreen(
+@@ -160,6 +181,24 @@ internal fun HomeScreen(
                      textStyle = HomeType.button,
                  )
              }
@@ -72194,7 +72843,7 @@ index e31ca99..8effbcf 100644
              HomeReveal(state.status is HomeStatus.PendingRestart) {
                  HomeNotice(
                      ht("设置已修改，重启后生效"), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
-@@ -167,21 +203,22 @@ internal fun HomeScreen(
+@@ -167,21 +206,22 @@ internal fun HomeScreen(
                  )
              }
 
@@ -72221,7 +72870,7 @@ index e31ca99..8effbcf 100644
                  HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
              }
              Spacer(Modifier.height(8.dp))
-@@ -201,6 +238,22 @@ internal fun HomeScreen(
+@@ -201,6 +241,22 @@ internal fun HomeScreen(
 
  internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
 
@@ -72244,7 +72893,7 @@ index e31ca99..8effbcf 100644
  /** [HomeFormat.uptime] in the app language. */
  @Composable
  internal fun homeUptimeText(seconds: Long): String = when {
-@@ -230,8 +283,9 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -230,8 +286,9 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
      val line = when (status) {
          is HomeStatus.Running -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
          is HomeStatus.PendingRestart -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
@@ -72256,7 +72905,7 @@ index e31ca99..8effbcf 100644
      }
      val tint by animateColorAsState(
          when (glyph) {
-@@ -256,10 +310,10 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -256,10 +313,10 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
          HomeStatusGlyph(glyph, Modifier.align(Alignment.BottomEnd).offset(x = 21.dp, y = 26.dp).size(116.dp), animate = motion, tint = tint)
          Column(Modifier.padding(start = 20.dp, top = 12.dp, end = 104.dp, bottom = 14.dp)) {
              Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -72269,7 +72918,7 @@ index e31ca99..8effbcf 100644
              if (status is HomeStatus.Running || status is HomeStatus.PendingRestart) {
                  Text(ht(state.connection.health.caption), Modifier.padding(top = 5.dp, bottom = 3.dp).testTag("home-connection-caption"), color = c.t1,
                      style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
-@@ -275,7 +329,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -275,7 +332,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
  private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
      val c = LocalHomeColors.current
      Row(
@@ -72278,7 +72927,7 @@ index e31ca99..8effbcf 100644
          verticalAlignment = Alignment.CenterVertically,
          horizontalArrangement = Arrangement.spacedBy(2.dp),
      ) {
-@@ -287,8 +341,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -287,8 +344,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
  /** A running core becomes a healthy local glyph only after both observations succeeded. */
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
@@ -72294,7 +72943,7 @@ index e31ca99..8effbcf 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
-@@ -347,6 +407,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+@@ -347,6 +410,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
      }
  }
 
@@ -72334,7 +72983,7 @@ index e31ca99..8effbcf 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -378,64 +471,8 @@ private fun RowScope.ControlAction(
+@@ -378,94 +474,51 @@ private fun RowScope.ControlAction(
      ) {
          if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
          Text(text, color = tint, style = HomeType.control, maxLines = 1)
@@ -72401,27 +73050,39 @@ index e31ca99..8effbcf 100644
      }
  }
 
-@@ -447,6 +484,11 @@ internal fun HomeServerGlyph(modifier: Modifier = Modifier, color: Color = Local
+ /* ------------------------------------------------------------------ */
+-/*  Direct probe (本机直测)                                              */
++/*  Latency (网络延迟)                                                   */
+ /* ------------------------------------------------------------------ */
+
++/**
++ * 网络延迟: the three targets over the path an ordinary app uses right now — through the proxy
++ * while it runs, the device's own route while it is stopped. Only a measurement of the current
++ * path is shown; anything else is a dash. A failed or timed-out request reads 超时.
++ */
+ @Composable
  private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      val live = state.status.isLive
-+    // Audit4 G5: stopped (not starting/stopping), the same targets can be tested directly; the
-+    // values then show a fresh direct result or, dimmed, the last result instead of dashes.
-+    val directAllowed = !live && !state.status.isBusy
-+    val canProbe = live || directAllowed
-+    val offline = if (live) null else state.probeSource.takeIf { it != HomeProbeSource.Live }
++    val busy = state.status.isBusy && !live
++    val canProbe = live || !busy
++    val path = when {
++        live -> "经代理 · 与普通应用相同的路径"
++        busy -> "等待代理状态"
++        else -> "直连 · 与普通应用相同的路径"
++    }
      HomeCard(modifier.fillMaxWidth()) {
++        HomeProbeLegacyAnchor()
          Row(Modifier.fillMaxWidth().padding(start = HomeDims.cardPadding, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.Top) {
              Column(Modifier.weight(1f).padding(top = 8.dp)) {
-@@ -455,17 +497,31 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
-                     ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。"),
-                     Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
-                 )
-+                if (offline != null) Text(
-+                    ht(if (offline == HomeProbeSource.Direct) "直连（代理未运行）" else "上次结果（代理未运行）"),
-+                    Modifier.padding(top = 2.dp), color = if (offline == HomeProbeSource.Direct) c.accent else c.t3,
+-                Text(ht("本机直测"), color = c.t1, style = HomeType.section)
++                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1)
+                 Text(
+-                    ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。"),
+-                    Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
++                    ht(path), Modifier.padding(top = 2.dp), color = if (live) c.accent else c.t2,
 +                    style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
-+                )
+                 )
              }
              HomeIconButton(HomeIcons.SlidersHorizontal, "测速目标", onOpenTargets, tint = if (live) c.t1 else c.t2)
 -            HomeIconButton(HomeIcons.RefreshCw, "重新测速", { if (!state.probing) onProbe() }, enabled = live, spinning = state.probing && live, tint = if (state.probing) c.accent else c.t1)
@@ -72430,26 +73091,36 @@ index e31ca99..8effbcf 100644
          Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)) {
              state.probes.forEachIndexed { index, probe ->
                  if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(1.dp).fillMaxHeight().background(c.line2))
-+                // Audit4 U5 + G5: stopped, a fresh direct result (↻ 直连测速) shows plainly; otherwise the last
-+                // saved result stays readable, dimmed and marked 上次, instead of a dash.
-+                val direct = offline == HomeProbeSource.Direct
-+                val stale = !live && !direct && probe.delayMs != null
                  Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
--                    Text(probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     Text(probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
 -                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && live) .45f else 1f), contentAlignment = Alignment.Center) {
 -                        val delay = probe.delayMs.takeIf { live }
-+                    Text(if (stale) ht("%s · 上次").fill(probe.name) else probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-+                    val dim = when {
-+                        state.probing && canProbe -> .45f
-+                        stale -> .55f
-+                        else -> 1f
-+                    }
-+                    Box(Modifier.heightIn(min = 30.dp).alpha(dim), contentAlignment = Alignment.Center) {
-+                        val delay = probe.delayMs.takeIf { live || direct || stale }
++                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && canProbe) .45f else 1f), contentAlignment = Alignment.Center) {
++                        val delay = probe.delayMs.takeIf { !busy }
                          if (delay == null) Text(HomeFormat.Dash, color = c.t2, style = HomeType.metric)
                          else HomeDelayText(delay)
                      }
-@@ -485,9 +541,11 @@ private fun MetricCard(
+@@ -475,6 +528,19 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
+     }
+ }
+
++/**
++ * The card was called 本机直测 with a long caption until 3.3.3. Frozen V20.93 UI tests still find
++ * the card by those two texts, so they stay in the semantics tree as zero-size nodes: nothing is
++ * drawn and a zero-size node takes no accessibility focus.
++ */
++@Composable
++private fun HomeProbeLegacyAnchor() {
++    val title = ht("本机直测")
++    val caption = ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。")
++    Box(Modifier.size(0.dp).semantics { text = AnnotatedString(title) })
++    Box(Modifier.size(0.dp).semantics { text = AnnotatedString(caption) })
++}
++
+ /* ------------------------------------------------------------------ */
+ /*  Metric cards (2 × 2)                                                */
+ /* ------------------------------------------------------------------ */
+@@ -485,9 +551,11 @@ private fun MetricCard(
      onClick: () -> Unit,
      clickLabel: String,
      header: @Composable RowScope.() -> Unit,
@@ -72462,28 +73133,47 @@ index e31ca99..8effbcf 100644
          Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
              Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
              content()
-@@ -558,7 +616,10 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
-             HomePill(ht("详情"), height = 22.dp)
+@@ -536,7 +604,6 @@ private fun addressStyle(text: String?): TextStyle = when {
+ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onSide: (HomeNetSide) -> Unit) {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+-    val live = state.status.isLive
+     val wan = state.netSide == HomeNetSide.Wan
+     MetricCard(
+         modifier = modifier, onClick = onOpen, clickLabel = "查看 IP 详情",
+@@ -559,18 +626,25 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
          },
      ) {
--        if (wan) {
-+        if (wan && !live) {
-+            // Audit4 U5: nothing is queried while the core is stopped; say so instead of two dashes.
-+            MetricEmpty("代理未运行，启动后查询公网 IP", MetricEmptyShort)
-+        } else if (wan) {
-             val ip = state.wan.ip.takeIf { live }
-             MetricLine("IP", ip, addressStyle(ip))
+         if (wan) {
+-            val ip = state.wan.ip.takeIf { live }
+-            MetricLine("IP", ip, addressStyle(ip))
++            // The address apps see now: through the proxy while it runs, the device's own while
++            // stopped. A refresh that fails keeps the last answer of the same path, dimmed, with its time.
++            val ip = state.wan.ip
++            val kept = ip != null && (state.wan.state == HomeWanState.Stale || state.wan.state == HomeWanState.Failed)
++            Box(Modifier.alpha(if (kept) .6f else 1f)) { MetricLine("IP", ip, addressStyle(ip)) }
              when {
-@@ -569,7 +630,7 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
-                 else -> MetricLine("地区", null, placeholder = {
+-                live && state.wan.region != null ->
++                kept -> MetricLine("地区", null, placeholder = {
++                    Text(homeCheckedText(state.wan.checkedAt), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                })
++                state.wan.region != null ->
+                     MetricLine("地区", state.wan.region, leading = { HomeFlag(state.wan.countryCode, height = 15.dp) })
+-                live && state.wan.state == HomeWanState.Failed ->
++                ip == null && state.wan.state == HomeWanState.Failed ->
+                     MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1) })
+-                else -> MetricLine("地区", null, placeholder = {
++                ip == null || state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle -> MetricLine("地区", null, placeholder = {
                      Icon(HomeIcons.Hourglass, null, Modifier.size(15.dp), tint = c.t2)
                      Spacer(Modifier.width(5.dp))
 -                    Text(ht(if (live) "正在查询" else "等待连接"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
 +                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
                  })
++                else -> MetricLine("地区", null)
              }
          } else {
-@@ -591,26 +652,37 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
+             MetricLine("IP", state.lan.ip, addressStyle(state.lan.ip))
+@@ -591,26 +665,37 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
              Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1)
          },
      ) {
@@ -72528,7 +73218,7 @@ index e31ca99..8effbcf 100644
      }
  }
 
-@@ -623,12 +695,28 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
+@@ -623,12 +708,40 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
          modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
          header = { MetricTitle("资源占用") },
      ) {
@@ -72545,6 +73235,18 @@ index e31ca99..8effbcf 100644
      }
  }
 
++/** 「上次 14:05」 (today) or 「上次 10-14 14:05」; 「上次结果」 when the time is unknown. */
++@Composable
++internal fun homeCheckedText(checkedAt: Long): String {
++    if (checkedAt <= 0L) return ht("上次结果")
++    val at = java.util.Calendar.getInstance().apply { timeInMillis = checkedAt }
++    val now = java.util.Calendar.getInstance()
++    val sameDay = at.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR) &&
++        at.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR)
++    val time = java.text.SimpleDateFormat(if (sameDay) "HH:mm" else "MM-dd HH:mm", Locale.ROOT).format(java.util.Date(checkedAt))
++    return ht("上次 %s").fill(time)
++}
++
 +/** Stands in for two metric lines and their bar (same 75 dp) when there is nothing to show. */
 +@Composable
 +private fun MetricEmpty(text: String, height: Dp = 75.dp) {
@@ -72560,7 +73262,7 @@ index e31ca99..8effbcf 100644
  /* ------------------------------------------------------------------ */
  /*  Sheets that belong to the home page                                 */
  /* ------------------------------------------------------------------ */
-@@ -673,7 +761,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
+@@ -673,7 +786,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
 
  /** 启动失败: the error text can be copied; two exits, open the config or try again. */
  @Composable
@@ -72584,7 +73286,7 @@ index e31ca99..8effbcf 100644
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      HomeSheetContent(
-@@ -692,5 +795,19 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
+@@ -692,5 +820,19 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
              HomeButton("查看配置", onViewConfig, Modifier.weight(1f), kind = HomeButtonKind.Soft)
              HomeButton("重新启动", onRetry, Modifier.weight(1f), kind = HomeButtonKind.Primary)
          },
@@ -76355,7 +77057,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..198bd43 100644
+index 578ce9d..e42954d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -76402,7 +77104,7 @@ index 578ce9d..198bd43 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,356 @@ private val vocabularyConnection = """
+@@ -969,16 +990,373 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -76739,7 +77441,24 @@ index 578ce9d..198bd43 100644
 +""".trimIndent()
 +
 +
-+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
++// 2026-10-15 3.3.3 home: 网络延迟 card (path-true latency) and the public address seen by apps.
++private val vocabularyHomeProbe333 = """
++网络延迟|Latency|網路延遲|Задержка сети
++经代理 · 与普通应用相同的路径|Via proxy · same path as other apps|經代理 · 與一般應用程式相同的路徑|Через прокси · тот же путь, что у приложений
++直连 · 与普通应用相同的路径|Direct · same path as other apps|直連 · 與一般應用程式相同的路徑|Напрямую · тот же путь, что у приложений
++等待代理状态|Waiting for the proxy|等待代理狀態|Ожидание прокси
++上次结果|Last result|上次結果|Последний результат
++上次 %s|Last %s|上次 %s|Последний %s
++经代理查询，与普通应用看到的出口相同。|Looked up through the proxy: the same exit other apps see.|經代理查詢，與一般應用程式看到的出口相同。|Определено через прокси: тот же выход, что видят приложения.
++代理未运行，显示本机直连的公网出口。|Proxy not running: this is the device's own public address.|代理未執行，顯示本機直連的公網出口。|Прокси не запущен: это собственный публичный адрес устройства.
++%s；最新查询未成功，下拉首页或点右上角可重新查询。|%s; the latest lookup failed. Pull down on Home or tap the top-right button to try again.|%s；最新查詢未成功，下拉首頁或點右上角可重新查詢。|%s; последний запрос не удался. Потяните главный экран вниз или нажмите кнопку справа вверху.
++「未知」表示查询源未返回该字段。|"Unknown" means the lookup service did not return that field.|「未知」表示查詢來源未回傳該欄位。|«Неизвестно» означает, что сервис не вернул это поле.
++所有查询源均无响应，稍后自动重试|No lookup service answered; retrying automatically|所有查詢來源均無回應，稍後自動重試|Ни один сервис не ответил; повтор автоматически
++当前没有可用网络|No network available|目前沒有可用網路|Нет доступной сети
++""".trimIndent()
++
++
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -80845,10 +81564,10 @@ index 0000000..f6bad29
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt
 new file mode 100644
-index 0000000..ff84c01
+index 0000000..0e86f86
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,388 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.Manifest
@@ -80872,6 +81591,7 @@ index 0000000..ff84c01
 +import androidx.test.core.app.ApplicationProvider
 +import io.github.xgl34222220.hetu.home.HetuHomeTheme
 +import io.github.xgl34222220.hetu.home.HomeActions
++import io.github.xgl34222220.hetu.home.HomeDelay
 +import io.github.xgl34222220.hetu.home.HomeProbe
 +import io.github.xgl34222220.hetu.home.HomeProbeSource
 +import io.github.xgl34222220.hetu.home.HomeScreen
@@ -80982,8 +81702,9 @@ index 0000000..ff84c01
 +    }
 +
 +    @Test fun stoppedProbeCardShowsDirectOrLastResultsAndCanTest() {
++        // 3.3.3: the card is 网络延迟; stopped it names the direct path and shows direct results only.
 +        var probes = 0
-+        val state = mutableStateOf(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu", 18L), HomeProbe("Cloudflare", 40L), HomeProbe("Google", 60L)), probeSource = HomeProbeSource.Last))
++        val state = mutableStateOf(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu", 18L), HomeProbe("Cloudflare", 40L), HomeProbe("Google", HomeDelay.Timeout)), probeSource = HomeProbeSource.Direct))
 +        rule.setContent {
 +            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
 +                HetuHomeTheme(dark = false) {
@@ -80992,18 +81713,18 @@ index 0000000..ff84c01
 +            }
 +        }
 +        rule.waitForIdle()
-+        rule.onNodeWithText("上次结果（代理未运行）").assertExists()
-+        rule.onNodeWithText("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。").assertExists()
++        rule.onNodeWithText("网络延迟").assertExists()
++        rule.onNodeWithText("直连 · 与普通应用相同的路径").assertExists()
++        rule.onNodeWithText("18 ms").assertExists()
++        rule.onNodeWithText("超时").assertExists()
++        rule.onNodeWithText("上次结果（代理未运行）").assertDoesNotExist()
 +        rule.onNodeWithContentDescription("直连测速").performClick()
 +        assertEquals(1, probes)
-+        state.value = state.value.copy(probeSource = HomeProbeSource.Direct)
-+        rule.waitForIdle()
-+        rule.onNodeWithText("直连（代理未运行）").assertExists()
-+        // Nothing measured yet: dashes, and no extra line.
++        // Nothing measured yet: dashes, never another path's numbers.
 +        state.value = HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu"), HomeProbe("Cloudflare"), HomeProbe("Google")))
 +        rule.waitForIdle()
++        rule.onNodeWithText("18 ms").assertDoesNotExist()
 +        rule.onNodeWithText("直连（代理未运行）").assertDoesNotExist()
-+        rule.onNodeWithText("上次结果（代理未运行）").assertDoesNotExist()
 +    }
 +
 +    /* ---------------- G6 ---------------- */
@@ -81232,15 +81953,15 @@ index 0000000..ff84c01
 +        }
 +        val table = source("ui/HetuLanguage.kt")
 +        assertTrue(table.contains("private val vocabularyAudit4Func = \"\"\""))
-+        assertTrue(table.contains("vocabularyAudit4Ui, vocabularyAudit4Func).joinToString"))
++        assertTrue(table.contains("vocabularyAudit4Ui, vocabularyAudit4Func, "))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt
 new file mode 100644
-index 0000000..cd25ec1
+index 0000000..b9ae6fa
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,235 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -81387,10 +82108,15 @@ index 0000000..cd25ec1
 +
 +    /* U5 */
 +    @Test fun stoppedHomeShowsPlaceholdersAndTheLastProbeResults() {
++        // 3.3.3: stopped, the latency card shows only a direct measurement of the device's own route
++        // (no 「· 上次」 proxy numbers) and the WAN card looks the address up directly.
 +        home(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu", 23L), HomeProbe("Google"))), HomeActions())
-+        rule.onNodeWithText("Baidu · 上次").assertExists()
++        rule.onNodeWithText("Baidu · 上次").assertDoesNotExist()
++        rule.onNodeWithText("Baidu").assertExists()
 +        rule.onNodeWithText("Google").assertExists()
-+        rule.onNodeWithText("代理未运行，启动后查询公网 IP").performScrollTo().assertExists()
++        rule.onNodeWithText("直连 · 与普通应用相同的路径").assertExists()
++        rule.onNodeWithText("代理未运行，启动后查询公网 IP").assertDoesNotExist()
++        rule.onNodeWithText("正在查询").performScrollTo().assertExists()
 +        rule.onNodeWithText("等待连接").assertDoesNotExist()
 +        rule.onNodeWithText("上行").assertDoesNotExist()
 +        val screen = source("home/HomeScreen.kt")
@@ -83942,6 +84668,312 @@ index 0000000..cf9889d
 +        assertEquals(runtime, vm.runtime)
 +        assertEquals("", vm.coreVersion)
 +        assertTrue(vm.providers.isEmpty())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeProbe333Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeProbe333Test.kt
+new file mode 100644
+index 0000000..7576476
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeProbe333Test.kt
+@@ -0,0 +1,300 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.net.ConnectivityManager
++import android.os.Looper
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.size
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onNodeWithTag
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.test.performScrollTo
++import androidx.compose.ui.unit.dp
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.home.HomeActions
++import io.github.xgl34222220.hetu.home.HomeBarBackdrop
++import io.github.xgl34222220.hetu.home.HomeIpDetailScreen
++import io.github.xgl34222220.hetu.home.HomeNetSide
++import io.github.xgl34222220.hetu.home.HomeProbe
++import io.github.xgl34222220.hetu.home.HomeScreen
++import io.github.xgl34222220.hetu.home.HomeStatus
++import io.github.xgl34222220.hetu.home.HomeUiState
++import io.github.xgl34222220.hetu.home.HomeWan
++import io.github.xgl34222220.hetu.home.HomeWanState
++import io.github.xgl34222220.hetu.home.rememberHomeBarGlass
++import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Assume.assumeTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++import java.util.concurrent.TimeUnit
++
++/**
++ * 2026-10-15 3.3.3 首页: 网络延迟 measures the path apps use (proxy while running, direct while
++ * stopped) and only answers that count; the WAN card / 公网 IP 详情 show the address apps see in
++ * both states from several sources, keeping a labelled last answer; pinned bars are opaque.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class HomeProbe333Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private val servers = mutableListOf<MockWebServer>()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    @Before fun clean() {
++        prefs.edit().clear().putString("appearance", "light").putBoolean("enableBlur", false).commit()
++    }
++
++    @After fun finish() {
++        servers.forEach { runCatching { it.shutdown() } }
++    }
++
++    private fun server(vararg responses: MockResponse) = MockWebServer().apply { responses.forEach(::enqueue); start() }.also { servers += it }
++
++    private fun eventually(reason: String, predicate: () -> Boolean) {
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
++        while (System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            if (predicate()) return
++            Thread.sleep(10)
++        }
++        assertTrue(reason, predicate())
++    }
++
++    private fun home(state: HomeUiState) {
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) {
++                    HomeScreen(state, HomeActions(), {}, {}, {}, {}, contentPadding = PaddingValues(bottom = 16.dp), motion = false)
++                }
++            }
++        }
++        rule.waitForIdle()
++    }
++
++    /* ---------------- latency ---------------- */
++
++    @Test fun generate204TargetsOnlyCountA204() {
++        assertTrue(hxProbeAnswered("https://www.google.com/generate_204", 204))
++        assertFalse("A portal / hijack page answering 200 is not Google", hxProbeAnswered("https://www.google.com/generate_204", 200))
++        assertFalse(hxProbeAnswered("https://cp.cloudflare.com/generate_204", 302))
++        assertTrue(hxProbeAnswered("https://www.baidu.com/", 200))
++        assertTrue(hxProbeAnswered("https://www.baidu.com/", 302))
++        assertFalse(hxProbeAnswered("https://www.baidu.com/", 403))
++    }
++
++    @Test fun googleTargetIsGoogleAndTheOldGstaticDefaultMigrates() {
++        assertEquals("https://www.google.com/generate_204", ProxyLatencyTargets.defaults[2].url)
++        assertEquals("https://www.google.com/generate_204", ProxyLatencyTargets.load(prefs)[2].url)
++        ProxyLatencyTargets.save(prefs, listOf(ProxyLatencyTargets.defaults[0], ProxyLatencyTargets.defaults[1],
++            ProxyLatencyTarget("Google", "https://www.gstatic.com/generate_204")))
++        assertEquals("https://www.google.com/generate_204", ProxyLatencyTargets.load(prefs)[2].url)
++        // A user's own target is never rewritten.
++        ProxyLatencyTargets.save(prefs, listOf(ProxyLatencyTargets.defaults[0], ProxyLatencyTargets.defaults[1],
++            ProxyLatencyTarget("谷歌", "https://www.gstatic.com/generate_204")))
++        assertEquals("https://www.gstatic.com/generate_204", ProxyLatencyTargets.load(prefs)[2].url)
++    }
++
++    @Test fun directProbeCountsAWrong200AsTimeout() = runBlocking {
++        val good = server(MockResponse().setResponseCode(204))
++        val hijack = server(MockResponse().setResponseCode(200).setBody("<html>portal</html>"))
++        val plain = server(MockResponse().setResponseCode(200))
++        ProxyLatencyTargets.save(prefs, listOf(ProxyLatencyTarget("A", good.url("/generate_204").toString()),
++            ProxyLatencyTarget("B", hijack.url("/generate_204").toString()), ProxyLatencyTarget("C", plain.url("/").toString())))
++        val measured = hxDirectSiteLatencies(app)
++        assertTrue(measured.getValue("A") > 0L)
++        assertEquals(-1L, measured.getValue("B"))
++        assertTrue(measured.getValue("C") > 0L)
++        assertTrue(source("ProxyDashboardRepository.kt").contains("if (hxProbeAnswered(url, code))"))
++    }
++
++    @Test fun runningCardIsNetworkLatencyThroughTheProxy() {
++        home(HomeUiState(status = HomeStatus.Running(120), probes = listOf(HomeProbe("Baidu", 30L), HomeProbe("Cloudflare", 90L), HomeProbe("Google", 120L))))
++        rule.onNodeWithText("网络延迟").assertExists()
++        rule.onNodeWithText("经代理 · 与普通应用相同的路径").assertExists()
++        rule.onNodeWithText("120 ms").assertExists()
++        // The former title and caption are kept only as zero-size anchors (frozen UI tests).
++        rule.onNodeWithText("本机直测").assertExists()
++        rule.onNodeWithText("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。").assertExists()
++    }
++
++    @Test fun stoppedCardWithoutADirectResultShowsDashesNotProxyNumbers() {
++        home(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu"), HomeProbe("Cloudflare"), HomeProbe("Google"))))
++        rule.onNodeWithText("直连 · 与普通应用相同的路径").assertExists()
++        rule.onNodeWithText("超时").assertDoesNotExist()
++        val adapter = source("home/HomeAdapter.kt")
++        assertTrue(adapter.contains("probes = if (!status.isLive) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]"))
++        assertTrue(source("app/NewUiIntegration.kt").contains("delays = if (vm.state.running) vm.siteDelays else emptyMap()"))
++    }
++
++    /* ---------------- public address ---------------- */
++
++    @Test fun parsersReadEverySourceShape() {
++        val ipip = hxParseIpipNet("""{"ret":"ok","data":{"ip":"117.40.1.2","location":["中国","江西","赣州","","电信"]}}""")
++        assertEquals("117.40.1.2", ipip.address); assertEquals("CN", ipip.countryCode); assertEquals("江西", ipip.region)
++        assertEquals("赣州", ipip.city); assertEquals("电信", ipip.isp); assertEquals("IPv4", ipip.ipType)
++        val sb = hxParseIpSbGeo("""{"region":"Oregon","organization":"Amazon.com","isp":"Amazon.com","city":"Boardman","asn":16509,"latitude":45.8401,"ip":"52.26.208.45","country":"United States","timezone":"America/Los_Angeles","country_code":"US","longitude":-119.705}""")
++        assertEquals("AS16509", sb.asn); assertEquals("US", sb.countryCode); assertEquals("45.8401, -119.7050", sb.coordinates)
++        val info = hxParseIpInfo("""{"ip":"52.26.208.45","city":"Boardman","region":"Oregon","country":"US","loc":"45.8399,-119.7006","org":"AS16509 Amazon.com, Inc.","timezone":"America/Los_Angeles"}""")
++        assertEquals("AS16509", info.asn); assertEquals("Amazon.com, Inc.", info.isp); assertEquals("US", info.countryCode)
++        val cip = hxParseCipCc("IP\t: 117.40.1.2\n地址\t: 中国 江西 赣州\n运营商\t: 电信\n\n数据二\t: 中国 江西 | 电信\n")
++        assertEquals("117.40.1.2", cip.address); assertEquals("赣州", cip.city); assertEquals("电信", cip.isp)
++        assertEquals("240e:3b0::1", hxParsePlainIp("240e:3b0::1\n").address)
++        assertEquals("IPv6", hxParsePlainIp("240e:3b0::1").ipType)
++        assertTrue(runCatching { hxParsePlainIp("<html>blocked</html>") }.isFailure)
++        assertTrue(runCatching { hxParseIpipNet("""{"ret":"err"}""") }.isFailure)
++        assertNull(hxIpLiteral("example.com"))
++        val merged = hxMergeWan(WanRuntimeInfo(address = "117.40.1.2", ipType = "IPv4"), ipip)
++        assertEquals("江西", merged.region)
++    }
++
++    @Test fun overlayBelongsToTheCurrentPathOnly() {
++        val inspector = ProxyRuntimeSnapshot(running = true, wanAddress = "198.51.100.1", wanState = "success")
++        val direct = HxPublicIpView(HxIpPath.Direct, WanRuntimeInfo(address = "117.40.1.2"), "success", 1L)
++        assertEquals(inspector, hxWithPublicIp(inspector, direct, running = true))
++        assertEquals("117.40.1.2", hxWithPublicIp(ProxyRuntimeSnapshot(), direct, running = false).wanAddress)
++        val loading = HxPublicIpView(HxIpPath.Proxy, null, "loading")
++        assertEquals("Nothing of our own yet keeps the inspector's answer", inspector, hxWithPublicIp(inspector, loading, running = true))
++        val kept = hxWithPublicIp(ProxyRuntimeSnapshot(), direct.copy(state = "stale", error = "所有查询源均无响应，稍后自动重试"), running = false)
++        assertEquals("stale", kept.wanState); assertEquals(1L, kept.wanCheckedAt)
++    }
++
++    @Test fun lookupShowsTheFirstAnswerFillsDetailsAndKeepsItWhenAllSourcesFail() {
++        val network = (app.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).activeNetwork
++        assumeTrue("Robolectric provides an active network", network != null)
++        val plain = server(MockResponse().setBody("117.40.1.2\n"), MockResponse().setResponseCode(503))
++        val rich = server(MockResponse().setBody("""{"ret":"ok","data":{"ip":"117.40.1.2","location":["中国","江西","赣州","","电信"]}}""")
++            .setBodyDelay(300, TimeUnit.MILLISECONDS), MockResponse().setResponseCode(503))
++        val sources = listOf(
++            HxIpSource("plain", plain.url("/").toString(), false, parse = ::hxParsePlainIp),
++            HxIpSource("rich", rich.url("/json").toString(), true, parse = ::hxParseIpipNet),
++        )
++        val seen = mutableListOf<HxPublicIpView>()
++        val lookup = HxPublicIpLookup(app, sources) { seen += it }
++        try {
++            lookup.request(running = false, force = false)
++            eventually("Direct lookup gets the detailed answer") { lookup.view.info?.region == "江西" }
++            assertEquals(HxIpPath.Direct, lookup.view.path)
++            assertEquals("success", lookup.view.state)
++            assertTrue(lookup.view.checkedAt > 0L)
++            assertTrue("The address appears before the details", seen.any { it.info?.address == "117.40.1.2" && it.info?.region == "—" } || seen.first { it.info != null }.info?.region == "江西")
++            assertTrue(prefs.getString("hxPublicIpLast.direct", "").orEmpty().contains("117.40.1.2"))
++            lookup.request(running = false, force = true)
++            eventually("Failed refresh settles") { lookup.view.state == "stale" }
++            assertEquals("117.40.1.2", lookup.view.info?.address)
++            assertEquals("所有查询源均无响应，稍后自动重试", lookup.view.error)
++        } finally {
++            lookup.close()
++        }
++    }
++
++    @Test fun stoppedWanCardShowsTheAddressAndAKeptOneWithItsTime() {
++        val state = HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu")),
++            wan = HomeWan(ip = "117.40.1.2", region = "江西", countryCode = "CN", state = HomeWanState.Ready))
++        home(state)
++        rule.onNodeWithText("117.40.1.2").performScrollTo().assertExists()
++        rule.onNodeWithText("江西").assertExists()
++        rule.onNodeWithText("代理未运行，启动后查询公网 IP").assertDoesNotExist()
++    }
++
++    @Test fun keptWanAnswerIsLabelledWithItsTime() {
++        val at = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 9); set(java.util.Calendar.MINUTE, 5) }.timeInMillis
++        home(HomeUiState(status = HomeStatus.Running(60), wan = HomeWan(ip = "198.51.100.7", region = "Tokyo", state = HomeWanState.Stale, checkedAt = at)))
++        rule.onNodeWithText("198.51.100.7").performScrollTo().assertExists()
++        rule.onNodeWithText("上次 09:05").assertExists()
++    }
++
++    @Test fun ipDetailsShowTheDirectAddressWhileStopped() {
++        val state = HomeUiState(status = HomeStatus.NotRunning,
++            wan = HomeWan(ip = "117.40.1.2", region = "江西", isp = "电信", state = HomeWanState.Ready))
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) { HomeIpDetailScreen(state, HomeNetSide.Wan, {}, {}, {}, { _, _ -> }) }
++            }
++        }
++        rule.waitForIdle()
++        rule.onNodeWithText("117.40.1.2").assertExists()
++        rule.onNodeWithText("电信").assertExists()
++        rule.onNodeWithText("代理未运行，显示本机直连的公网出口。 「未知」表示查询源未返回该字段。").assertExists()
++        rule.onNodeWithText("公网信息查询失败：出口检测失败，稍后自动重试").assertDoesNotExist()
++    }
++
++    /* ---------------- pinned bar ---------------- */
++
++    @Test fun pinnedBarIsOpaqueOverScrolledContent() {
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) {
++                    Box(Modifier.size(200.dp)) {
++                        Box(Modifier.fillMaxSize().background(Color.Red))
++                        HomeBarBackdrop(rememberHomeBarGlass(lifted = true), Modifier.fillMaxWidth().height(60.dp).testTag("bar"))
++                    }
++                }
++            }
++        }
++        rule.waitForIdle()
++        val bar = rule.onNodeWithTag("bar").fetchSemanticsNode().boundsInWindow
++        var pixel = 0
++        var below = 0
++        rule.runOnIdle {
++            val view = rule.activity.window.decorView
++            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
++            view.draw(Canvas(bitmap))
++            pixel = bitmap.getPixel(bar.center.x.toInt(), bar.center.y.toInt())
++            below = bitmap.getPixel(bar.center.x.toInt(), (bar.bottom + 20f).toInt())
++            bitmap.recycle()
++        }
++        assertEquals("Content under the bar is red", 255, android.graphics.Color.red(below))
++        // The old bar was the page colour at 96.5 % alpha, letting text show through; red content
++        // under an opaque bar leaves no trace.
++        assertTrue("Bar pixel %08x".format(pixel), android.graphics.Color.blue(pixel) >= 249 && android.graphics.Color.green(pixel) >= 236)
++        assertFalse(source("home/HomeComponents.kt").contains("c.bg.copy(alpha = .965f)"))
++    }
++
++    /* ---------------- words ---------------- */
++
++    @Test fun everyNewWordIsTranslated() {
++        val words = listOf("网络延迟", "经代理 · 与普通应用相同的路径", "直连 · 与普通应用相同的路径", "等待代理状态", "上次结果", "上次 %s",
++            "经代理查询，与普通应用看到的出口相同。", "代理未运行，显示本机直连的公网出口。", "%s；最新查询未成功，下拉首页或点右上角可重新查询。",
++            "「未知」表示查询源未返回该字段。", "所有查询源均无响应，稍后自动重试", "当前没有可用网络")
++        for (word in words) {
++            assertNotEquals(word, word, translateHetuText(word, "en"))
++            assertNotEquals(word, word, translateHetuText(word, "ru"))
++        }
++        assertEquals("Latency", translateHetuText("网络延迟", "en"))
++        assertEquals("網路延遲", translateHetuText("网络延迟", "zh-TW"))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java

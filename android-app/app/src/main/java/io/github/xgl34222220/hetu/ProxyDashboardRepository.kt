@@ -665,7 +665,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
             try {
                 val code = connection.responseCode
                 coroutineContext.ensureActive()
-                if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+                // generate_204 targets must answer 204 (a hijack/portal page is not a measurement).
+                if (hxProbeAnswered(url, code)) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
             } finally {
                 runCatching { connection.inputStream?.close() }
                 connection.disconnect()

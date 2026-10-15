@@ -16,6 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.xgl34222220.hetu.ui.HetuComposeController
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -168,6 +169,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         private set
     var runtime by mutableStateOf(initialRuntime())
         private set
+    /** Public address as apps see it (through the proxy while running, direct while stopped). */
+    private val publicIp = HxPublicIpLookup(app) { view -> runtime = hxWithPublicIp(runtime, view, state.running) }
     var upRate by mutableLongStateOf(0L)
         private set
     var downRate by mutableLongStateOf(0L)
@@ -467,6 +470,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (operation == null) {
                     refreshNow()
                     maybeVerifyEgress()
+                    if (operation == null) {
+                        publicIp.request(state.running, force = false)
+                        maybeAutoProbeSites(this)
+                    }
                 }
                 // Stopped and idle: probe Root every 8 s instead of every 2 s, but wake within a
                 // second when a tile / boot / network-match start flips the cached running hint.
@@ -556,7 +563,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return true
     }
 
-    private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
+    private fun initialRuntime(): ProxyRuntimeSnapshot = initialRuntimeCached().let { cached ->
+        // The cached address was the proxy exit; with the proxy stopped it is not the device's address.
+        if (cached.running) cached else cached.copy(wanAddress = "—", wanCountryCode = "", wanCountry = "—", wanRegion = "—",
+            wanCity = "—", wanIsp = "—", wanAsn = "—", wanOrganization = "—", wanIpType = "—", wanTimezone = "—",
+            wanCoordinates = "—", wanState = "idle")
+    }
+
+    private fun initialRuntimeCached(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
         running = prefs.getBoolean("proxyUiLastRunning", false),
         elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
         rssBytes = prefs.getLong("proxyUiLastRss", 0L),
@@ -702,7 +716,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             }
             lastProcessTicks = sampled.processTicks
             lastSystemTicks = sampled.systemTicks
-            runtime = sampled
+            runtime = hxWithPublicIp(sampled, publicIp.view, next.running)
 
             if (!next.running) {
                 providers = emptyList()
@@ -785,6 +799,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             refreshing = true
             try {
                 refreshNow()
+                if (operation == null) publicIp.request(state.running, force = true)
                 val request = activeRuntimeRequest()
                 if (request != null) {
                     val providerOwner = beginProviderRead()
@@ -1282,6 +1297,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     /** Audit4 G5: results of the last direct 本机直测 made while the proxy was stopped (memory only). */
     var directSiteDelays by mutableStateOf<Map<String, Long>>(emptyMap())
         private set
+    private var directSiteAt = 0L
+    private var siteAutoAt = 0L
+    private var siteAutoGeneration = -1L
+
+    /**
+     * 网络延迟 keeps itself current while 首页 is open, so it never shows an old or other-path
+     * number: once per runtime (start, restart, network change) and every five minutes through the
+     * proxy while it runs; a direct test right after stopping and every two minutes while stopped.
+     */
+    private fun maybeAutoProbeSites(scope: CoroutineScope) {
+        if (operation != null || siteTesting || tab != HxTab.Home) return
+        val now = SystemClock.elapsedRealtime()
+        if (state.running) {
+            if (!state.panelReady) return
+            if (siteAutoGeneration == runtimeRequestGeneration && now - siteAutoAt < 300_000L) return
+            siteAutoGeneration = runtimeRequestGeneration
+            siteAutoAt = now
+            // Children of the foreground poll: leaving the app cancels them.
+            scope.launch { measureSitesQuietly() }
+        } else {
+            if (directSiteDelays.isNotEmpty() && now - directSiteAt < 120_000L) return
+            if (siteAutoAt > 0L && now - siteAutoAt < 20_000L) return
+            siteAutoAt = now
+            measureSitesDirect(quiet = true, scope = scope)
+        }
+    }
+
+    override fun onCleared() {
+        publicIp.close()
+        super.onCleared()
+    }
 
     /** Home ↻: the proxy-path probe while running; a direct test while stopped (Audit4 G5). */
     fun probeSites() {
@@ -1293,22 +1339,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      * runtime-bound [measureSites] path and its probe identity are unchanged. Nothing is persisted:
      * the saved last results stay those of the proxy path.
      */
-    fun measureSitesDirect() {
+    fun measureSitesDirect(quiet: Boolean = false, scope: CoroutineScope = viewModelScope) {
         if (state.running || operation != null || siteTesting) return
         val owner = beginSiteRead()
         siteProbeOwner = owner
         siteTesting = true
-        viewModelScope.launch {
+        scope.launch {
             try {
                 val measured = hxDirectSiteLatencies(app)
                 if (owner == latestSiteRead && !state.running && operation == null && measured.isNotEmpty()) {
                     directSiteDelays = measured
-                    if (measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
+                    directSiteAt = SystemClock.elapsedRealtime()
+                    if (!quiet && measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (owner == latestSiteRead) toastAs(HxTone.Bad, errorText(error, "测速失败"))
+                if (owner == latestSiteRead && !quiet) toastAs(HxTone.Bad, errorText(error, "测速失败"))
             } finally {
                 if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
             }

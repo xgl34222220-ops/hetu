@@ -313,7 +313,7 @@ internal fun HxPage(
                 list()
             }
 
-            HomeBarBackdrop(glass, Modifier.fillMaxWidth().height(statusTop + barHeight))
+            HomeBarBackdrop(glass, Modifier.fillMaxWidth().height(statusTop + barHeight), canvas = canvasColor)
             Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).heightIn(min = barHeight)) {
                 val twoLine = !largeTitle && shownSubtitle != null
                 HxBarRow(

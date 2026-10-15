@@ -1322,7 +1322,24 @@ Wi‑Fi 仍无法联网时重开|Restart Wi‑Fi if it still has no internet|Wi�
 """.trimIndent()
 
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
+// 2026-10-15 3.3.3 home: 网络延迟 card (path-true latency) and the public address seen by apps.
+private val vocabularyHomeProbe333 = """
+网络延迟|Latency|網路延遲|Задержка сети
+经代理 · 与普通应用相同的路径|Via proxy · same path as other apps|經代理 · 與一般應用程式相同的路徑|Через прокси · тот же путь, что у приложений
+直连 · 与普通应用相同的路径|Direct · same path as other apps|直連 · 與一般應用程式相同的路徑|Напрямую · тот же путь, что у приложений
+等待代理状态|Waiting for the proxy|等待代理狀態|Ожидание прокси
+上次结果|Last result|上次結果|Последний результат
+上次 %s|Last %s|上次 %s|Последний %s
+经代理查询，与普通应用看到的出口相同。|Looked up through the proxy: the same exit other apps see.|經代理查詢，與一般應用程式看到的出口相同。|Определено через прокси: тот же выход, что видят приложения.
+代理未运行，显示本机直连的公网出口。|Proxy not running: this is the device's own public address.|代理未執行，顯示本機直連的公網出口。|Прокси не запущен: это собственный публичный адрес устройства.
+%s；最新查询未成功，下拉首页或点右上角可重新查询。|%s; the latest lookup failed. Pull down on Home or tap the top-right button to try again.|%s；最新查詢未成功，下拉首頁或點右上角可重新查詢。|%s; последний запрос не удался. Потяните главный экран вниз или нажмите кнопку справа вверху.
+「未知」表示查询源未返回该字段。|"Unknown" means the lookup service did not return that field.|「未知」表示查詢來源未回傳該欄位。|«Неизвестно» означает, что сервис не вернул это поле.
+所有查询源均无响应，稍后自动重试|No lookup service answered; retrying automatically|所有查詢來源均無回應，稍後自動重試|Ни один сервис не ответил; повтор автоматически
+当前没有可用网络|No network available|目前沒有可用網路|Нет доступной сети
+""".trimIndent()
+
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

@@ -97,6 +97,8 @@ internal data class HomeWan(
     val state: HomeWanState = HomeWanState.Idle,
     /** Why the last lookup failed; shown only while [state] is [HomeWanState.Failed]. */
     val error: String? = null,
+    /** Wall-clock ms the shown address was obtained; 0 = unknown. Labels a kept (stale) answer. */
+    val checkedAt: Long = 0L,
 )
 
 internal data class HomeLan(val ip: String? = null, val iface: String? = null)
@@ -203,7 +205,7 @@ internal data class HomeUiState(
     val probeSource: HomeProbeSource = HomeProbeSource.Live,
 )
 
-/** Audit4 G5: origin of the 本机直测 values. Live = the running proxy path (unchanged behaviour). */
+/** Origin of the 网络延迟 values: Live = through the running proxy, Direct = the device's own route (stopped). Last is unused. */
 internal enum class HomeProbeSource { Live, Direct, Last }
 
 /** Audit G1: what the 「上次可启动」 copy is: the config it came from and when it was kept (epoch ms). */
@@ -240,7 +242,7 @@ internal object HomeTargets {
     val defaults = listOf(
         HomeTarget("Baidu", "https://www.baidu.com/"),
         HomeTarget("Cloudflare", "https://cp.cloudflare.com/generate_204"),
-        HomeTarget("Google", "https://www.gstatic.com/generate_204"),
+        HomeTarget("Google", "https://www.google.com/generate_204"),
     )
 
     fun autoRefreshLabel(seconds: Int): String = if (seconds <= 0) "关闭" else "$seconds 秒"

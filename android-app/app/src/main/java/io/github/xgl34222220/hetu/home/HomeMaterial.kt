@@ -24,15 +24,23 @@ import kotlin.math.max
  * An OLED black preference keeps the page exactly black, including while blur is unavailable.
  */
 @Composable
-internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier {
+internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier = homeDiffuseCanvas(background, Float.POSITIVE_INFINITY)
+
+/**
+ * The same canvas with its vertical wash spread over [washHeight] px instead of the element's own
+ * height. A pinned bar passes the page height, so the opaque bar shows exactly the pixels of the
+ * page canvas behind it and scrolled cards never show through.
+ */
+@Composable
+internal fun Modifier.homeDiffuseCanvas(background: Color?, washHeight: Float): Modifier {
     val c = LocalHomeColors.current
     val base = background ?: c.bg
     if (c.dark && c.bg == Color.Black && base == c.bg) return this.background(base)
     // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
     // soft light at the top. No coloured blobs; cached per size, nothing animates.
     val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
-    val material = remember(c, base) { Modifier.drawWithCache {
-        val wash = Brush.verticalGradient(listOf(
+    val material = remember(c, base, washHeight) { Modifier.drawWithCache {
+        val wash = Brush.verticalGradient(startY = 0f, endY = washHeight, colors = listOf(
             lerp(base, if (c.dark) Color(0xFF1B2330) else Color.White, if (c.dark) .30f else .42f),
             base,
             lerp(base, mist, if (c.dark) .28f else .34f),

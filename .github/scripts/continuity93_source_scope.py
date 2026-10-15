@@ -148,6 +148,9 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-13 WeChat message-latency fix: the subscription-exception list of WeChat message
     # transports (MessagingFilterPolicy) also protects the Hong Kong hk*.weixin.qq.com transports.
     PACKAGE + 'MessagingFilterPolicy.java',
+    # 2026-10-15 home probe fix: the 网络延迟 card's Google target measures google.com (gstatic is
+    # served inside mainland China and answered without a proxy); a saved old default is migrated.
+    PACKAGE + 'ProxyLatencyTargets.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
