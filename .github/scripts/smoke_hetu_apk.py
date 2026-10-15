@@ -671,7 +671,8 @@ def main():
   adb('shell','input','keyevent','4');time.sleep(2);click('首页',bottom=True)
   expect('河图','01-home-language-restored')
  if os.environ.get('HETU_EXPECT_NEW_UI')=='1':
-  expect('本机直测','01-home-new-ui')
+  # 3.3.3: the home latency card is titled 网络延迟 (formerly 本机直测).
+  expect('网络延迟','01-home-new-ui')
  if os.environ.get('HETU_EXPECT_PALETTE_CRASH')=='1':
   palette_scripts_cases(choices[0],apk,expect_crash=True)
   return
