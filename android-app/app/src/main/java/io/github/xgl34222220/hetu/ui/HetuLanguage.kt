@@ -1272,6 +1272,15 @@ private val vocabularyAudit4Ui = """
 
 
 // 2026-10-14 audit4 functions: stopped 本机直测, connection details actions, subscription alerts, launcher shortcuts, update check, restore undo.
+// 2026-10-15 3.3.3 polish (audit5): tools group titles (U14) and the plain copy toast.
+private val vocabularyAudit5 = """
+常用工具|Frequently used|常用工具|Часто используемые
+分流与网络|Routing & network|分流與網路|Маршрутизация и сеть
+配置与规则|Configs & rules|設定檔與規則|Конфигурации и правила
+核心与维护|Core & maintenance|核心與維護|Ядро и обслуживание
+已复制|Copied|已複製|Скопировано
+""".trimIndent()
+
 private val vocabularyAudit4Func = """
 直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
 上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
@@ -1339,7 +1348,7 @@ private val vocabularyHomeProbe333 = """
 """.trimIndent()
 
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333).joinToString("\n")
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

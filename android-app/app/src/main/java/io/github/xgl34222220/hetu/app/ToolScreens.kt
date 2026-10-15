@@ -1057,6 +1057,8 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         subscriptionAlerts = on
         prefs.edit().putBoolean(HxSubscriptionAlerts.PREF_ENABLED, on).apply()
         if (on) HxSubscriptionAlerts.check(context, vm.providers)
+        // Audit5 G7: the background check follows the switch (scheduled on, cancelled off).
+        UpdateJobService.scheduleSubscriptionAlerts(context, on)
     }
     val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) setSubscriptionAlerts(true) else vm.toast("没有通知权限，无法发送订阅提醒")

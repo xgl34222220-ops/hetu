@@ -274,7 +274,7 @@ internal fun PanelSearchField(value: String, onValueChange: (String) -> Unit, pl
                 Icon(PanelIcons.Search, null, Modifier.size(22.dp), tint = c.t1)
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body.copy(fontSize = 17.sp), maxLines = 1)
+                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body.copy(fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
                 if (value.isNotEmpty()) {
@@ -320,7 +320,7 @@ internal fun PanelChip(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         if (leading != null) leading()
-        Text(ht(text), color = tint, style = if (selected) PanelType.chip.copy(fontWeight = FontWeight.SemiBold) else PanelType.chip, maxLines = 1)
+        Text(ht(text), color = tint, style = if (selected) PanelType.chip.copy(fontWeight = FontWeight.SemiBold) else PanelType.chip, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailingIcon != null) Icon(trailingIcon, null, Modifier.size(16.dp), tint = tint)
     }
 }

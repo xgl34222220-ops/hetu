@@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeNotice
 import io.github.xgl34222220.hetu.home.HomeReveal
-import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.HomeVerticalDivider
@@ -106,7 +105,8 @@ internal fun ToolsEditorScreen(
                 }
                 HomeCard(Modifier.fillMaxWidth().weight(1f)) {
                     when (val load = state.load) {
-                        ToolsLoad.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HomeSpinner(size = 22.dp, color = c.t3) }
+                        // Audit5 E1: code-line placeholders while the file is read (static with motion off), like the config editor.
+                        ToolsLoad.Loading -> Box(Modifier.fillMaxSize()) { io.github.xgl34222220.hetu.HxSkeletonLines(count = 8, modifier = Modifier.padding(top = 8.dp), rowHeight = 44.dp, icon = false) }
                         is ToolsLoad.Failed -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
                             ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message, topPadding = 24.dp) {
                                 ToolsButton("重新读取", onReload, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)

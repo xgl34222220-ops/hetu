@@ -236,7 +236,7 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
 private fun Metric(label: String, value: String, color: Color, modifier: Modifier) {
     val c = LocalHomeColors.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
         HomeRollingText(value, color, HomeType.metric.copy(fontSize = HomeType.sheetTitle.fontSize), alignment = Alignment.Center)
     }
 }

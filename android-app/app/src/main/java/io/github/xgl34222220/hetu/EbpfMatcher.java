@@ -43,10 +43,29 @@ final class EbpfMatcher {
 
     /** The loader asset for the first supported ABI that has one, or null. */
     static String loaderAsset(String[] supportedAbis) {
+        return loaderAsset(supportedAbis, null);
+    }
+
+    /**
+     * Audit5 G13: whether a packaged asset is really there. An ABI-split (arm64-only) APK installed
+     * on an x86_64 device that translates ARM no longer carries the x86_64 payloads, so the first
+     * supported ABI is not enough. {@code null} = not checked (the old first-match behaviour).
+     */
+    interface AssetProbe { boolean exists(String path); }
+
+    /** {@link #loaderAsset(String[])} that skips ABIs whose loader is not packaged. */
+    static String loaderAsset(String[] supportedAbis, AssetProbe probe) {
+        return firstAsset(supportedAbis, "hetu-bpf/", "/" + LOADER_NAME, probe);
+    }
+
+    /** prefix + abi + suffix for the first arm64-v8a / x86_64 entry of {@code supportedAbis} the probe accepts. */
+    static String firstAsset(String[] supportedAbis, String prefix, String suffix, AssetProbe probe) {
         if (supportedAbis == null) return null;
         for (String abi : supportedAbis) {
             String value = abi == null ? "" : abi.toLowerCase(Locale.ROOT);
-            if (value.equals("arm64-v8a") || value.equals("x86_64")) return "hetu-bpf/" + value + "/" + LOADER_NAME;
+            if (!value.equals("arm64-v8a") && !value.equals("x86_64")) continue;
+            String path = prefix + value + suffix;
+            if (probe == null || probe.exists(path)) return path;
         }
         return null;
     }

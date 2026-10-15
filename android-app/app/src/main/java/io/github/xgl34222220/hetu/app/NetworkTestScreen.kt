@@ -156,6 +156,8 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
     val interruptedLabel = ht("测试中断")
     var runFailed by remember { mutableStateOf(false) }
     val unlockIds = remember { NetworkUnlock.checkIds }
+    // Audit5 N3: a finished run confirms with a light haptic, an interrupted one rejects; leaving the page says nothing.
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
 
     LaunchedEffect(runId) {
         if (runId == 0) return@LaunchedEffect
@@ -166,6 +168,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
         exits = null
         exitTesting = true
         val results = ArrayList<NetSiteResult>()
+        var finished = false
         try {
             coroutineScope {
                 // Unlock checks and exit IPs go through the system network and run beside the latency rows.
@@ -191,6 +194,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
                     rows[result.id]?.let { it.value = it.value.copy(testing = false, result = result) }
                 }
             }
+            finished = true
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (_: Exception) {
@@ -202,6 +206,8 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
             val done = rows.values.mapNotNull { it.value.result }
             // A run that failed outright (no network, port probe error) says so instead of leaving dashes.
             summary = hxNetTestSummary(done.count { it.ok && !it.blocked }, NetworkTest.sites.size, done.size, runFailed, availableLabel, interruptedLabel)
+            if (finished) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Confirm)
+            else if (runFailed) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Reject)
         }
     }
 
@@ -272,7 +278,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
                         },
                         Modifier.weight(1f), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    if (summary.isNotBlank()) Text(summary, color = if (runFailed) c.badText else c.t2, style = HomeType.noteStrong, maxLines = 1)
+                    if (summary.isNotBlank()) Text(summary, Modifier.padding(start = 8.dp), color = if (runFailed) c.badText else c.t2, style = HomeType.noteStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             item(key = "conn-exit") { ExitIpCard(exits, exitTesting) }
@@ -352,6 +358,10 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
     }
     val regionText = if (region == null) "" else (NetworkTest.flag(region) + " " + region).trim()
     val unlockText = unlock?.let { unlockChipText(it) }.orEmpty()
+    // Audit5 N2: the result colour settles in instead of snapping (instant with motion off).
+    val shownStatusColor by androidx.compose.animation.animateColorAsState(
+        statusColor, if (LocalHomeMotionEnabled.current) tween(220) else tween(0), label = "net-site-status",
+    )
     Row(
         Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(start = HomeRowDims.start, end = HomeRowDims.end, top = 9.dp, bottom = 9.dp)
             .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, unlockText, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
@@ -372,9 +382,9 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
                     Spacer(Modifier.width(6.dp))
-                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(status, color = shownStatusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else Text(status, color = shownStatusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

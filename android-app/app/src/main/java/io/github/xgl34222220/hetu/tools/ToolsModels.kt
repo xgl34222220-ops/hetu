@@ -38,7 +38,7 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
 internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEntry>)
 
 internal object ToolsCatalog {
-    /** Concept layout (03A page 1): six untitled cards. This is the default. */
+    /** Concept layout (03A page 1): six untitled cards (the default before 3.3.3). */
     val concept: List<ToolsGroupSpec> = listOf(
         // 网络测试 is the most used tool: it opens the first card (approved concept c2), and
         // 配置管理 still sits fully above the floating dock without scrolling.
@@ -48,6 +48,18 @@ internal object ToolsCatalog {
         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
+    )
+
+    /**
+     * Audit5 U14 (3.3.3, default): the concept order kept row for row, folded into four titled
+     * cards so the single-row cards (日志文件, 应用管理) join their neighbours and every card says
+     * what it holds. Titles never repeat an entry's own text, so a search hit is never doubled.
+     */
+    val grouped: List<ToolsGroupSpec> = listOf(
+        ToolsGroupSpec("常用工具", listOf(ToolsEntry.NetTest, ToolsEntry.Files, ToolsEntry.Logs)),
+        ToolsGroupSpec("分流与网络", listOf(ToolsEntry.Apps, ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
+        ToolsGroupSpec("配置与规则", listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
+        ToolsGroupSpec("核心与维护", listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
     )
 
     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
@@ -85,7 +97,7 @@ internal object ToolsCatalog {
 internal data class ToolsRootState(
     val searching: Boolean = false,
     val query: String = "",
-    val groups: List<ToolsGroupSpec> = ToolsCatalog.concept,
+    val groups: List<ToolsGroupSpec> = ToolsCatalog.grouped,
 ) {
     /** Non-null while a query is typed: the filtered cards (possibly empty → empty state). */
     val results: List<ToolsGroupSpec>? get() = if (searching && query.isNotBlank()) ToolsCatalog.search(groups, query) else null

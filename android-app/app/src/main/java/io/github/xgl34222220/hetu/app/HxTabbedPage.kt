@@ -369,7 +369,7 @@ internal fun HxTabbedPage(
                 pagerState = pagerState,
                 onSelect = { index ->
                     val key = tabs[index].key
-                    if (key != selected) onSelect(key) else scope.launch { listStates[key]?.animateScrollToItem(0) }
+                    if (key != selected) onSelect(key) else scope.launch { listStates[key]?.let { if (tabMotion) it.animateScrollToItem(0) else it.scrollToItem(0) } }
                 },
             )
             HorizontalDivider(
@@ -398,10 +398,12 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
     val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val refOutline = Color(0xFF646775).copy(alpha = .78f)
     val refSelected = Color(0xE8F8F7FF)
+    val chipMotion = hxMotion()
     LaunchedEffect(pagerState.targetPage) {
         val left = lefts.getOrNull(pagerState.targetPage) ?: return@LaunchedEffect
         val margin = with(density) { 56.dp.toPx() }.toInt()
-        scroll.animateScrollTo((left - margin).coerceAtLeast(0))
+        // Audit5 R1: the chip strip follows the page without a sweep when motion is off.
+        if (chipMotion) scroll.animateScrollTo((left - margin).coerceAtLeast(0)) else scroll.scrollTo((left - margin).coerceAtLeast(0))
     }
     Row(
         Modifier
