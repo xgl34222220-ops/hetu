@@ -144,10 +144,15 @@ class Audit4Ui107Test {
 
     /* U5 */
     @Test fun stoppedHomeShowsPlaceholdersAndTheLastProbeResults() {
+        // 3.3.3: stopped, the latency card shows only a direct measurement of the device's own route
+        // (no 「· 上次」 proxy numbers) and the WAN card looks the address up directly.
         home(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu", 23L), HomeProbe("Google"))), HomeActions())
-        rule.onNodeWithText("Baidu · 上次").assertExists()
+        rule.onNodeWithText("Baidu · 上次").assertDoesNotExist()
+        rule.onNodeWithText("Baidu").assertExists()
         rule.onNodeWithText("Google").assertExists()
-        rule.onNodeWithText("代理未运行，启动后查询公网 IP").performScrollTo().assertExists()
+        rule.onNodeWithText("直连 · 与普通应用相同的路径").assertExists()
+        rule.onNodeWithText("代理未运行，启动后查询公网 IP").assertDoesNotExist()
+        rule.onNodeWithText("正在查询").performScrollTo().assertExists()
         rule.onNodeWithText("等待连接").assertDoesNotExist()
         rule.onNodeWithText("上行").assertDoesNotExist()
         val screen = source("home/HomeScreen.kt")

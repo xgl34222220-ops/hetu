@@ -10,14 +10,14 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
-import java.net.Proxy
 import java.net.URL
 import kotlin.coroutines.coroutineContext
 
 /**
- * Audit4 G5: 本机直测 while the proxy is stopped. A plain direct request (Proxy.NO_PROXY) to the
- * same three targets, deliberately separate from ProxyDashboardRepository.siteLatencies, whose
- * runtime-bound probe identity stays untouched. Same timeouts and success range as that probe.
+ * 网络延迟 while the proxy is stopped: the same three targets over the device's ordinary route
+ * (what any other app gets with Hetu off). Deliberately separate from
+ * ProxyDashboardRepository.siteLatencies, whose runtime-bound probe identity stays untouched.
+ * Same timeouts and success rule ([hxProbeAnswered]) as that probe.
  * Results: name → ms (> 0), -1 = failed or timed out.
  */
 internal suspend fun hxDirectSiteLatencies(context: Context): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -27,12 +27,24 @@ internal suspend fun hxDirectSiteLatencies(context: Context): Map<String, Long> 
     }
 }
 
+/**
+ * Whether [code] is a real answer from [url]. A generate_204 endpoint must answer 204: a captive
+ * portal, a DNS-hijack page or an interception box answers 200/302 for any host, which used to
+ * count as "reachable". Other targets accept 2xx/3xx as before.
+ */
+internal fun hxProbeAnswered(url: String, code: Int): Boolean {
+    val path = runCatching { URL(url).path.orEmpty() }.getOrDefault("")
+    return if (path.trimEnd('/').endsWith("generate_204")) code == 204 else code in 200..399
+}
+
 private suspend fun hxDirectLatency(url: String): Long {
     coroutineContext.ensureActive()
     return try {
         val started = SystemClock.elapsedRealtime()
-        val connection = (URL(url).openConnection(Proxy.NO_PROXY) as HttpURLConnection).apply {
+        // The default route, not Proxy.NO_PROXY: a stopped Hetu measures exactly what other apps see.
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = true
+            useCaches = false
             connectTimeout = 3_000
             readTimeout = 3_000
             requestMethod = "GET"
@@ -42,7 +54,7 @@ private suspend fun hxDirectLatency(url: String): Long {
         try {
             val code = connection.responseCode
             coroutineContext.ensureActive()
-            if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+            if (hxProbeAnswered(url, code)) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
         } finally {
             runCatching { connection.inputStream?.close() }
             connection.disconnect()

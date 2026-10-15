@@ -101,7 +101,7 @@ internal fun HetuHomeV2(
     /** Audit4 U3: 控制接口异常 › 设置密钥 / 诊断工具; both fall back to [onOpenNode] when the host has no deeper link. */
     onOpenControllerKey: () -> Unit = onOpenNode,
     onOpenDiagnostics: () -> Unit = onOpenNode,
-    /** Audit4 G5: results of a direct (no proxy) 本机直测 made while the proxy is stopped. */
+    /** Results of a direct 网络延迟 measurement made while the proxy is stopped (the device's own route). */
     directProbes: Map<String, Long> = emptyMap(),
 ) {
     val context = LocalContext.current
@@ -139,13 +139,10 @@ internal fun HetuHomeV2(
         connection = connection,
         lastGood = lastGood,
         lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
-        probes = if (!status.isLive && directProbes.isNotEmpty()) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]?.let { if (it > 0L) it else HomeDelay.Timeout }) } else mapped.probes,
-        probeSource = when {
-            status.isLive -> HomeProbeSource.Live
-            directProbes.isNotEmpty() -> HomeProbeSource.Direct
-            mapped.probes.any { it.delayMs != null } -> HomeProbeSource.Last
-            else -> HomeProbeSource.Live
-        },
+        // Stopped, only a direct measurement of the device's own route is shown; the proxy path's
+        // last numbers are never carried over (they described a path that no longer exists).
+        probes = if (!status.isLive) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]?.let { if (it > 0L) it else HomeDelay.Timeout }) } else mapped.probes,
+        probeSource = if (status.isLive) HomeProbeSource.Live else HomeProbeSource.Direct,
         statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
         wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
             city = wanExtras.city.known(),
@@ -155,6 +152,7 @@ internal fun HetuHomeV2(
             coordinates = wanExtras.coordinates.known(),
             state = HomeWanState.fromId(wanExtras.state),
             error = wanExtras.error.known(),
+            checkedAt = wanExtras.checkedAt,
         ),
     )
 
@@ -252,6 +250,8 @@ internal data class HomeWanExtras(
     /** `ProxyRuntimeSnapshot.wanState`: idle, loading, success, stale or failed. */
     val state: String = "",
     val error: String = "",
+    /** `ProxyRuntimeSnapshot.wanCheckedAt` (wall-clock ms; 0 = unknown). */
+    val checkedAt: Long = 0L,
 )
 
 internal fun homeStatusOf(data: CompactHomeData, startupError: String?): HomeStatus = when {

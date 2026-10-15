@@ -32,7 +32,9 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
             refreshing = vm.refreshing, testing = vm.siteTesting,
             uptimeSeconds = rt.elapsedSeconds, core = vm.state.core,
             mode = vm.state.mode, config = vm.state.config, message = vm.state.message,
-            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(), delays = vm.siteDelays,
+            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(),
+            // Proxy-path numbers only while that path exists; stopped, the card shows the direct test.
+            delays = if (vm.state.running) vm.siteDelays else emptyMap(),
             latencyTargets = ProxyLatencyTargets.load(vm.prefs).map { it.name },
             wan = rt.wanAddress, lan = rt.lanAddress, countryCode = rt.wanCountryCode,
             region = rt.wanRegion.ifBlank { listOf(rt.wanCountry, rt.wanCity).filter { it.isNotBlank() }.distinct().joinToString(" · ") },
@@ -57,7 +59,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         wanExtras = HomeWanExtras(
             city = rt.wanCity, organization = rt.wanOrganization, ipType = rt.wanIpType,
             timezone = rt.wanTimezone, coordinates = rt.wanCoordinates,
-            state = rt.wanState, error = rt.wanError,
+            state = rt.wanState, error = rt.wanError, checkedAt = rt.wanCheckedAt,
         ),
         operationText = vm.operationText,
         onUpdateProviders = vm::updateAllProviders,

@@ -21,6 +21,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import io.github.xgl34222220.hetu.home.HetuHomeTheme
 import io.github.xgl34222220.hetu.home.HomeActions
+import io.github.xgl34222220.hetu.home.HomeDelay
 import io.github.xgl34222220.hetu.home.HomeProbe
 import io.github.xgl34222220.hetu.home.HomeProbeSource
 import io.github.xgl34222220.hetu.home.HomeScreen
@@ -131,8 +132,9 @@ class Audit4Func107Test {
     }
 
     @Test fun stoppedProbeCardShowsDirectOrLastResultsAndCanTest() {
+        // 3.3.3: the card is 网络延迟; stopped it names the direct path and shows direct results only.
         var probes = 0
-        val state = mutableStateOf(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu", 18L), HomeProbe("Cloudflare", 40L), HomeProbe("Google", 60L)), probeSource = HomeProbeSource.Last))
+        val state = mutableStateOf(HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu", 18L), HomeProbe("Cloudflare", 40L), HomeProbe("Google", HomeDelay.Timeout)), probeSource = HomeProbeSource.Direct))
         rule.setContent {
             CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
                 HetuHomeTheme(dark = false) {
@@ -141,18 +143,18 @@ class Audit4Func107Test {
             }
         }
         rule.waitForIdle()
-        rule.onNodeWithText("上次结果（代理未运行）").assertExists()
-        rule.onNodeWithText("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。").assertExists()
+        rule.onNodeWithText("网络延迟").assertExists()
+        rule.onNodeWithText("直连 · 与普通应用相同的路径").assertExists()
+        rule.onNodeWithText("18 ms").assertExists()
+        rule.onNodeWithText("超时").assertExists()
+        rule.onNodeWithText("上次结果（代理未运行）").assertDoesNotExist()
         rule.onNodeWithContentDescription("直连测速").performClick()
         assertEquals(1, probes)
-        state.value = state.value.copy(probeSource = HomeProbeSource.Direct)
-        rule.waitForIdle()
-        rule.onNodeWithText("直连（代理未运行）").assertExists()
-        // Nothing measured yet: dashes, and no extra line.
+        // Nothing measured yet: dashes, never another path's numbers.
         state.value = HomeUiState(status = HomeStatus.NotRunning, probes = listOf(HomeProbe("Baidu"), HomeProbe("Cloudflare"), HomeProbe("Google")))
         rule.waitForIdle()
+        rule.onNodeWithText("18 ms").assertDoesNotExist()
         rule.onNodeWithText("直连（代理未运行）").assertDoesNotExist()
-        rule.onNodeWithText("上次结果（代理未运行）").assertDoesNotExist()
     }
 
     /* ---------------- G6 ---------------- */
@@ -381,6 +383,6 @@ class Audit4Func107Test {
         }
         val table = source("ui/HetuLanguage.kt")
         assertTrue(table.contains("private val vocabularyAudit4Func = \"\"\""))
-        assertTrue(table.contains("vocabularyAudit4Ui, vocabularyAudit4Func).joinToString"))
+        assertTrue(table.contains("vocabularyAudit4Ui, vocabularyAudit4Func, "))
     }
 }

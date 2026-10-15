@@ -82,6 +82,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -777,14 +779,20 @@ internal fun Modifier.homeGlassSource(@Suppress("UNUSED_PARAMETER") glass: HomeB
 
 /**
  * Background of a pinned bar. Invisible at the top of the page; once content scrolls beneath it
- * the bar turns to frosted glass (real blur when allowed, a near-opaque canvas tint otherwise)
- * with a hairline along its lower edge.
+ * the bar fades in as an opaque copy of the page canvas behind it (the same wash over the page
+ * height), with a hairline along its lower edge. Scrolled cards never show through the title.
+ * [canvas] is the page's canvas colour when it is not the theme background.
  */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier) {
+internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier, canvas: Color? = null) {
     if (!glass.active) return
     val c = LocalHomeColors.current
+    val density = LocalDensity.current
+    val pageHeight = with(density) {
+        LocalConfiguration.current.screenHeightDp.dp.toPx() +
+            WindowInsets.statusBars.getTop(this) + WindowInsets.navigationBars.getBottom(this)
+    }
     val line = c.line
     // No live blur (see homeGlassSource): the frosted bar is a static translucent canvas tint.
     val haze: HazeState? = null
@@ -799,7 +807,7 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
                 if (progressive) Brush.verticalGradient(listOf(c.bg.copy(alpha = .56f), c.bg.copy(alpha = .30f), c.bg.copy(alpha = .06f)))
                 else Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))),
             )
-    } else Modifier.background(c.bg.copy(alpha = .965f))
+    } else Modifier.homeDiffuseCanvas(canvas, pageHeight)
     Box(
         modifier
             .graphicsLayer { alpha = glass.shown }

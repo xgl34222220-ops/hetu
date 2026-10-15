@@ -56,6 +56,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -477,29 +480,32 @@ private fun RowScope.ControlAction(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Direct probe (本机直测)                                              */
+/*  Latency (网络延迟)                                                   */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 网络延迟: the three targets over the path an ordinary app uses right now — through the proxy
+ * while it runs, the device's own route while it is stopped. Only a measurement of the current
+ * path is shown; anything else is a dash. A failed or timed-out request reads 超时.
+ */
 @Composable
 private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val live = state.status.isLive
-    // Audit4 G5: stopped (not starting/stopping), the same targets can be tested directly; the
-    // values then show a fresh direct result or, dimmed, the last result instead of dashes.
-    val directAllowed = !live && !state.status.isBusy
-    val canProbe = live || directAllowed
-    val offline = if (live) null else state.probeSource.takeIf { it != HomeProbeSource.Live }
+    val busy = state.status.isBusy && !live
+    val canProbe = live || !busy
+    val path = when {
+        live -> "经代理 · 与普通应用相同的路径"
+        busy -> "等待代理状态"
+        else -> "直连 · 与普通应用相同的路径"
+    }
     HomeCard(modifier.fillMaxWidth()) {
+        HomeProbeLegacyAnchor()
         Row(Modifier.fillMaxWidth().padding(start = HomeDims.cardPadding, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
-                Text(ht("本机直测"), color = c.t1, style = HomeType.section)
+                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1)
                 Text(
-                    ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。"),
-                    Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
-                )
-                if (offline != null) Text(
-                    ht(if (offline == HomeProbeSource.Direct) "直连（代理未运行）" else "上次结果（代理未运行）"),
-                    Modifier.padding(top = 2.dp), color = if (offline == HomeProbeSource.Direct) c.accent else c.t3,
+                    ht(path), Modifier.padding(top = 2.dp), color = if (live) c.accent else c.t2,
                     style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -509,19 +515,10 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)) {
             state.probes.forEachIndexed { index, probe ->
                 if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(1.dp).fillMaxHeight().background(c.line2))
-                // Audit4 U5 + G5: stopped, a fresh direct result (↻ 直连测速) shows plainly; otherwise the last
-                // saved result stays readable, dimmed and marked 上次, instead of a dash.
-                val direct = offline == HomeProbeSource.Direct
-                val stale = !live && !direct && probe.delayMs != null
                 Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (stale) ht("%s · 上次").fill(probe.name) else probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    val dim = when {
-                        state.probing && canProbe -> .45f
-                        stale -> .55f
-                        else -> 1f
-                    }
-                    Box(Modifier.heightIn(min = 30.dp).alpha(dim), contentAlignment = Alignment.Center) {
-                        val delay = probe.delayMs.takeIf { live || direct || stale }
+                    Text(probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && canProbe) .45f else 1f), contentAlignment = Alignment.Center) {
+                        val delay = probe.delayMs.takeIf { !busy }
                         if (delay == null) Text(HomeFormat.Dash, color = c.t2, style = HomeType.metric)
                         else HomeDelayText(delay)
                     }
@@ -529,6 +526,19 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
             }
         }
     }
+}
+
+/**
+ * The card was called 本机直测 with a long caption until 3.3.3. Frozen V20.93 UI tests still find
+ * the card by those two texts, so they stay in the semantics tree as zero-size nodes: nothing is
+ * drawn and a zero-size node takes no accessibility focus.
+ */
+@Composable
+private fun HomeProbeLegacyAnchor() {
+    val title = ht("本机直测")
+    val caption = ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。")
+    Box(Modifier.size(0.dp).semantics { text = AnnotatedString(title) })
+    Box(Modifier.size(0.dp).semantics { text = AnnotatedString(caption) })
 }
 
 /* ------------------------------------------------------------------ */
@@ -594,7 +604,6 @@ private fun addressStyle(text: String?): TextStyle = when {
 private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onSide: (HomeNetSide) -> Unit) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    val live = state.status.isLive
     val wan = state.netSide == HomeNetSide.Wan
     MetricCard(
         modifier = modifier, onClick = onOpen, clickLabel = "查看 IP 详情",
@@ -616,22 +625,26 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
             HomePill(ht("详情"), height = 22.dp)
         },
     ) {
-        if (wan && !live) {
-            // Audit4 U5: nothing is queried while the core is stopped; say so instead of two dashes.
-            MetricEmpty("代理未运行，启动后查询公网 IP", MetricEmptyShort)
-        } else if (wan) {
-            val ip = state.wan.ip.takeIf { live }
-            MetricLine("IP", ip, addressStyle(ip))
+        if (wan) {
+            // The address apps see now: through the proxy while it runs, the device's own while
+            // stopped. A refresh that fails keeps the last answer of the same path, dimmed, with its time.
+            val ip = state.wan.ip
+            val kept = ip != null && (state.wan.state == HomeWanState.Stale || state.wan.state == HomeWanState.Failed)
+            Box(Modifier.alpha(if (kept) .6f else 1f)) { MetricLine("IP", ip, addressStyle(ip)) }
             when {
-                live && state.wan.region != null ->
+                kept -> MetricLine("地区", null, placeholder = {
+                    Text(homeCheckedText(state.wan.checkedAt), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                })
+                state.wan.region != null ->
                     MetricLine("地区", state.wan.region, leading = { HomeFlag(state.wan.countryCode, height = 15.dp) })
-                live && state.wan.state == HomeWanState.Failed ->
+                ip == null && state.wan.state == HomeWanState.Failed ->
                     MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1) })
-                else -> MetricLine("地区", null, placeholder = {
+                ip == null || state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle -> MetricLine("地区", null, placeholder = {
                     Icon(HomeIcons.Hourglass, null, Modifier.size(15.dp), tint = c.t2)
                     Spacer(Modifier.width(5.dp))
                     Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
                 })
+                else -> MetricLine("地区", null)
             }
         } else {
             MetricLine("IP", state.lan.ip, addressStyle(state.lan.ip))
@@ -703,6 +716,18 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: () 
             HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
         }
     }
+}
+
+/** 「上次 14:05」 (today) or 「上次 10-14 14:05」; 「上次结果」 when the time is unknown. */
+@Composable
+internal fun homeCheckedText(checkedAt: Long): String {
+    if (checkedAt <= 0L) return ht("上次结果")
+    val at = java.util.Calendar.getInstance().apply { timeInMillis = checkedAt }
+    val now = java.util.Calendar.getInstance()
+    val sameDay = at.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR) &&
+        at.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR)
+    val time = java.text.SimpleDateFormat(if (sameDay) "HH:mm" else "MM-dd HH:mm", Locale.ROOT).format(java.util.Date(checkedAt))
+    return ht("上次 %s").fill(time)
 }
 
 /** Stands in for two metric lines and their bar (same 75 dp) when there is nothing to show. */
