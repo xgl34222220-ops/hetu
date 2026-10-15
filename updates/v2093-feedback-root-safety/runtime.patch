@@ -56238,7 +56238,7 @@ index 48280df..b453abf 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
-index 2c5e10f..f3442ae 100644
+index 2c5e10f..626094b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 @@ -6,6 +6,9 @@ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomShe
@@ -56412,7 +56412,7 @@ index 2c5e10f..f3442ae 100644
 -            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { _, line -> HxLogLine(line) }
 +            // Keys follow the line itself (plus its occurrence), so a refresh that appends lines keeps the list in place.
 +            // Audit5 L1: lines a live refresh adds fade in and the rest glide (no item animation with motion off).
-+            else -> items(lines, key = { it.first }) { (_, line) -> Box(Modifier.hxAnimateItem()) { HxLogLine(line) } }
++            else -> items(lines, key = { it.first }) { (_, line) -> Box(hxAnimateItem()) { HxLogLine(line) } }
          }
      }
 
@@ -81837,7 +81837,7 @@ index 0000000..cd25ec1
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit5Polish108Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit5Polish108Test.kt
 new file mode 100644
-index 0000000..603ed09
+index 0000000..1f20b92
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit5Polish108Test.kt
 @@ -0,0 +1,274 @@
@@ -81911,7 +81911,7 @@ index 0000000..603ed09
 +    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
 +    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
 +    private var vm: HetuViewModel? = null
-+    private val output = File(System.getProperty("hetu.qa.output", "build/outputs/concept-remaining-coverage"), "audit5-coverage")
++    private val output = File("build/outputs/concept-remaining-coverage/audit5-coverage")
 +
 +    @Before fun clean() {
 +        prefs.edit().clear().putString("appearance", "light").putBoolean("hetuDynamicColor", false)
@@ -81947,7 +81947,7 @@ index 0000000..603ed09
 +    }
 +
 +    @Test fun logLinesAnimateAndTheEditorShowsPlaceholders() {
-+        assertTrue(source("ProxyLogViewerActivity.kt").contains("Box(Modifier.hxAnimateItem()) { HxLogLine(line) }"))
++        assertTrue(source("ProxyLogViewerActivity.kt").contains("Box(hxAnimateItem()) { HxLogLine(line) }"))
 +        val editor = source("tools/ToolsEditorScreen.kt")
 +        assertTrue(editor.contains("ToolsLoad.Loading -> Box(Modifier.fillMaxSize()) { io.github.xgl34222220.hetu.HxSkeletonLines("))
 +        assertFalse(editor.contains("HomeSpinner(size = 22.dp"))

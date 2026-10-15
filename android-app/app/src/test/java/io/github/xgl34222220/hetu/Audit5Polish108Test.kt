@@ -68,7 +68,7 @@ class Audit5Polish108Test {
     private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
     private var vm: HetuViewModel? = null
-    private val output = File(System.getProperty("hetu.qa.output", "build/outputs/concept-remaining-coverage"), "audit5-coverage")
+    private val output = File("build/outputs/concept-remaining-coverage/audit5-coverage")
 
     @Before fun clean() {
         prefs.edit().clear().putString("appearance", "light").putBoolean("hetuDynamicColor", false)
@@ -104,7 +104,7 @@ class Audit5Polish108Test {
     }
 
     @Test fun logLinesAnimateAndTheEditorShowsPlaceholders() {
-        assertTrue(source("ProxyLogViewerActivity.kt").contains("Box(Modifier.hxAnimateItem()) { HxLogLine(line) }"))
+        assertTrue(source("ProxyLogViewerActivity.kt").contains("Box(hxAnimateItem()) { HxLogLine(line) }"))
         val editor = source("tools/ToolsEditorScreen.kt")
         assertTrue(editor.contains("ToolsLoad.Loading -> Box(Modifier.fillMaxSize()) { io.github.xgl34222220.hetu.HxSkeletonLines("))
         assertFalse(editor.contains("HomeSpinner(size = 22.dp"))

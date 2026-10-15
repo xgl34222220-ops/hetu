@@ -552,7 +552,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             lines.isEmpty() -> item(key = "empty") { HxEmpty(PanelIcons.SearchX, "当前筛选条件下没有日志") }
             // Keys follow the line itself (plus its occurrence), so a refresh that appends lines keeps the list in place.
             // Audit5 L1: lines a live refresh adds fade in and the rest glide (no item animation with motion off).
-            else -> items(lines, key = { it.first }) { (_, line) -> Box(Modifier.hxAnimateItem()) { HxLogLine(line) } }
+            else -> items(lines, key = { it.first }) { (_, line) -> Box(hxAnimateItem()) { HxLogLine(line) } }
         }
     }
 
