@@ -25,7 +25,7 @@ class NetlossSelfHeal108Test {
 
     @Test
     fun hostsAreDefaultsPlusCaptivePortalSettingsWithoutGoogleSearchHosts() {
-        assertEquals(listOf("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"), CaptivePortalBypass.hosts(null))
+        assertEquals(listOf("connect.rom.miui.com", "www.qualcomm.cn"), CaptivePortalBypass.hosts(null))
         val hosts = CaptivePortalBypass.hosts(listOf(
             "http://connect.rom.miui.com/generate_204", "https://www.google.com/generate_204",
             "http://wifi.vivo.com.cn:80/generate_204,https://clients3.google.com/generate_204", null, "",
@@ -33,6 +33,15 @@ class NetlossSelfHeal108Test {
         assertEquals(probes + "wifi.vivo.com.cn", hosts)
         assertNull(CaptivePortalBypass.host("https://www.google.com/generate_204"))
         assertNull(CaptivePortalBypass.host("http://connectivitycheck.android.com/generate_204"))
+        // 3.3.3: Google-owned probe hosts time out direct in mainland China and keep the proxy.
+        assertNull(CaptivePortalBypass.host("http://connectivitycheck.gstatic.com/generate_204"))
+        assertNull(CaptivePortalBypass.host("http://www.gstatic.com/generate_204"))
+        assertEquals("www.google.cn", CaptivePortalBypass.host("http://www.google.cn/generate_204"))
+        val entries = CaptivePortalBypass.validationEntries(listOf("http://connectivitycheck.gstatic.com/generate_204",
+            "https://www.google.com/gen_204", "http://conn-service-cn-04.allawntech.com/generate204"))
+        assertFalse(entries.toString(), entries.any { it.contains("gstatic") || it.contains("android.com") || it.endsWith("google.com") })
+        assertTrue(entries.containsAll(listOf("connect.rom.miui.com", "www.qualcomm.cn", "conn1.oppomobile.com",
+            "connectivitycheck.platform.hicloud.com", "wifi.vivo.com.cn", "+.allawntech.com", "+.google.cn", "+.googleapis.cn")))
         assertEquals("captive.example.cn", CaptivePortalBypass.host("HTTPS://Captive.Example.CN./x?y"))
     }
 
@@ -42,7 +51,7 @@ class NetlossSelfHeal108Test {
         assertEquals("filter", created.state)
         assertEquals(probes + AdblockDnsPolicy.MIHOMO_DEFAULT_FAKE_IP_FILTER, dns(created.yaml)["fake-ip-filter"])
         val kept = CaptivePortalBypass.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter:\n    - '*.lan'\n    - connect.rom.miui.com\n", probes)
-        assertEquals(listOf("connectivitycheck.gstatic.com", "www.qualcomm.cn", "*.lan", "connect.rom.miui.com"), dns(kept.yaml)["fake-ip-filter"])
+        assertEquals(listOf("www.qualcomm.cn", "*.lan", "connect.rom.miui.com"), dns(kept.yaml)["fake-ip-filter"])
         val rule = CaptivePortalBypass.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter-mode: rule\n  fake-ip-filter:\n  - MATCH,fake-ip\n", probes)
         assertEquals("rule", rule.state)
         assertEquals(probes.map { "DOMAIN,$it,real-ip" } + "MATCH,fake-ip", dns(rule.yaml)["fake-ip-filter"])

@@ -28,16 +28,28 @@ final class AdblockDnsPolicy {
     /** Mihomo's own fake-ip-filter defaults, kept when Hetu has to create the list. */
     static final List<String> MIHOMO_DEFAULT_FAKE_IP_FILTER =
             Collections.unmodifiableList(Arrays.asList("dns.msftnsci.com", "www.msftnsci.com", "www.msftconnecttest.com"));
-    /** Android network-validation probe hosts (CaptivePortalBypass.DEFAULT_HOSTS): never DNS-blocked. */
-    static final List<String> VALIDATION_PROBE_HOSTS =
-            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"));
     /**
-     * 3.0.0: vendor-independent probe hosts of other ROMs (Huawei/Honor, OPPO/OnePlus/realme, vivo, AOSP
-     * fallback). Exact hosts; CaptivePortalBypass.EXTRA_HOSTS reuses them. Never DNS-blocked either.
+     * Android network-validation probe hosts that answer from mainland China (CaptivePortalBypass.DEFAULT_HOSTS):
+     * they go DIRECT with real addresses and are never DNS-blocked. 3.3.3: connectivitycheck.gstatic.com is no
+     * longer here; it times out on a direct path in mainland China, so it goes through the proxy again.
+     */
+    static final List<String> VALIDATION_PROBE_HOSTS =
+            Collections.unmodifiableList(Arrays.asList("connect.rom.miui.com", "www.qualcomm.cn"));
+    /**
+     * 3.0.0: vendor-independent probe hosts of other ROMs (Huawei/Honor, OPPO/OnePlus/realme, vivo). Exact hosts;
+     * CaptivePortalBypass.EXTRA_HOSTS reuses them. Never DNS-blocked either. 3.3.3: the AOSP fallback
+     * connectivitycheck.android.com (Google, unreachable direct from mainland China) is proxied again.
      */
     static final List<String> VALIDATION_PROBE_EXTRA_HOSTS =
-            Collections.unmodifiableList(Arrays.asList("connectivitycheck.platform.hicloud.com", "connectivitycheck.android.com",
+            Collections.unmodifiableList(Arrays.asList("connectivitycheck.platform.hicloud.com",
                     "conn1.oppomobile.com", "conn2.oppomobile.com", "wifi.vivo.com.cn"));
+    /**
+     * 3.3.3: Google-owned probe hosts. They keep the proxy (no DIRECT rule, no fake-ip-filter entry) but are
+     * still never answered empty by the DNS-layer ad-block, so validation through the proxy keeps working.
+     */
+    static final List<String> PROXIED_PROBE_HOSTS =
+            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "www.gstatic.com",
+                    "connectivitycheck.android.com"));
     /**
      * 3.0.0: probe domains taken with every subdomain (ColorOS conn-service-cn-0N.allawntech.com, www.google.cn,
      * www.googleapis.cn). All three are served inside mainland China; google.com itself is never among them.
@@ -65,6 +77,7 @@ final class AdblockDnsPolicy {
         ArrayList<String> probes = new ArrayList<>(VALIDATION_PROBE_HOSTS);
         probes.addAll(VALIDATION_PROBE_EXTRA_HOSTS);
         probes.addAll(VALIDATION_PROBE_SUFFIXES);
+        probes.addAll(PROXIED_PROBE_HOSTS);
         for (String probe : probes) {
             allowSet.add(probe);
             for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))

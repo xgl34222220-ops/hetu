@@ -163,7 +163,9 @@ WD_RESTART_MAX=3
 WD_RESTART_WINDOW=1800
 WD_LOG_MAX=65536
 WD_PROXY_URL=http://www.gstatic.com/generate_204
-WD_DIRECT_URLS="http://connectivitycheck.gstatic.com/generate_204 http://connect.rom.miui.com/generate_204"
+# 3.3.3: DIRECT checks use probe hosts that answer from mainland China (connectivitycheck.gstatic.com times
+# out direct there, which made every outage look like "DIRECT fails too").
+WD_DIRECT_URLS="http://connect.rom.miui.com/generate_204 http://www.qualcomm.cn/generate_204 http://www.google.cn/generate_204"
 WD_HEAL_REASON=""
 # Data-plane probe (3.0.0, real-device outage on ColorOS: core and controller alive, the Google group's
 # node stalled, the MATCH-group delay check saw nothing). As root the watchdog asks the core's DNS for a
@@ -795,6 +797,171 @@ net_recover_async(){
   [ -d "$CG_ESCAPE_GATE" ] || return 0
   detach_probe
   $SETSID "$0" net-recover "$1" </dev/null >/dev/null 2>&1 &
+  cg_escape "$!"
+  return 0
+}
+# ---- Wi-Fi recovery driven by a real probe (3.3.3) -----------------------------------------
+# Real-device report (OnePlus PLK110 / ColorOS): after a while the whole phone lost the network on
+# Wi-Fi; stopping or restarting Hetu did not help (flushnet + reevaluate ran fine, ColorOS kept the
+# Wi-Fi bad), only Wi-Fi off/on did. After a stop, start or restart (net-recover) and when the
+# watchdog sees a whole-phone outage, an HTTP 204 is fetched over the Wi-Fi route outside Hetu
+# (core identity root:net_admin, which every capture chain returns; real addresses from public DNS).
+# A failing probe or a Wi-Fi the system marks not validated escalates: flushnet + reevaluate, then
+# `cmd wifi reconnect`, then Wi-Fi off/on. On by default ($WIFI_HEAL_OFF turns the reconnect off,
+# written by the App setting), at most once per WIFI_HEAL_GAP s and WIFI_HEAL_HOUR_MAX per hour,
+# logged to watchdog.log, with a notification when Wi-Fi is reconnected.
+WIFI_HEAL_URLS="http://www.google.cn/generate_204 http://connect.rom.miui.com/generate_204 http://www.qualcomm.cn/generate_204"
+WIFI_HEAL_DNS="223.5.5.5 119.29.29.29 114.114.114.114"
+WIFI_HEAL_OFF="$BASE/policy/wifi-reconnect-off"
+WIFI_HEAL_GAP=600
+WIFI_HEAL_HOUR_MAX=3
+WIFI_HEAL_SETTLE=12
+WIFI_HEAL_WAIT=20
+WIFI_HEAL_OFFLINE_LIMIT=2
+# "<interface> <validated 0|1>" of the first Wi-Fi network with INTERNET in `dumpsys connectivity` on stdin.
+wifi_nai(){
+  awk 'index($0, "NetworkAgentInfo") && index($0, "ni{WIFI") {
+    i = ""; if (match($0, /InterfaceName: [A-Za-z0-9_.-]+/)) i = substr($0, RSTART + 15, RLENGTH - 15)
+    c = ""; if (match($0, /Capabilities: [A-Z0-9_&]+/)) c = substr($0, RSTART + 14, RLENGTH - 14)
+    n = split(c, a, "&"); v = 0; net = 0
+    for (k = 1; k <= n; k++) { if (a[k] == "VALIDATED") v = 1; if (a[k] == "INTERNET") net = 1 }
+    if (i != "" && net) { print i, v; exit } }'
+}
+# WP_BB = BusyBox, WP_RUN = "BusyBox setuidgid <spec>" running as uid 0 / gid net_admin (the core identity
+# every Hetu capture and DNS chain returns), empty when it cannot be had (then plain root).
+wifi_runner(){
+  WP_BB=""; WP_RUN=""
+  for WR_B in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do [ -x "$WR_B" ] && { WP_BB="$WR_B"; break; }; done
+  [ -n "$WP_BB" ] || return 0
+  for WR_S in root:net_admin "0:$CORE_GROUP_ID"; do
+    [ "$("$WP_BB" setuidgid "$WR_S" "$WP_BB" id -g 2>/dev/null)" = "$CORE_GROUP_ID" ] && { WP_RUN="$WP_BB setuidgid $WR_S"; return 0; }
+  done
+  return 0
+}
+# First IPv4 address of $1 from public resolvers (outside the core's DNS); BusyBox nslookup output on stdin.
+wifi_addr(){ awk '/^Name:/ {n = 1; next} n && /^Address/ { for (i = 2; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) { print $i; exit } }'; }
+wifi_lookup(){
+  [ -n "$WP_BB" ] || return 1
+  for WL_D in $WIFI_HEAL_DNS; do
+    WL_IP=$(timeout 6 $WP_RUN "$WP_BB" nslookup "$1" "$WL_D" 2>/dev/null | wifi_addr)
+    [ -z "$WL_IP" ] || { printf '%s\n' "$WL_IP"; return 0; }
+  done
+  return 1
+}
+# HTTP status of GET http://$1$3 with Host $2 over interface $4 (curl binds it; BusyBox wget follows the route).
+wifi_get(){
+  if has curl; then timeout 8 $WP_RUN curl -s -m 6 --interface "$4" -o /dev/null -w '%{http_code}' -H "Host: $2" "http://$1$3" 2>/dev/null; return 0; fi
+  [ -n "$WP_BB" ] || return 0
+  timeout 8 $WP_RUN "$WP_BB" wget -S -q -T 6 -O /dev/null --header "Host: $2" "http://$1$3" 2>&1 | awk '$1 ~ /^HTTP\// {c = $2} END {print c}'
+}
+# 0 = a 204 came back over Wi-Fi $1, 1 = no 204 from any probe host, 2 = could not test (no tool, the
+# route to the probe host is not the Wi-Fi). WP_HOW says what was seen.
+wifi_probe(){
+  WP_IF="$1"; WP_HOW=""
+  wifi_runner
+  if [ -z "$WP_BB" ] && ! has curl; then WP_HOW=no-http-tool; return 2; fi
+  for WP_U in $WIFI_HEAL_URLS; do
+    WP_H=${WP_U#http://}; WP_P="/${WP_H#*/}"; WP_H=${WP_H%%/*}
+    if [ -n "$WP_BB" ]; then
+      WP_IP=$(wifi_lookup "$WP_H") || { WP_HOW="${WP_HOW:+$WP_HOW,}$WP_H=no-dns"; continue; }
+      if ! has curl; then
+        case "$(ip route get "$WP_IP" 2>/dev/null | head -n 1) " in *" dev $WP_IF "*) ;; *) WP_HOW="${WP_HOW:+$WP_HOW,}route-not-$WP_IF"; return 2;; esac
+      fi
+    else WP_IP="$WP_H"; fi
+    WP_C=$(wifi_get "$WP_IP" "$WP_H" "$WP_P" "$WP_IF")
+    [ "$WP_C" != 204 ] || { WP_HOW="${WP_HOW:+$WP_HOW,}$WP_H=204"; return 0; }
+    WP_HOW="${WP_HOW:+$WP_HOW,}$WP_H=${WP_C:-none}"
+  done
+  return 1
+}
+# WC_STATE: none (no Wi-Fi network) | ok | bad. Bad = no 204 over Wi-Fi, or the system shows the Wi-Fi
+# not validated (an untestable probe then decides nothing on its own).
+wifi_check(){
+  WC_NAI=$(timeout 8 dumpsys connectivity 2>/dev/null | wifi_nai)
+  WC_IF=${WC_NAI% *}; WC_VALID=${WC_NAI##* }
+  if [ -z "$WC_NAI" ]; then WC_STATE=none; WC_DETAIL="no Wi-Fi network"; return 0; fi
+  wifi_probe "$WC_IF"; WC_RC=$?
+  WC_DETAIL="$WC_IF validated=$WC_VALID probe=$WP_HOW"
+  if [ "$WC_RC" = 1 ] || [ "$WC_VALID" != 1 ]; then WC_STATE=bad; else WC_STATE=ok; fi
+}
+# 0 when another Wi-Fi reconnect is allowed now (WIFI_HEAL_GAP since the last, < WIFI_HEAL_HOUR_MAX in an hour).
+wifi_heal_allowed(){
+  WHA_NOW=$(date +%s 2>/dev/null); case "$WHA_NOW" in ''|*[!0-9]*) return 1;; esac
+  WHA_F="$RUN/state/wifi-reconnects"
+  WHA_LAST=0; WHA_N=0
+  if [ -r "$WHA_F" ]; then
+    while read -r WHA_T; do
+      case "$WHA_T" in ''|*[!0-9]*) continue;; esac
+      [ "$WHA_T" -le "$WHA_NOW" ] || continue
+      [ "$WHA_T" -le "$WHA_LAST" ] || WHA_LAST="$WHA_T"
+      [ $((WHA_NOW-WHA_T)) -ge 3600 ] || WHA_N=$((WHA_N+1))
+    done < "$WHA_F"
+  fi
+  [ $((WHA_NOW-WHA_LAST)) -ge "$WIFI_HEAL_GAP" ] || { WHA_WHY="last reconnect $((WHA_NOW-WHA_LAST))s ago (at most one per ${WIFI_HEAL_GAP}s)"; return 1; }
+  [ "$WHA_N" -lt "$WIFI_HEAL_HOUR_MAX" ] || { WHA_WHY="$WHA_N reconnects in the last hour (at most $WIFI_HEAL_HOUR_MAX)"; return 1; }
+  return 0
+}
+wifi_heal_record(){
+  mkdir -p "$RUN/state" 2>/dev/null || true
+  { { tail -n 9 "$RUN/state/wifi-reconnects" 2>/dev/null; date +%s; } > "$RUN/state/wifi-reconnects.new.$$" &&
+    mv -f "$RUN/state/wifi-reconnects.new.$$" "$RUN/state/wifi-reconnects"; } 2>/dev/null || rm -f "$RUN/state/wifi-reconnects.new.$$" 2>/dev/null
+  return 0
+}
+wifi_cmd_ok(){ case "$1" in *[Ee]rror*|*[Uu]nknown*|*[Ee]xception*|*[Uu]sage*|*[Ff]ail*|*"not found"*) return 1;; esac; return 0; }
+# $1 reason (start | stop | restart | watchdog), $2 "flushed" when net_recover just ran.
+wifi_heal(){
+  WHL_R="$1"
+  mkdir -p "$RUN" 2>/dev/null || true
+  if ! mkdir "$RUN/wifi-heal.lock" 2>/dev/null; then
+    WHL_P=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
+    if [ -n "$WHL_P" ] && kill -0 "$WHL_P" 2>/dev/null; then return 0; fi
+    rm -rf "$RUN/wifi-heal.lock"; mkdir "$RUN/wifi-heal.lock" 2>/dev/null || return 0
+  fi
+  printf '%s\n' "$$" > "$RUN/wifi-heal.lock/pid" 2>/dev/null || true
+  wifi_heal_body "$WHL_R" "${2:-}"
+  rm -rf "$RUN/wifi-heal.lock"
+  return 0
+}
+wifi_heal_body(){
+  sleep "$WIFI_HEAL_SETTLE"
+  wifi_check
+  case "$WC_STATE" in
+    none) [ "$1" != watchdog ] || wd_log "wifi-heal ($1): $WC_DETAIL; nothing to reconnect"; return 0;;
+    ok) wd_log "wifi-heal ($1): Wi-Fi works ($WC_DETAIL)"; return 0;;
+  esac
+  wd_log "wifi-heal ($1): Wi-Fi has no internet ($WC_DETAIL)"
+  if [ "$2" != flushed ]; then
+    net_recover "wifi-heal ($1)"
+    sleep "$WIFI_HEAL_SETTLE"; wifi_check
+    [ "$WC_STATE" = bad ] || { wd_log "wifi-heal ($1): Wi-Fi works again after flushnet + reevaluate ($WC_DETAIL)"; return 0; }
+  fi
+  if [ -f "$WIFI_HEAL_OFF" ]; then wd_log "wifi-heal ($1): Wi-Fi reconnect is turned off in the settings; not reconnecting"; return 0; fi
+  wifi_heal_allowed || { wd_log "wifi-heal ($1): not reconnecting Wi-Fi: $WHA_WHY"; return 0; }
+  wifi_heal_record
+  WHB_HOW=""
+  if has cmd; then
+    WHB_X=$(timeout 8 cmd wifi reconnect 2>&1); WHB_RC=$?
+    if [ "$WHB_RC" = 0 ] && wifi_cmd_ok "$WHB_X"; then
+      WHB_HOW="cmd wifi reconnect"
+      sleep "$WIFI_HEAL_WAIT"; wifi_check
+    fi
+  fi
+  if [ -z "$WHB_HOW" ] || [ "$WC_STATE" = bad ]; then
+    WHB_HOW="${WHB_HOW:+$WHB_HOW, then }Wi-Fi off/on"
+    if has svc; then timeout 8 svc wifi disable >/dev/null 2>&1; sleep 2; timeout 8 svc wifi enable >/dev/null 2>&1
+    elif has cmd; then timeout 8 cmd wifi set-wifi-enabled disabled >/dev/null 2>&1; sleep 2; timeout 8 cmd wifi set-wifi-enabled enabled >/dev/null 2>&1
+    else wd_log "wifi-heal ($1): no svc or cmd to switch Wi-Fi"; return 0; fi
+    sleep "$WIFI_HEAL_WAIT"; wifi_check
+  fi
+  wd_log "wifi-heal ($1): reconnected Wi-Fi ($WHB_HOW); now $WC_STATE ($WC_DETAIL)"
+  wd_notify "wifi-reconnect $1" "检测到 Wi‑Fi 无法联网，河图已自动重连 Wi‑Fi（$WHB_HOW）。可在 代理高级设置 › 网络恢复 中关闭。"
+  return 0
+}
+# Watchdog: a detached wifi-heal (the probe and the reconnect take up to a minute). Android only.
+wifi_heal_async(){
+  [ -d "$CG_ESCAPE_GATE" ] || return 1
+  detach_probe
+  $SETSID "$0" wifi-heal "$1" </dev/null >/dev/null 2>&1 &
   cg_escape "$!"
   return 0
 }
@@ -2358,6 +2525,7 @@ wd_selfheal_init(){
   # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
   # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
   WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0
+  WD_OFF_N=0; WD_OFF_NEXT=0
   WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
   WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
   if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
@@ -2511,13 +2679,15 @@ wd_egress_tick(){
   wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
   case "$WET_RC" in
     0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-       WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
+       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
     2) WD_EG_TARGET=""; return 0;;
   esac
   # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
   WET_DIRECT=1
   for WET_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WET_U" && { WET_DIRECT=0; break; }; done
-  if [ "$WET_DIRECT" != 0 ]; then WD_EG_FAIL=0; return 0; fi
+  # 3.3.3: DIRECT failing too is a whole-phone outage, not "nothing to do": check the Wi-Fi outside Hetu.
+  if [ "$WET_DIRECT" != 0 ]; then WD_EG_FAIL=0; wd_offline_seen "proxy egress via $WD_EG_TARGET and DIRECT fail"; return 0; fi
+  WD_OFF_N=0
   WD_EG_FAIL=$((WD_EG_FAIL+1)); WD_EG_AT=$((WD_NOW+WD_EGRESS_RETRY))
   wd_log "proxy egress probe failed via $WD_EG_TARGET while direct works ($WD_EG_FAIL/$WD_EGRESS_LIMIT)"
   [ "$WD_EG_FAIL" -ge "$WD_EGRESS_LIMIT" ] || return 0
@@ -2715,6 +2885,19 @@ wd_dp_classify(){
   elif [ "$1" = ok ] || [ "${3:-0}" = 0 ]; then echo proxy-down
   else echo skip; fi
 }
+# A whole-phone outage verdict ($1 = what failed). After WIFI_HEAL_OFFLINE_LIMIT in a row a detached wifi-heal
+# probes the Wi-Fi outside Hetu and escalates (flushnet + reevaluate, reconnect, Wi-Fi off/on; rate-limited there).
+# A new check at most every WIFI_HEAL_GAP/2 s while the outage lasts.
+wd_offline_seen(){
+  WD_OFF_N=$((WD_OFF_N+1))
+  [ "$WD_OFF_N" -ge "$WIFI_HEAL_OFFLINE_LIMIT" ] || return 0
+  WD_OFF_N=0
+  [ "$WD_NOW" -ge "$WD_OFF_NEXT" ] || return 0
+  wifi_heal_async watchdog || return 0
+  WD_OFF_NEXT=$((WD_NOW+WIFI_HEAL_GAP/2))
+  wd_log "whole-phone outage ($1) while the core answers; checking Wi-Fi outside Hetu"
+  return 0
+}
 wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
 # Dead node: close the core's connections, let url-test/fallback/load-balance groups re-measure (and
@@ -2769,9 +2952,12 @@ wd_dataplane_tick(){
       WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
       wd_egress_state ok; return 0;;
     offline)
-      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL); nothing to heal"
-      WD_DP_FAIL=0; WD_DP_LAST=offline; wd_egress_state offline; return 0;;
+      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
+      WD_DP_FAIL=0; WD_DP_LAST=offline; wd_egress_state offline
+      # 3.3.3: whole-phone outage (DIRECT fails too while core and rules answer): Wi-Fi check / reconnect.
+      WD_DP_AT=$((WD_NOW+WD_DP_RETRY)); wd_offline_seen "$WD_DP_DETAIL"; return 0;;
   esac
+  WD_OFF_N=0
   if [ "$WDT_C" = "$WD_DP_LAST" ]; then WD_DP_FAIL=$((WD_DP_FAIL+1)); else WD_DP_FAIL=1; WD_DP_LAST="$WDT_C"; fi
   wd_egress_state "$WDT_C"
   wd_log "data-plane probe: $WDT_C ($WD_DP_DETAIL) $WD_DP_FAIL/$WD_DP_LIMIT"
@@ -4353,7 +4539,8 @@ case "${1:-status}" in
   monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
   # 3.0.0 system-side recovery (stop/start spawn it detached), probe URL discovery for the App, and the
   # end of the post-stop fake-IP reset window.
-  net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2";;
+  net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2"; wifi_heal "$2" flushed;;
+  wifi-heal) [ "$#" = 2 ] || exit 0; root; wifi_heal "$2";;
   probe-urls) [ "$#" = 1 ] || fail "参数错误"; root; probe_urls;;
   fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_expire "$2";;
   monitor-status) root; monitor_status_json;;

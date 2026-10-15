@@ -23,6 +23,12 @@ import java.util.Locale
  * every subdomain: fake-ip-filter '+.domain', rule DOMAIN-SUFFIX,domain,DIRECT), plus probe URLs read as Root
  * from device_config / dumpsys / logcat when available. Only the probe host connectivitycheck.android.com
  * goes DIRECT, never android.com, google.com, googleapis.com or youtube.com.
+ *
+ * 3.3.3 (real-device report, mainland China): connectivitycheck.gstatic.com and connectivitycheck.android.com
+ * time out on a direct path there, so they are no longer bypassed and go through the proxy as before 3.0.0.
+ * Every Google-owned host (gstatic.com included) is refused by [host], also when a ROM setting or a probe URL
+ * read as Root names it. allawntech.com, google.cn, googleapis.cn, OPPO, Huawei, Xiaomi, Qualcomm and vivo
+ * probe hosts stay DIRECT.
  */
 object CaptivePortalBypass {
     /** Same list as AdblockDnsPolicy.VALIDATION_PROBE_HOSTS (that pure-Java class is also compiled alone by host tests). */
@@ -38,7 +44,7 @@ object CaptivePortalBypass {
     @JvmField val SETTINGS_KEYS: List<String> = listOf(
         "captive_portal_http_url", "captive_portal_https_url", "captive_portal_fallback_url", "captive_portal_other_fallback_urls")
 
-    private val NEVER_DIRECT = listOf("google.com", "android.com", "googleapis.com", "youtube.com")
+    private val NEVER_DIRECT = listOf("google.com", "android.com", "googleapis.com", "gstatic.com", "youtube.com")
     private val HOST = Regex("^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$")
 
     class Result(@JvmField val yaml: String, @JvmField val state: String)

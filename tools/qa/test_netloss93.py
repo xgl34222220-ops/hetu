@@ -20,6 +20,11 @@ assets/hetu-root.sh and run under /bin/sh against temporary fixtures:
 * network change: an App repair-network call leaves a kick that makes the watchdog re-probe.
 * rule shapes: preserve_existing_tcp never lets a fake-IP destination go direct, the network
   stack UID 1073 stays out of DNS takeover (captured resolver); cgroup memory limit uses memory.high (+50 % max).
+* 3.3.3 Wi-Fi recovery: after stop/start (net-recover) and on a whole-phone outage seen by the watchdog
+  (proxy and DIRECT both fail while the core answers) an HTTP 204 is fetched over the Wi-Fi outside Hetu;
+  a failure or a not-validated Wi-Fi escalates flushnet + reevaluate -> cmd wifi reconnect -> Wi-Fi off/on,
+  on by default, turned off by the policy marker, rate-limited, logged and notified. DIRECT checks use
+  mainland-China probe hosts (connectivitycheck.gstatic.com times out direct there).
 """
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -66,12 +71,14 @@ SELFHEAL_VARS = ('CG_ESCAPE_GATE', 'CG_ESCAPE_V1', 'CG_ESCAPED', 'SETSID', 'SETS
                  'WD_HTTP_TOOLS', 'WD_HTTP_TIMEOUT', 'WD_LIVE_GRACE', 'WD_LIVE_EVERY', 'WD_LIVE_RETRY', 'WD_LIVE_LIMIT',
                  'WD_DNS_EVERY', 'WD_DNS_LIMIT', 'WD_EGRESS_GRACE', 'WD_EGRESS_EVERY', 'WD_EGRESS_RETRY',
                  'WD_EGRESS_LIMIT', 'WD_EGRESS_BACKOFF', 'WD_EGRESS_BACKOFF_MAX', 'WD_RESTART_MAX',
-                 'WD_RESTART_WINDOW', 'WD_LOG_MAX', 'WD_PROXY_URL', 'WD_DIRECT_URLS', 'WD_HEAL_REASON')
+                 'WD_RESTART_WINDOW', 'WD_LOG_MAX', 'WD_PROXY_URL', 'WD_DIRECT_URLS', 'WD_HEAL_REASON',
+                 'CORE_GROUP_ID', 'WIFI_HEAL_URLS', 'WIFI_HEAL_DNS', 'WIFI_HEAL_OFF', 'WIFI_HEAL_GAP', 'WIFI_HEAL_HOUR_MAX',
+                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT')
 HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape', 'wd_log', 'wd_log_body', 'wd_now',
            'wd_notify', 'wd_http', 'wd_dns_probe', 'wd_core_frozen', 'wd_selfheal_init', 'wd_net_sig', 'wd_net_watch',
            'wd_liveness', 'wd_restart_allowed', 'wd_restart_core', 'wd_heal_notice', 'wd_recover', 'wd_egress_target',
            'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick', 'fake_range', 'wd_session_fake_range',
-           'wd_root_fake_captured')
+           'wd_root_fake_captured', 'wd_offline_seen', 'wifi_heal_async')
 
 
 class Controller:
@@ -746,6 +753,281 @@ class Phase300SourceGuards(unittest.TestCase):
             self.assertIn('cg_escape "$!"', body)
             self.assertLess(body.index('detach_probe'), body.index(cmd))
             self.assertLess(body.index(cmd), body.index('cg_escape "$!"'))
+
+
+WIFI_NAI_LINE = ('  NetworkAgentInfo{network{373}  handle{1605428498445}  ni{WIFI CONNECTED extra: } created=Thu  Score(Policies : '
+                 'TRANSPORT_PRIMARY&EVER_EVALUATED&IS_UNMETERED&EVER_VALIDATED&IS_VALIDATED ; KeepConnected : 0)  lp{{InterfaceName: wlan0 '
+                 'LinkAddresses: [ 192.168.2.99/23 ] DnsAddresses: [ /202.101.224.69,/114.114.114.114 ]}}  nc{[ Transports: WIFI '
+                 'Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND '
+                 'LinkUpBandwidth>=49382Kbps SSID: "lh"]}  factorySerialNumber=7}\n')
+CELL_NAI_LINE = ('  NetworkAgentInfo{network{375}  ni{MOBILE[NR] CONNECTED extra: ims}  lp{{InterfaceName: rmnet_data4 }}  nc{[ Transports: '
+                 'CELLULAR Capabilities: IMS&NOT_METERED&TRUSTED&NOT_VPN&VALIDATED ]}\n')
+
+
+class WifiHeal(ShellCase):
+    """3.3.3: Wi-Fi recovery driven by a real probe (net-recover after stop/start, wifi-heal from the watchdog)."""
+    FUNCS = ('wifi_nai', 'wifi_addr', 'wifi_lookup', 'wifi_get', 'wifi_probe', 'wifi_check', 'wifi_heal_allowed',
+             'wifi_heal_record', 'wifi_cmd_ok', 'wifi_heal', 'wifi_heal_body')
+
+    def bin_dir(self):
+        b = self.dir / 'bin'
+        b.mkdir(exist_ok=True)
+        for name, body in (('cmd', 'echo "cmd $*" >> "$CALLS"; [ "$1 $2" = "wifi reconnect" ] && [ -n "${NO_RECONNECT:-}" ] && { echo "Unknown command: reconnect"; exit 255; }\n'
+                                   '[ "$1" = notification ] && echo "$*" >> "$NOTES"; exit 0\n'),
+                           ('svc', 'echo "svc $*" >> "$CALLS"; exit 0\n')):
+            f = b / name
+            f.write_text('#!/bin/sh\n' + body)
+            f.chmod(0o755)
+        return b
+
+    def run_heal(self, states, reason='stop', flushed='flushed', extra='', env=None):
+        """wifi_check yields the given states in order (the last one repeats)."""
+        b = self.bin_dir()
+        seq = self.dir / 'states'
+        seq.write_text('\n'.join(states) + '\n')
+        stubs = ('wifi_check(){ WC_STATE=$(head -n 1 %s); [ "$(wc -l < %s)" -le 1 ] || sed -i 1d %s; WC_DETAIL="wlan0 stub"; }\n'
+                 'net_recover(){ echo "net_recover $1" >> "$CALLS"; }\nsleep(){ :; }\n') % (shq(seq), shq(seq), shq(seq))
+        fn = ''.join(function(n) for n in self.FUNCS if n != 'wifi_check')
+        e = {'PATH': '%s:%s' % (b, os.environ['PATH']), 'CALLS': str(self.dir / 'calls'), 'NOTES': str(self.dir / 'notes')}
+        e.update(env or {})
+        body = 'wifi_heal %s %s; echo "rc=$?"' % (shq(reason), shq(flushed))
+        r = self.sh(body, extra=fn + stubs + extra, env=e)
+        calls = (self.dir / 'calls').read_text() if (self.dir / 'calls').exists() else ''
+        notes = (self.dir / 'notes').read_text() if (self.dir / 'notes').exists() else ''
+        return r, calls, notes
+
+    def test_nai_reads_wifi_interface_and_validated_flag_from_dumpsys(self):
+        body = function('wifi_nai') + 'wifi_nai'
+        run = lambda text: subprocess.run(['/bin/sh', '-c', body], input=text, capture_output=True, text=True, timeout=20).stdout.strip()
+        self.assertEqual(run(CELL_NAI_LINE + WIFI_NAI_LINE), 'wlan0 1')
+        # EVER_VALIDATED / IS_VALIDATED in the score are not the capability.
+        self.assertEqual(run(WIFI_NAI_LINE.replace('NOT_VPN&VALIDATED&', 'NOT_VPN&')), 'wlan0 0')
+        self.assertEqual(run(CELL_NAI_LINE), '', 'no Wi-Fi network')
+        self.assertEqual(run(WIFI_NAI_LINE.replace('&INTERNET&', '&')), '', 'Wi-Fi without INTERNET is not the one')
+
+    def test_addr_parses_both_busybox_nslookup_formats(self):
+        old = 'Server:    223.5.5.5\nAddress 1: 223.5.5.5 public1.alidns.com\n\nName:      www.google.cn\nAddress 1: 180.163.151.171\n'
+        new = 'Server:\t\t223.5.5.5\nAddress:\t223.5.5.5:53\n\nNon-authoritative answer:\nName:\twww.google.cn\nAddress: 180.163.150.33\n'
+        body = function('wifi_addr') + 'wifi_addr'
+        for text, want in ((old, '180.163.151.171'), (new, '180.163.150.33'), ('Server: 1.1.1.1\nAddress 1: 1.1.1.1\n', '')):
+            r = subprocess.run(['/bin/sh', '-c', body], input=text, capture_output=True, text=True, timeout=20)
+            self.assertEqual(r.stdout.strip(), want)
+
+    def test_probe_runs_as_core_identity_resolves_publicly_and_needs_a_204_over_wifi(self):
+        b = self.bin_dir()
+        bb = b / 'busybox'
+        bb.write_text('#!/bin/sh\necho "bb $*" >> "$CALLS"\n'
+                      'if [ "$1" = setuidgid ]; then shift 2; exec "$@"; fi\n'
+                      'case "$1" in\n'
+                      '  nslookup) [ "$3" = "${DEAD_DNS:-x}" ] && exit 1; printf "Server: %s\\n\\nName: %s\\nAddress 1: 203.0.113.%s\\n" "$3" "$2" "${#2}";;\n'
+                      '  wget) for a; do case "$a" in http://*) u="$a";; esac; done; echo "wget $u" >> "$CALLS"\n'
+                      '        case "$u" in *"${OK_IP:-none}"*) echo "  HTTP/1.1 204 No Content" >&2;; *) echo "  HTTP/1.1 ${CODE:-302} Found" >&2;; esac;;\n'
+                      'esac\n')
+        bb.chmod(0o755)
+        ip = b / 'ip'
+        ip.write_text('#!/bin/sh\necho "$4 via 192.168.2.1 dev ${ROUTE_DEV:-wlan0} table wlan0 src 192.168.2.99 uid 0"\n')
+        ip.chmod(0o755)
+        extra = ('wifi_runner(){ WP_BB=%s; WP_RUN="%s setuidgid root:net_admin"; }\n'
+                 'has(){ [ "$1" != curl ] && command -v "$1" >/dev/null 2>&1; }\n') % (shq(bb), bb)
+        extra += ''.join(function(n) for n in ('wifi_addr', 'wifi_lookup', 'wifi_get', 'wifi_probe'))
+        e = {'PATH': '%s:%s' % (b, os.environ['PATH']), 'CALLS': str(self.dir / 'calls')}
+
+        def probe(**env):
+            if (self.dir / 'calls').exists():
+                (self.dir / 'calls').unlink()
+            r = self.sh('wifi_probe wlan0; echo "rc=$? how=$WP_HOW"', extra=extra, env={**e, **env})
+            return r.stdout.strip(), (self.dir / 'calls').read_text() if (self.dir / 'calls').exists() else ''
+
+        # www.google.cn (13 chars) answers 204.
+        out, calls = probe(OK_IP='203.0.113.13')
+        self.assertIn('rc=0 how=www.google.cn=204', out)
+        self.assertIn('bb setuidgid root:net_admin %s nslookup www.google.cn 223.5.5.5' % bb, calls)
+        self.assertIn('wget http://203.0.113.13/generate_204', calls)
+        self.assertNotIn('gstatic', calls)
+        # A captive/blocked answer (302) from every probe host is a failure, the first public resolver may be down.
+        out, calls = probe(DEAD_DNS='223.5.5.5')
+        self.assertIn('rc=1', out)
+        for host in ('www.google.cn=302', 'connect.rom.miui.com=302', 'www.qualcomm.cn=302'):
+            self.assertIn(host, out)
+        self.assertIn('nslookup www.google.cn 119.29.29.29', calls)
+        # The route is not the Wi-Fi (e.g. cellular became the default): cannot test.
+        out, _ = probe(ROUTE_DEV='rmnet_data1', OK_IP='203.0.113.13')
+        self.assertIn('rc=2 how=route-not-wlan0', out)
+
+    def test_working_wifi_is_left_alone(self):
+        r, calls, notes = self.run_heal(['ok'])
+        self.assertIn('rc=0', r.stdout, r.stderr)
+        self.assertNotIn('svc', calls)
+        self.assertNotIn('wifi reconnect', calls)
+        self.assertIn('wifi-heal (stop): Wi-Fi works', self.log_text())
+        self.assertFalse((self.run_dir / 'wifi-heal.lock').exists())
+
+    def test_bad_wifi_escalates_reconnect_then_off_on_with_log_notification_and_record(self):
+        r, calls, notes = self.run_heal(['bad'])
+        self.assertIn('rc=0', r.stdout, r.stderr)
+        lines = calls.split('\n')
+        self.assertLess(lines.index('cmd wifi reconnect'), lines.index('svc wifi disable'))
+        self.assertLess(lines.index('svc wifi disable'), lines.index('svc wifi enable'))
+        self.assertNotIn('net_recover', calls, 'net-recover already flushed and re-evaluated')
+        log = self.log_text()
+        self.assertIn('wifi-heal (stop): Wi-Fi has no internet', log)
+        self.assertIn('reconnected Wi-Fi (cmd wifi reconnect, then Wi-Fi off/on)', log)
+        self.assertIn('hetu-selfheal', notes)
+        self.assertIn('自动重连 Wi‑Fi', notes)
+        self.assertEqual(len((self.run_dir / 'state/wifi-reconnects').read_text().split()), 1)
+
+    def test_reconnect_that_fixes_it_skips_off_on_and_missing_reconnect_command_goes_to_off_on(self):
+        r, calls, _ = self.run_heal(['bad', 'ok'])
+        self.assertIn('cmd wifi reconnect', calls)
+        self.assertNotIn('svc wifi', calls)
+        self.assertIn('reconnected Wi-Fi (cmd wifi reconnect); now ok', self.log_text())
+        (self.run_dir / 'state/wifi-reconnects').unlink()
+        (self.dir / 'calls').unlink()
+        r, calls, _ = self.run_heal(['bad'], env={'NO_RECONNECT': '1'})
+        self.assertIn('svc wifi disable', calls)
+        self.assertIn('reconnected Wi-Fi (Wi-Fi off/on)', self.log_text())
+
+    def test_watchdog_reason_flushes_and_reevaluates_first(self):
+        r, calls, _ = self.run_heal(['bad', 'ok'], reason='watchdog', flushed='')
+        self.assertIn('net_recover wifi-heal (watchdog)', calls)
+        self.assertNotIn('wifi reconnect', calls)
+        self.assertIn('Wi-Fi works again after flushnet + reevaluate', self.log_text())
+
+    def test_policy_marker_turns_the_reconnect_off(self):
+        (self.dir / 'policy').mkdir()
+        (self.dir / 'policy/wifi-reconnect-off').write_text('')
+        r, calls, notes = self.run_heal(['bad'])
+        self.assertNotIn('svc', calls)
+        self.assertNotIn('wifi reconnect', calls)
+        self.assertEqual(notes, '')
+        self.assertIn('Wi-Fi reconnect is turned off in the settings', self.log_text())
+
+    def test_rate_limit_once_per_ten_minutes_and_three_per_hour(self):
+        now = int(time.time())
+        state = self.run_dir / 'state/wifi-reconnects'
+        cases = [([], 0), ([now - 120], 1), ([now - 700], 0), ([now - 3000, now - 2000, now - 1000], 1),
+                 ([now - 4000, now - 2000, now - 1000], 0), ([now + 9999], 0)]
+        fn = function('wifi_heal_allowed')
+        for stamps, want in cases:
+            with self.subTest(stamps=[s - now for s in stamps]):
+                state.write_text(''.join('%d\n' % s for s in stamps))
+                r = self.sh('wifi_heal_allowed; echo "rc=$? $WHA_WHY"', extra=fn + 'WHA_WHY=""\n')
+                self.assertIn('rc=%d' % want, r.stdout, r.stderr)
+        state.write_text('%d\n' % (now - 60))
+        r, calls, _ = self.run_heal(['bad'])
+        self.assertNotIn('svc', calls)
+        self.assertIn('not reconnecting Wi-Fi: last reconnect', self.log_text())
+
+    def test_a_running_heal_is_not_doubled(self):
+        lock = self.run_dir / 'wifi-heal.lock'
+        lock.mkdir()
+        (lock / 'pid').write_text(str(os.getpid()))
+        r, calls, _ = self.run_heal(['bad'])
+        self.assertEqual(calls, '')
+        self.assertTrue(lock.exists())
+        (lock / 'pid').write_text('999999')
+        r, calls, _ = self.run_heal(['ok'])
+        self.assertIn('Wi-Fi works', self.log_text(), 'a stale lock is taken over')
+
+
+class WholePhoneOutage(ShellCase):
+    """3.3.3: proxy and DIRECT both failing while the core answers starts the Wi-Fi check (watchdog blind spot)."""
+
+    def ticks(self, c, n, gate=True):
+        self.session(cp=c.port)
+        self0 = self.dir / 'hetu-root.sh'
+        spawned = self.dir / 'spawned'
+        self0.write_text('#!/bin/sh\necho "$*" >> %s\n' % shq(spawned))
+        self0.chmod(0o755)
+        g = self.dir / 'android'
+        g.mkdir(exist_ok=True)
+        body = ('CG_ESCAPE_V1=""; ' + ('CG_ESCAPE_GATE=%s; ' % shq(g) if gate else '') +
+                'COREPID=$$; KILL=0; wd_selfheal_init; WD_EGRESS_RETRY=0; WD_EGRESS_EVERY=0; '
+                'for i in $(seq %d); do wd_now; WD_EG_AT=0; wd_egress_tick; done; echo "off=$WD_OFF_N level=$WD_EG_LEVEL"' % n)
+        r = subprocess.run(['/bin/sh', '-c', self.prelude('wd_restart_core(){ return 1; }\n') + body, str(self0)],
+                           capture_output=True, text=True, timeout=120)
+        for _ in range(30):
+            if spawned.exists() or not gate:
+                break
+            time.sleep(0.1)
+        return r, spawned.read_text() if spawned.exists() else ''
+
+    def test_direct_failing_too_spawns_one_wifi_heal_and_never_touches_the_core(self):
+        c = self.controller()
+        c.proxy_ok = False
+        c.direct_ok = False
+        r, spawned = self.ticks(c, 5)
+        self.assertIn('level=0', r.stdout, r.stderr)
+        self.assertEqual(spawned.split('\n')[0], 'wifi-heal watchdog')
+        self.assertEqual(spawned.count('wifi-heal'), 1, 'next check only after WIFI_HEAL_GAP/2')
+        self.assertIn('whole-phone outage (proxy egress via', self.log_text())
+        self.assertFalse([1 for m, p, a in c.requests if m in ('DELETE', 'POST')])
+        direct = [u for u in (unquote(p) for m, p, a in c.requests) if u.startswith('/proxies/DIRECT/')]
+        self.assertTrue(direct and not [p for p in direct if 'gstatic' in p], direct)
+        self.assertIn('url=http://connect.rom.miui.com/generate_204', direct[0])
+
+    def test_one_offline_verdict_or_a_working_direct_path_does_not(self):
+        c = self.controller()
+        c.proxy_ok = False
+        c.direct_ok = False
+        r, spawned = self.ticks(c, 1)
+        self.assertIn('off=1', r.stdout, r.stderr)
+        self.assertEqual(spawned, '')
+        c.direct_ok = True
+        r, spawned = self.ticks(c, 2)
+        self.assertIn('off=0', r.stdout, r.stderr)
+        self.assertEqual(spawned, '')
+
+    def test_off_android_nothing_is_spawned(self):
+        c = self.controller()
+        c.proxy_ok = False
+        c.direct_ok = False
+        r, spawned = self.ticks(c, 4, gate=False)
+        self.assertEqual(spawned, '')
+        self.assertNotIn('whole-phone outage', self.log_text())
+
+
+class Phase333SourceGuards(unittest.TestCase):
+    def test_net_recover_runs_the_wifi_check_after_flush_and_watchdog_offline_uses_it(self):
+        self.assertIn('net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2"; wifi_heal "$2" flushed;;', TEXT)
+        self.assertIn('wifi-heal) [ "$#" = 2 ] || exit 0; root; wifi_heal "$2";;', TEXT)
+        self.assertIn('wd_offline_seen "$WD_DP_DETAIL"', function('wd_dataplane_tick'))
+        self.assertIn('wd_offline_seen "proxy egress via $WD_EG_TARGET and DIRECT fail"', function('wd_egress_tick'))
+        async_body = function('wifi_heal_async')
+        self.assertLess(async_body.index('detach_probe'), async_body.index('$SETSID "$0" wifi-heal "$1"'))
+        self.assertLess(async_body.index('$SETSID "$0" wifi-heal "$1"'), async_body.index('cg_escape "$!"'))
+        # The start path itself only spawns net-recover (single su; the probe runs detached).
+        self.assertNotIn('wifi_heal', function('start'))
+
+    def test_direct_checks_and_wifi_probe_avoid_google_hosts_unreachable_direct_in_china(self):
+        for name in ('WD_DIRECT_URLS', 'WIFI_HEAL_URLS'):
+            line = top_assignment(name)
+            self.assertNotIn('gstatic', line)
+            self.assertNotIn('google.com', line)
+            self.assertIn('connect.rom.miui.com/generate_204', line)
+        self.assertIn('www.google.cn/generate_204', top_assignment('WIFI_HEAL_URLS'))
+        self.assertEqual(top_assignment('WIFI_HEAL_OFF'), 'WIFI_HEAL_OFF="$BASE/policy/wifi-reconnect-off"\n')
+
+    def test_app_side_policy_and_validation_list(self):
+        pkg = REPO / 'android-app/app/src/main/java/io/github/xgl34222220/hetu'
+        adblock = (pkg / 'AdblockDnsPolicy.java').read_text()
+        hosts = re.search(r'VALIDATION_PROBE_HOSTS =\s*Collections\.unmodifiableList\(Arrays\.asList\((.*?)\)\);', adblock, re.S).group(1)
+        extra = re.search(r'VALIDATION_PROBE_EXTRA_HOSTS =\s*Collections\.unmodifiableList\(Arrays\.asList\((.*?)\)\);', adblock, re.S).group(1)
+        suffixes = re.search(r'VALIDATION_PROBE_SUFFIXES =\s*Collections\.unmodifiableList\(Arrays\.asList\((.*?)\)\);', adblock, re.S).group(1)
+        direct = hosts + extra + suffixes
+        for gone in ('connectivitycheck.gstatic.com', 'connectivitycheck.android.com', 'gstatic.com', 'google.com'):
+            self.assertNotIn('"%s"' % gone, direct)
+        for kept in ('connect.rom.miui.com', 'www.qualcomm.cn', 'connectivitycheck.platform.hicloud.com', 'conn1.oppomobile.com',
+                     'conn2.oppomobile.com', 'wifi.vivo.com.cn', 'allawntech.com', 'google.cn', 'googleapis.cn'):
+            self.assertIn('"%s"' % kept, direct)
+        bypass = (pkg / 'app/CaptivePortalBypass.kt').read_text()
+        self.assertIn('"gstatic.com"', re.search(r'NEVER_DIRECT = listOf\((.*?)\)', bypass).group(1))
+        reval = (pkg / 'app/NetworkRevalidation.kt').read_text()
+        self.assertIn('const val WIFI_RECONNECT_DEFAULT = true', reval)
+        self.assertNotIn('svc wifi', reval, 'the App no longer toggles Wi-Fi itself')
+        manager = (pkg / 'RootProxyManager.java').read_text()
+        self.assertIn('prefs.getBoolean("proxyWifiToggleRecovery",true)', manager)
+        self.assertIn('policyDir+"/wifi-reconnect-off"', manager)
 
 
 if __name__ == '__main__':

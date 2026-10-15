@@ -1314,11 +1314,11 @@ private val vocabularyAudit4Func = """
 """.trimIndent()
 
 
-// 2026-10-14 3.0.0 network recovery (opt-in Wi-Fi re-toggle after stop/start).
+// 2026-10-14 3.0.0 network recovery; 3.3.3: Wi-Fi reconnect driven by a real probe, on by default.
 private val vocabularyNetRecovery300 = """
 网络恢复|Network recovery|網路恢復|Восстановление сети
-Wi‑Fi 仍无法联网时重开|Restart Wi‑Fi if it still has no internet|Wi‑Fi 仍無法連網時重開|Перезапускать Wi‑Fi, если интернета всё ещё нет
-启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效|After the proxy starts or stops, DNS caches are flushed and the system re-checks its networks; when this is on and Wi‑Fi still shows no internet, Root turns Wi‑Fi off and on once. Off by default; applies at once|啟動或停止代理後會清除 DNS 快取並讓系統重新偵測網路；開啟後，若 Wi‑Fi 仍顯示無法連線到網路，再用 Root 關閉並重新開啟一次 Wi‑Fi。預設關閉，立即生效|После запуска или остановки прокси очищается кэш DNS и система заново проверяет сети; если включено и Wi‑Fi всё ещё без интернета, Root один раз выключает и включает Wi‑Fi. По умолчанию выключено, действует сразу
+Wi‑Fi 无法联网时自动重连|Reconnect Wi‑Fi when it has no internet|Wi‑Fi 無法連網時自動重新連線|Переподключать Wi‑Fi, если нет интернета
+启动、停止或重启代理后，以及守护进程发现整机断网时，会绕过河图直接访问国内的 204 检测地址并读取系统的 Wi‑Fi 验证状态；若 Wi‑Fi 仍无法联网，先刷新 DNS 并让系统重新检测，再用 Root 重连 Wi‑Fi（必要时关闭再打开）并发出通知。最多每 10 分钟一次、每小时 3 次。默认开启，立即生效|After the proxy starts, stops or restarts, and when the watchdog sees the whole phone offline, Hetu fetches a mainland China 204 check outside the proxy and reads the system's Wi‑Fi validation; if Wi‑Fi still has no internet, DNS caches are flushed and the system re-checks, then Root reconnects Wi‑Fi (off and on if needed) and posts a notification. At most once per 10 minutes and 3 times per hour. On by default; applies at once|啟動、停止或重新啟動代理後，以及守護程序發現整機斷網時，會繞過河圖直接存取國內的 204 偵測位址並讀取系統的 Wi‑Fi 驗證狀態；若 Wi‑Fi 仍無法連網，先清除 DNS 快取並讓系統重新偵測，再用 Root 重新連線 Wi‑Fi（必要時關閉再開啟）並發出通知。最多每 10 分鐘一次、每小時 3 次。預設開啟，立即生效|После запуска, остановки или перезапуска прокси, а также когда сторож видит, что весь телефон без сети, Hetu в обход прокси запрашивает 204-проверку в материковом Китае и читает статус проверки Wi‑Fi в системе; если интернета всё ещё нет, очищается кэш DNS и система заново проверяет сеть, затем Root переподключает Wi‑Fi (при необходимости выключает и включает) и показывает уведомление. Не чаще раза в 10 минут и 3 раз в час. По умолчанию включено, действует сразу
 """.trimIndent()
 
 

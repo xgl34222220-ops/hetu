@@ -11,8 +11,15 @@ import android.net.NetworkCapabilities
  * hetu-root.sh already flushes every network's resolver cache and asks for re-evaluation as Root
  * (`ndc resolver flushnet`, `cmd connectivity reevaluate`). From the App, every network with INTERNET
  * (no VPN) is reported with the opposite of its VALIDATED state, which makes ConnectivityService force
- * a re-evaluation without changing anything else. Only when the user turned on [PREF_WIFI_TOGGLE] and a
- * Wi-Fi network is still not validated [WIFI_TOGGLE_DELAY_MS] later is Wi-Fi switched off and on as Root.
+ * a re-evaluation without changing anything else.
+ *
+ * 3.3.3 (real-device report: ColorOS kept the Wi-Fi bad after flushnet + reevaluate; only Wi-Fi off/on helped):
+ * the Wi-Fi escalation moved into hetu-root.sh (`net-recover` after stop/start/restart, `wifi-heal` from the
+ * watchdog on a whole-phone outage). It fetches an HTTP 204 over the Wi-Fi outside Hetu, reads the system's
+ * VALIDATED flag and, if either says the Wi-Fi has no internet, runs flushnet + reevaluate, `cmd wifi reconnect`
+ * and Wi-Fi off/on, rate-limited and with a notification. [PREF_WIFI_TOGGLE] is now on by default
+ * ([WIFI_RECONNECT_DEFAULT]); turning it off writes the Root marker [WIFI_RECONNECT_OFF_MARKER] (also written by
+ * the start transaction's deployment, so the start stays one su invocation). The App no longer toggles Wi-Fi itself.
  *
  * After a start the probe URLs NetworkMonitor uses are also read as Root (`hetu-root.sh probe-urls`:
  * device_config, dumpsys network_stack / connectivity, logcat) at most once per [PROBE_URL_TTL_MS]; the next
@@ -24,7 +31,10 @@ object NetworkRevalidation {
     private const val PREF_PROBE_URLS = "proxyProbeUrlsCache"
     private const val PREF_PROBE_URLS_AT = "proxyProbeUrlsAt"
     private const val SCRIPT = "/data/adb/hetu/hetu-root.sh"
-    const val WIFI_TOGGLE_DELAY_MS = 12_000L
+    /** 3.3.3: Wi-Fi reconnect after a failed real probe is on unless the user turned it off. */
+    const val WIFI_RECONNECT_DEFAULT = true
+    /** Root policy marker read by hetu-root.sh wifi-heal: present = never reconnect Wi-Fi (same literal in RootProxyManager). */
+    const val WIFI_RECONNECT_OFF_MARKER = "/data/adb/hetu/policy/wifi-reconnect-off"
     const val PROBE_URL_DELAY_MS = 60_000L
     const val PROBE_URL_TTL_MS = 24L * 60 * 60 * 1000
 
@@ -32,6 +42,16 @@ object NetworkRevalidation {
     fun kick(context: Context, reason: String) {
         val app = context.applicationContext ?: context
         Thread({ runCatching { recover(app, reason) } }, "hetu-revalidate").apply { isDaemon = true }.start()
+    }
+
+    /** Applies the setting to the Root marker at once (async, best effort); the next start writes it again. */
+    @JvmStatic
+    fun applyWifiReconnectPolicy(context: Context, enabled: Boolean) {
+        val app = context.applicationContext ?: context
+        val marker = RootBridge.quote(WIFI_RECONNECT_OFF_MARKER)
+        val cmd = if (enabled) "rm -f $marker"
+        else "mkdir -p /data/adb/hetu/policy && chmod 700 /data/adb/hetu/policy && : > $marker && chmod 600 $marker && chown 0:0 $marker"
+        Thread({ runCatching { RootBridge.rootShell(app, cmd, 10_000L) } }, "hetu-wifi-policy").apply { isDaemon = true }.start()
     }
 
     /** Probe URLs last read as Root (one per line); empty until a start has read them. */
@@ -60,15 +80,9 @@ object NetworkRevalidation {
             val ok = runCatching { cm.reportNetworkConnectivity(network, !validated) }.isSuccess
             reported.append(if (wifi) " wifi" else " net").append(if (validated) "=valid" else "=invalid").append(if (ok) "" else "(report-failed)")
         }
-        var toggled = ""
-        if (prefs.getBoolean(PREF_WIFI_TOGGLE, false)) {
-            Thread.sleep(WIFI_TOGGLE_DELAY_MS)
-            if (networks(cm).any { it.third && !it.second }) {
-                val r = runCatching { RootBridge.rootShell(app, "svc wifi disable; sleep 2; svc wifi enable", 15_000L) }.getOrNull()
-                toggled = if (r != null && r.ok()) " wifi-toggled" else " wifi-toggle-failed"
-            }
-        }
-        prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + toggled).apply()
+        // The Wi-Fi probe / reconnect runs as Root in hetu-root.sh (net-recover), logged to watchdog.log.
+        val wifi = if (prefs.getBoolean(PREF_WIFI_TOGGLE, WIFI_RECONNECT_DEFAULT)) " wifi-reconnect=on" else " wifi-reconnect=off"
+        prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + wifi).apply()
         if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) {
             // Kept well away from the start transaction: the start path stays a single su invocation.
             Thread.sleep(PROBE_URL_DELAY_MS)

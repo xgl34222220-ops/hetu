@@ -2221,6 +2221,12 @@ final class RootProxyManager {
         if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
         else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                 .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
+        // 3.3.3: Wi-Fi reconnect after a failed real probe (hetu-root.sh wifi-heal) is on by default; this marker
+        // (NetworkRevalidation.WIFI_RECONNECT_OFF_MARKER, pref NetworkRevalidation.PREF_WIFI_TOGGLE) turns it off.
+        String wifiOffMarker=policyDir+"/wifi-reconnect-off";
+        if(prefs.getBoolean("proxyWifiToggleRecovery",true))cmd.append("; rm -f ").append(RootBridge.quote(wifiOffMarker));
+        else cmd.append("; : > ").append(RootBridge.quote(wifiOffMarker)).append("; chmod 600 ").append(RootBridge.quote(wifiOffMarker))
+                .append("; chown 0:0 ").append(RootBridge.quote(wifiOffMarker));
         // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
         String cnipPolicy=policyDir+"/cnip";
         boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);

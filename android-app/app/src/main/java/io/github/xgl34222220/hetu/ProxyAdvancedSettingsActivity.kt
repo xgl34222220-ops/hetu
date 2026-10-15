@@ -214,12 +214,16 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
         item(key = "recovery") {
             SettingsSection {
                 SettingsGroup(title = ht("网络恢复")) {
-                    // 3.0.0: opt-in last resort after stop/start; DNS flush and re-validation always run.
-                    val toggle = prefs.getBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, false)
+                    // 3.3.3: Wi-Fi reconnect after a failed real probe, on by default (hetu-root.sh wifi-heal);
+                    // DNS flush and re-validation always run. The switch writes the Root policy marker at once.
+                    val toggle = prefs.getBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, NetworkRevalidation.WIFI_RECONNECT_DEFAULT)
                     OtherSwitch(
-                        "Wi‑Fi 仍无法联网时重开", toggle, icon = HomeIcons.Server,
-                        subtitle = ht("启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效"),
-                    ) { prefs.edit().putBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, it).apply(); revision++ }
+                        "Wi‑Fi 无法联网时自动重连", toggle, icon = HomeIcons.Server,
+                        subtitle = ht("启动、停止或重启代理后，以及守护进程发现整机断网时，会绕过河图直接访问国内的 204 检测地址并读取系统的 Wi‑Fi 验证状态；若 Wi‑Fi 仍无法联网，先刷新 DNS 并让系统重新检测，再用 Root 重连 Wi‑Fi（必要时关闭再打开）并发出通知。最多每 10 分钟一次、每小时 3 次。默认开启，立即生效"),
+                    ) {
+                        prefs.edit().putBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, it).apply(); revision++
+                        NetworkRevalidation.applyWifiReconnectPolicy(context, it)
+                    }
                 }
             }
         }

@@ -36148,7 +36148,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..17de5d2 100755
+index ae832da..58f9931 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36211,7 +36211,7 @@ index ae832da..17de5d2 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +100,150 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +100,152 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -36278,7 +36278,9 @@ index ae832da..17de5d2 100755
 +WD_RESTART_WINDOW=1800
 +WD_LOG_MAX=65536
 +WD_PROXY_URL=http://www.gstatic.com/generate_204
-+WD_DIRECT_URLS="http://connectivitycheck.gstatic.com/generate_204 http://connect.rom.miui.com/generate_204"
++# 3.3.3: DIRECT checks use probe hosts that answer from mainland China (connectivitycheck.gstatic.com times
++# out direct there, which made every outage look like "DIRECT fails too").
++WD_DIRECT_URLS="http://connect.rom.miui.com/generate_204 http://www.qualcomm.cn/generate_204 http://www.google.cn/generate_204"
 +WD_HEAL_REASON=""
 +# Data-plane probe (3.0.0, real-device outage on ColorOS: core and controller alive, the Google group's
 +# node stalled, the MATCH-group delay check saw nothing). As root the watchdog asks the core's DNS for a
@@ -36365,7 +36367,7 @@ index ae832da..17de5d2 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +255,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +257,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -36489,7 +36491,7 @@ index ae832da..17de5d2 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +377,53 @@ acquire_lock(){
+@@ -99,10 +379,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -36545,7 +36547,7 @@ index ae832da..17de5d2 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +509,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +511,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -36569,7 +36571,7 @@ index ae832da..17de5d2 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +558,8 @@ cleanup4(){
+@@ -233,7 +560,8 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -36579,7 +36581,7 @@ index ae832da..17de5d2 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +574,248 @@ cleanup6(){
+@@ -248,13 +576,413 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -36809,6 +36811,171 @@ index ae832da..17de5d2 100755
 +  cg_escape "$!"
 +  return 0
 +}
++# ---- Wi-Fi recovery driven by a real probe (3.3.3) -----------------------------------------
++# Real-device report (OnePlus PLK110 / ColorOS): after a while the whole phone lost the network on
++# Wi-Fi; stopping or restarting Hetu did not help (flushnet + reevaluate ran fine, ColorOS kept the
++# Wi-Fi bad), only Wi-Fi off/on did. After a stop, start or restart (net-recover) and when the
++# watchdog sees a whole-phone outage, an HTTP 204 is fetched over the Wi-Fi route outside Hetu
++# (core identity root:net_admin, which every capture chain returns; real addresses from public DNS).
++# A failing probe or a Wi-Fi the system marks not validated escalates: flushnet + reevaluate, then
++# `cmd wifi reconnect`, then Wi-Fi off/on. On by default ($WIFI_HEAL_OFF turns the reconnect off,
++# written by the App setting), at most once per WIFI_HEAL_GAP s and WIFI_HEAL_HOUR_MAX per hour,
++# logged to watchdog.log, with a notification when Wi-Fi is reconnected.
++WIFI_HEAL_URLS="http://www.google.cn/generate_204 http://connect.rom.miui.com/generate_204 http://www.qualcomm.cn/generate_204"
++WIFI_HEAL_DNS="223.5.5.5 119.29.29.29 114.114.114.114"
++WIFI_HEAL_OFF="$BASE/policy/wifi-reconnect-off"
++WIFI_HEAL_GAP=600
++WIFI_HEAL_HOUR_MAX=3
++WIFI_HEAL_SETTLE=12
++WIFI_HEAL_WAIT=20
++WIFI_HEAL_OFFLINE_LIMIT=2
++# "<interface> <validated 0|1>" of the first Wi-Fi network with INTERNET in `dumpsys connectivity` on stdin.
++wifi_nai(){
++  awk 'index($0, "NetworkAgentInfo") && index($0, "ni{WIFI") {
++    i = ""; if (match($0, /InterfaceName: [A-Za-z0-9_.-]+/)) i = substr($0, RSTART + 15, RLENGTH - 15)
++    c = ""; if (match($0, /Capabilities: [A-Z0-9_&]+/)) c = substr($0, RSTART + 14, RLENGTH - 14)
++    n = split(c, a, "&"); v = 0; net = 0
++    for (k = 1; k <= n; k++) { if (a[k] == "VALIDATED") v = 1; if (a[k] == "INTERNET") net = 1 }
++    if (i != "" && net) { print i, v; exit } }'
++}
++# WP_BB = BusyBox, WP_RUN = "BusyBox setuidgid <spec>" running as uid 0 / gid net_admin (the core identity
++# every Hetu capture and DNS chain returns), empty when it cannot be had (then plain root).
++wifi_runner(){
++  WP_BB=""; WP_RUN=""
++  for WR_B in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do [ -x "$WR_B" ] && { WP_BB="$WR_B"; break; }; done
++  [ -n "$WP_BB" ] || return 0
++  for WR_S in root:net_admin "0:$CORE_GROUP_ID"; do
++    [ "$("$WP_BB" setuidgid "$WR_S" "$WP_BB" id -g 2>/dev/null)" = "$CORE_GROUP_ID" ] && { WP_RUN="$WP_BB setuidgid $WR_S"; return 0; }
++  done
++  return 0
++}
++# First IPv4 address of $1 from public resolvers (outside the core's DNS); BusyBox nslookup output on stdin.
++wifi_addr(){ awk '/^Name:/ {n = 1; next} n && /^Address/ { for (i = 2; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) { print $i; exit } }'; }
++wifi_lookup(){
++  [ -n "$WP_BB" ] || return 1
++  for WL_D in $WIFI_HEAL_DNS; do
++    WL_IP=$(timeout 6 $WP_RUN "$WP_BB" nslookup "$1" "$WL_D" 2>/dev/null | wifi_addr)
++    [ -z "$WL_IP" ] || { printf '%s\n' "$WL_IP"; return 0; }
++  done
++  return 1
++}
++# HTTP status of GET http://$1$3 with Host $2 over interface $4 (curl binds it; BusyBox wget follows the route).
++wifi_get(){
++  if has curl; then timeout 8 $WP_RUN curl -s -m 6 --interface "$4" -o /dev/null -w '%{http_code}' -H "Host: $2" "http://$1$3" 2>/dev/null; return 0; fi
++  [ -n "$WP_BB" ] || return 0
++  timeout 8 $WP_RUN "$WP_BB" wget -S -q -T 6 -O /dev/null --header "Host: $2" "http://$1$3" 2>&1 | awk '$1 ~ /^HTTP\// {c = $2} END {print c}'
++}
++# 0 = a 204 came back over Wi-Fi $1, 1 = no 204 from any probe host, 2 = could not test (no tool, the
++# route to the probe host is not the Wi-Fi). WP_HOW says what was seen.
++wifi_probe(){
++  WP_IF="$1"; WP_HOW=""
++  wifi_runner
++  if [ -z "$WP_BB" ] && ! has curl; then WP_HOW=no-http-tool; return 2; fi
++  for WP_U in $WIFI_HEAL_URLS; do
++    WP_H=${WP_U#http://}; WP_P="/${WP_H#*/}"; WP_H=${WP_H%%/*}
++    if [ -n "$WP_BB" ]; then
++      WP_IP=$(wifi_lookup "$WP_H") || { WP_HOW="${WP_HOW:+$WP_HOW,}$WP_H=no-dns"; continue; }
++      if ! has curl; then
++        case "$(ip route get "$WP_IP" 2>/dev/null | head -n 1) " in *" dev $WP_IF "*) ;; *) WP_HOW="${WP_HOW:+$WP_HOW,}route-not-$WP_IF"; return 2;; esac
++      fi
++    else WP_IP="$WP_H"; fi
++    WP_C=$(wifi_get "$WP_IP" "$WP_H" "$WP_P" "$WP_IF")
++    [ "$WP_C" != 204 ] || { WP_HOW="${WP_HOW:+$WP_HOW,}$WP_H=204"; return 0; }
++    WP_HOW="${WP_HOW:+$WP_HOW,}$WP_H=${WP_C:-none}"
++  done
++  return 1
++}
++# WC_STATE: none (no Wi-Fi network) | ok | bad. Bad = no 204 over Wi-Fi, or the system shows the Wi-Fi
++# not validated (an untestable probe then decides nothing on its own).
++wifi_check(){
++  WC_NAI=$(timeout 8 dumpsys connectivity 2>/dev/null | wifi_nai)
++  WC_IF=${WC_NAI% *}; WC_VALID=${WC_NAI##* }
++  if [ -z "$WC_NAI" ]; then WC_STATE=none; WC_DETAIL="no Wi-Fi network"; return 0; fi
++  wifi_probe "$WC_IF"; WC_RC=$?
++  WC_DETAIL="$WC_IF validated=$WC_VALID probe=$WP_HOW"
++  if [ "$WC_RC" = 1 ] || [ "$WC_VALID" != 1 ]; then WC_STATE=bad; else WC_STATE=ok; fi
++}
++# 0 when another Wi-Fi reconnect is allowed now (WIFI_HEAL_GAP since the last, < WIFI_HEAL_HOUR_MAX in an hour).
++wifi_heal_allowed(){
++  WHA_NOW=$(date +%s 2>/dev/null); case "$WHA_NOW" in ''|*[!0-9]*) return 1;; esac
++  WHA_F="$RUN/state/wifi-reconnects"
++  WHA_LAST=0; WHA_N=0
++  if [ -r "$WHA_F" ]; then
++    while read -r WHA_T; do
++      case "$WHA_T" in ''|*[!0-9]*) continue;; esac
++      [ "$WHA_T" -le "$WHA_NOW" ] || continue
++      [ "$WHA_T" -le "$WHA_LAST" ] || WHA_LAST="$WHA_T"
++      [ $((WHA_NOW-WHA_T)) -ge 3600 ] || WHA_N=$((WHA_N+1))
++    done < "$WHA_F"
++  fi
++  [ $((WHA_NOW-WHA_LAST)) -ge "$WIFI_HEAL_GAP" ] || { WHA_WHY="last reconnect $((WHA_NOW-WHA_LAST))s ago (at most one per ${WIFI_HEAL_GAP}s)"; return 1; }
++  [ "$WHA_N" -lt "$WIFI_HEAL_HOUR_MAX" ] || { WHA_WHY="$WHA_N reconnects in the last hour (at most $WIFI_HEAL_HOUR_MAX)"; return 1; }
++  return 0
++}
++wifi_heal_record(){
++  mkdir -p "$RUN/state" 2>/dev/null || true
++  { { tail -n 9 "$RUN/state/wifi-reconnects" 2>/dev/null; date +%s; } > "$RUN/state/wifi-reconnects.new.$$" &&
++    mv -f "$RUN/state/wifi-reconnects.new.$$" "$RUN/state/wifi-reconnects"; } 2>/dev/null || rm -f "$RUN/state/wifi-reconnects.new.$$" 2>/dev/null
++  return 0
++}
++wifi_cmd_ok(){ case "$1" in *[Ee]rror*|*[Uu]nknown*|*[Ee]xception*|*[Uu]sage*|*[Ff]ail*|*"not found"*) return 1;; esac; return 0; }
++# $1 reason (start | stop | restart | watchdog), $2 "flushed" when net_recover just ran.
++wifi_heal(){
++  WHL_R="$1"
++  mkdir -p "$RUN" 2>/dev/null || true
++  if ! mkdir "$RUN/wifi-heal.lock" 2>/dev/null; then
++    WHL_P=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
++    if [ -n "$WHL_P" ] && kill -0 "$WHL_P" 2>/dev/null; then return 0; fi
++    rm -rf "$RUN/wifi-heal.lock"; mkdir "$RUN/wifi-heal.lock" 2>/dev/null || return 0
++  fi
++  printf '%s\n' "$$" > "$RUN/wifi-heal.lock/pid" 2>/dev/null || true
++  wifi_heal_body "$WHL_R" "${2:-}"
++  rm -rf "$RUN/wifi-heal.lock"
++  return 0
++}
++wifi_heal_body(){
++  sleep "$WIFI_HEAL_SETTLE"
++  wifi_check
++  case "$WC_STATE" in
++    none) [ "$1" != watchdog ] || wd_log "wifi-heal ($1): $WC_DETAIL; nothing to reconnect"; return 0;;
++    ok) wd_log "wifi-heal ($1): Wi-Fi works ($WC_DETAIL)"; return 0;;
++  esac
++  wd_log "wifi-heal ($1): Wi-Fi has no internet ($WC_DETAIL)"
++  if [ "$2" != flushed ]; then
++    net_recover "wifi-heal ($1)"
++    sleep "$WIFI_HEAL_SETTLE"; wifi_check
++    [ "$WC_STATE" = bad ] || { wd_log "wifi-heal ($1): Wi-Fi works again after flushnet + reevaluate ($WC_DETAIL)"; return 0; }
++  fi
++  if [ -f "$WIFI_HEAL_OFF" ]; then wd_log "wifi-heal ($1): Wi-Fi reconnect is turned off in the settings; not reconnecting"; return 0; fi
++  wifi_heal_allowed || { wd_log "wifi-heal ($1): not reconnecting Wi-Fi: $WHA_WHY"; return 0; }
++  wifi_heal_record
++  WHB_HOW=""
++  if has cmd; then
++    WHB_X=$(timeout 8 cmd wifi reconnect 2>&1); WHB_RC=$?
++    if [ "$WHB_RC" = 0 ] && wifi_cmd_ok "$WHB_X"; then
++      WHB_HOW="cmd wifi reconnect"
++      sleep "$WIFI_HEAL_WAIT"; wifi_check
++    fi
++  fi
++  if [ -z "$WHB_HOW" ] || [ "$WC_STATE" = bad ]; then
++    WHB_HOW="${WHB_HOW:+$WHB_HOW, then }Wi-Fi off/on"
++    if has svc; then timeout 8 svc wifi disable >/dev/null 2>&1; sleep 2; timeout 8 svc wifi enable >/dev/null 2>&1
++    elif has cmd; then timeout 8 cmd wifi set-wifi-enabled disabled >/dev/null 2>&1; sleep 2; timeout 8 cmd wifi set-wifi-enabled enabled >/dev/null 2>&1
++    else wd_log "wifi-heal ($1): no svc or cmd to switch Wi-Fi"; return 0; fi
++    sleep "$WIFI_HEAL_WAIT"; wifi_check
++  fi
++  wd_log "wifi-heal ($1): reconnected Wi-Fi ($WHB_HOW); now $WC_STATE ($WC_DETAIL)"
++  wd_notify "wifi-reconnect $1" "检测到 Wi‑Fi 无法联网，河图已自动重连 Wi‑Fi（$WHB_HOW）。可在 代理高级设置 › 网络恢复 中关闭。"
++  return 0
++}
++# Watchdog: a detached wifi-heal (the probe and the reconnect take up to a minute). Android only.
++wifi_heal_async(){
++  [ -d "$CG_ESCAPE_GATE" ] || return 1
++  detach_probe
++  $SETSID "$0" wifi-heal "$1" </dev/null >/dev/null 2>&1 &
++  cg_escape "$!"
++  return 0
++}
 +# Probe URLs NetworkMonitor uses on this ROM, best effort (the App keeps them for the next start).
 +probe_urls(){
 +  {
@@ -36830,7 +36997,7 @@ index ae832da..17de5d2 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +847,21 @@ findcorepid(){
+@@ -286,8 +1014,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -36853,7 +37020,7 @@ index ae832da..17de5d2 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +870,8 @@ stopcore(){
+@@ -296,6 +1037,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -36862,7 +37029,7 @@ index ae832da..17de5d2 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,6 +896,14 @@ stopcore(){
+@@ -320,6 +1063,14 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -36877,7 +37044,7 @@ index ae832da..17de5d2 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -362,6 +946,138 @@ v6disabled(){
+@@ -362,6 +1113,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -37016,7 +37183,7 @@ index ae832da..17de5d2 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1172,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1339,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -37114,7 +37281,7 @@ index ae832da..17de5d2 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1280,8 @@ core_return(){
+@@ -473,8 +1447,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -37125,7 +37292,7 @@ index ae832da..17de5d2 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1305,14 @@ append_scoped(){
+@@ -498,12 +1472,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -37142,7 +37309,7 @@ index ae832da..17de5d2 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1320,21 @@ scoped_redirect(){
+@@ -511,17 +1487,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -37167,7 +37334,7 @@ index ae832da..17de5d2 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,15 +1346,281 @@ bypass4(){
+@@ -533,15 +1513,281 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -37449,7 +37616,7 @@ index ae832da..17de5d2 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -710,8 +1789,12 @@ local_destination_return(){
+@@ -710,8 +1956,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -37463,7 +37630,7 @@ index ae832da..17de5d2 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +1814,23 @@ install_mangle4(){
+@@ -731,22 +1981,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -37496,7 +37663,7 @@ index ae832da..17de5d2 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +1845,45 @@ install_mangle6(){
+@@ -761,40 +2012,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -37556,7 +37723,7 @@ index ae832da..17de5d2 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +1911,12 @@ remove_dot_guard(){
+@@ -822,12 +2078,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -37571,7 +37738,7 @@ index ae832da..17de5d2 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +1930,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2097,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -37593,7 +37760,7 @@ index ae832da..17de5d2 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +1955,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2122,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -37637,7 +37804,7 @@ index ae832da..17de5d2 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +2014,128 @@ v6_disable_guard_ready(){
+@@ -921,16 +2181,128 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -37771,7 +37938,7 @@ index ae832da..17de5d2 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +2166,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +2333,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -37780,7 +37947,7 @@ index ae832da..17de5d2 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1019,20 +2224,643 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2391,662 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -37918,6 +38085,7 @@ index ae832da..17de5d2 100755
 +  # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
 +  # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
 +  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0
++  WD_OFF_N=0; WD_OFF_NEXT=0
 +  WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
 +  WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
 +  if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
@@ -38071,13 +38239,15 @@ index ae832da..17de5d2 100755
 +  wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
 +  case "$WET_RC" in
 +    0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-+       WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
++       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
 +    2) WD_EG_TARGET=""; return 0;;
 +  esac
 +  # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
 +  WET_DIRECT=1
 +  for WET_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WET_U" && { WET_DIRECT=0; break; }; done
-+  if [ "$WET_DIRECT" != 0 ]; then WD_EG_FAIL=0; return 0; fi
++  # 3.3.3: DIRECT failing too is a whole-phone outage, not "nothing to do": check the Wi-Fi outside Hetu.
++  if [ "$WET_DIRECT" != 0 ]; then WD_EG_FAIL=0; wd_offline_seen "proxy egress via $WD_EG_TARGET and DIRECT fail"; return 0; fi
++  WD_OFF_N=0
 +  WD_EG_FAIL=$((WD_EG_FAIL+1)); WD_EG_AT=$((WD_NOW+WD_EGRESS_RETRY))
 +  wd_log "proxy egress probe failed via $WD_EG_TARGET while direct works ($WD_EG_FAIL/$WD_EGRESS_LIMIT)"
 +  [ "$WD_EG_FAIL" -ge "$WD_EGRESS_LIMIT" ] || return 0
@@ -38275,6 +38445,19 @@ index ae832da..17de5d2 100755
 +  elif [ "$1" = ok ] || [ "${3:-0}" = 0 ]; then echo proxy-down
 +  else echo skip; fi
 +}
++# A whole-phone outage verdict ($1 = what failed). After WIFI_HEAL_OFFLINE_LIMIT in a row a detached wifi-heal
++# probes the Wi-Fi outside Hetu and escalates (flushnet + reevaluate, reconnect, Wi-Fi off/on; rate-limited there).
++# A new check at most every WIFI_HEAL_GAP/2 s while the outage lasts.
++wd_offline_seen(){
++  WD_OFF_N=$((WD_OFF_N+1))
++  [ "$WD_OFF_N" -ge "$WIFI_HEAL_OFFLINE_LIMIT" ] || return 0
++  WD_OFF_N=0
++  [ "$WD_NOW" -ge "$WD_OFF_NEXT" ] || return 0
++  wifi_heal_async watchdog || return 0
++  WD_OFF_NEXT=$((WD_NOW+WIFI_HEAL_GAP/2))
++  wd_log "whole-phone outage ($1) while the core answers; checking Wi-Fi outside Hetu"
++  return 0
++}
 +wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 +wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
 +# Dead node: close the core's connections, let url-test/fallback/load-balance groups re-measure (and
@@ -38329,9 +38512,12 @@ index ae832da..17de5d2 100755
 +      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
 +      wd_egress_state ok; return 0;;
 +    offline)
-+      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL); nothing to heal"
-+      WD_DP_FAIL=0; WD_DP_LAST=offline; wd_egress_state offline; return 0;;
++      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
++      WD_DP_FAIL=0; WD_DP_LAST=offline; wd_egress_state offline
++      # 3.3.3: whole-phone outage (DIRECT fails too while core and rules answer): Wi-Fi check / reconnect.
++      WD_DP_AT=$((WD_NOW+WD_DP_RETRY)); wd_offline_seen "$WD_DP_DETAIL"; return 0;;
 +  esac
++  WD_OFF_N=0
 +  if [ "$WDT_C" = "$WD_DP_LAST" ]; then WD_DP_FAIL=$((WD_DP_FAIL+1)); else WD_DP_FAIL=1; WD_DP_LAST="$WDT_C"; fi
 +  wd_egress_state "$WDT_C"
 +  wd_log "data-plane probe: $WDT_C ($WD_DP_DETAIL) $WD_DP_FAIL/$WD_DP_LIMIT"
@@ -38432,7 +38618,7 @@ index ae832da..17de5d2 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +2873,45 @@ probe_core_owner(){
+@@ -1045,9 +3059,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -38479,7 +38665,7 @@ index ae832da..17de5d2 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +2922,29 @@ core_identity_prepare(){
+@@ -1058,14 +3108,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -38513,7 +38699,7 @@ index ae832da..17de5d2 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +2958,9 @@ core_launch(){
+@@ -1079,8 +3144,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -38525,7 +38711,7 @@ index ae832da..17de5d2 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +3027,21 @@ core_tune(){
+@@ -1147,6 +3213,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -38547,7 +38733,7 @@ index ae832da..17de5d2 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,16 +3120,90 @@ google_firewall_maintain(){ (
+@@ -1225,16 +3306,90 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -38638,7 +38824,7 @@ index ae832da..17de5d2 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +3211,16 @@ start(){
+@@ -1242,8 +3397,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -38648,15 +38834,15 @@ index ae832da..17de5d2 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +3230,91 @@ start(){
+@@ -1253,75 +3416,91 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -38787,7 +38973,7 @@ index ae832da..17de5d2 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +3326,91 @@ start(){
+@@ -1333,19 +3512,91 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -38884,7 +39070,7 @@ index ae832da..17de5d2 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +3472,12 @@ status(){
+@@ -1407,6 +3658,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -38897,7 +39083,7 @@ index ae832da..17de5d2 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +3558,24 @@ status(){
+@@ -1487,13 +3744,24 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -38924,7 +39110,7 @@ index ae832da..17de5d2 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +3699,8 @@ health_collect(){
+@@ -1617,6 +3885,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -38933,7 +39119,7 @@ index ae832da..17de5d2 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +3750,18 @@ health_restore_table(){
+@@ -1666,16 +3936,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -38954,7 +39140,7 @@ index ae832da..17de5d2 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +3810,7 @@ health_repair(){ (
+@@ -1724,7 +3996,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -38963,7 +39149,7 @@ index ae832da..17de5d2 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +3843,481 @@ health_json(){ (
+@@ -1757,6 +4029,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -39445,7 +39631,7 @@ index ae832da..17de5d2 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +4335,31 @@ case "${1:-status}" in
+@@ -1774,10 +4521,32 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -39470,7 +39656,8 @@ index ae832da..17de5d2 100755
 +  monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
 +  # 3.0.0 system-side recovery (stop/start spawn it detached), probe URL discovery for the App, and the
 +  # end of the post-stop fake-IP reset window.
-+  net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2";;
++  net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2"; wifi_heal "$2" flushed;;
++  wifi-heal) [ "$#" = 2 ] || exit 0; root; wifi_heal "$2";;
 +  probe-urls) [ "$#" = 1 ] || fail "参数错误"; root; probe_urls;;
 +  fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_expire "$2";;
 +  monitor-status) root; monitor_status_json;;
@@ -50116,10 +50303,10 @@ index 0000000..faa5a76
 +HSPLtop/yukonga/miuix/kmp/utils/MiuixIndication$MiuixIndicationInstance$onAttach$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
 new file mode 100644
-index 0000000..6f84189
+index 0000000..e2968c4
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,354 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.util.*;
@@ -50150,16 +50337,28 @@ index 0000000..6f84189
 +    /** Mihomo's own fake-ip-filter defaults, kept when Hetu has to create the list. */
 +    static final List<String> MIHOMO_DEFAULT_FAKE_IP_FILTER =
 +            Collections.unmodifiableList(Arrays.asList("dns.msftnsci.com", "www.msftnsci.com", "www.msftconnecttest.com"));
-+    /** Android network-validation probe hosts (CaptivePortalBypass.DEFAULT_HOSTS): never DNS-blocked. */
-+    static final List<String> VALIDATION_PROBE_HOSTS =
-+            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"));
 +    /**
-+     * 3.0.0: vendor-independent probe hosts of other ROMs (Huawei/Honor, OPPO/OnePlus/realme, vivo, AOSP
-+     * fallback). Exact hosts; CaptivePortalBypass.EXTRA_HOSTS reuses them. Never DNS-blocked either.
++     * Android network-validation probe hosts that answer from mainland China (CaptivePortalBypass.DEFAULT_HOSTS):
++     * they go DIRECT with real addresses and are never DNS-blocked. 3.3.3: connectivitycheck.gstatic.com is no
++     * longer here; it times out on a direct path in mainland China, so it goes through the proxy again.
++     */
++    static final List<String> VALIDATION_PROBE_HOSTS =
++            Collections.unmodifiableList(Arrays.asList("connect.rom.miui.com", "www.qualcomm.cn"));
++    /**
++     * 3.0.0: vendor-independent probe hosts of other ROMs (Huawei/Honor, OPPO/OnePlus/realme, vivo). Exact hosts;
++     * CaptivePortalBypass.EXTRA_HOSTS reuses them. Never DNS-blocked either. 3.3.3: the AOSP fallback
++     * connectivitycheck.android.com (Google, unreachable direct from mainland China) is proxied again.
 +     */
 +    static final List<String> VALIDATION_PROBE_EXTRA_HOSTS =
-+            Collections.unmodifiableList(Arrays.asList("connectivitycheck.platform.hicloud.com", "connectivitycheck.android.com",
++            Collections.unmodifiableList(Arrays.asList("connectivitycheck.platform.hicloud.com",
 +                    "conn1.oppomobile.com", "conn2.oppomobile.com", "wifi.vivo.com.cn"));
++    /**
++     * 3.3.3: Google-owned probe hosts. They keep the proxy (no DIRECT rule, no fake-ip-filter entry) but are
++     * still never answered empty by the DNS-layer ad-block, so validation through the proxy keeps working.
++     */
++    static final List<String> PROXIED_PROBE_HOSTS =
++            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "www.gstatic.com",
++                    "connectivitycheck.android.com"));
 +    /**
 +     * 3.0.0: probe domains taken with every subdomain (ColorOS conn-service-cn-0N.allawntech.com, www.google.cn,
 +     * www.googleapis.cn). All three are served inside mainland China; google.com itself is never among them.
@@ -50187,6 +50386,7 @@ index 0000000..6f84189
 +        ArrayList<String> probes = new ArrayList<>(VALIDATION_PROBE_HOSTS);
 +        probes.addAll(VALIDATION_PROBE_EXTRA_HOSTS);
 +        probes.addAll(VALIDATION_PROBE_SUFFIXES);
++        probes.addAll(PROXIED_PROBE_HOSTS);
 +        for (String probe : probes) {
 +            allowSet.add(probe);
 +            for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))
@@ -52604,7 +52804,7 @@ index 17eab36..a7bd311 100644
          try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
          catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-index 65d651c..530ad49 100644
+index 65d651c..744d29a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 @@ -17,14 +17,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52692,7 +52892,7 @@ index 65d651c..530ad49 100644
                  }
              }
          }
-@@ -184,6 +210,49 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -184,6 +210,53 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                  }
              }
          }
@@ -52700,12 +52900,16 @@ index 65d651c..530ad49 100644
 +        item(key = "recovery") {
 +            SettingsSection {
 +                SettingsGroup(title = ht("网络恢复")) {
-+                    // 3.0.0: opt-in last resort after stop/start; DNS flush and re-validation always run.
-+                    val toggle = prefs.getBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, false)
++                    // 3.3.3: Wi-Fi reconnect after a failed real probe, on by default (hetu-root.sh wifi-heal);
++                    // DNS flush and re-validation always run. The switch writes the Root policy marker at once.
++                    val toggle = prefs.getBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, NetworkRevalidation.WIFI_RECONNECT_DEFAULT)
 +                    OtherSwitch(
-+                        "Wi‑Fi 仍无法联网时重开", toggle, icon = HomeIcons.Server,
-+                        subtitle = ht("启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效"),
-+                    ) { prefs.edit().putBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, it).apply(); revision++ }
++                        "Wi‑Fi 无法联网时自动重连", toggle, icon = HomeIcons.Server,
++                        subtitle = ht("启动、停止或重启代理后，以及守护进程发现整机断网时，会绕过河图直接访问国内的 204 检测地址并读取系统的 Wi‑Fi 验证状态；若 Wi‑Fi 仍无法联网，先刷新 DNS 并让系统重新检测，再用 Root 重连 Wi‑Fi（必要时关闭再打开）并发出通知。最多每 10 分钟一次、每小时 3 次。默认开启，立即生效"),
++                    ) {
++                        prefs.edit().putBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, it).apply(); revision++
++                        NetworkRevalidation.applyWifiReconnectPolicy(context, it)
++                    }
 +                }
 +            }
 +        }
@@ -52742,7 +52946,7 @@ index 65d651c..530ad49 100644
      }
 
      if (choice == "dns") {
-@@ -239,6 +308,8 @@ private class OtherLiveState(
+@@ -239,6 +312,8 @@ private class OtherLiveState(
      private val tuningReport: String,
      private val firewall: String,
      val firewallDetail: String,
@@ -52751,7 +52955,7 @@ index 65d651c..530ad49 100644
  ) {
      /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
      fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
-@@ -256,11 +327,18 @@ private class OtherLiveState(
+@@ -256,11 +331,18 @@ private class OtherLiveState(
              tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
              firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
              firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
@@ -52771,7 +52975,7 @@ index 65d651c..530ad49 100644
  @Composable
  private fun ResourceSetting(
      title: String,
-@@ -272,13 +350,43 @@ private fun ResourceSetting(
+@@ -272,13 +354,43 @@ private fun ResourceSetting(
      subtitle: String? = null,
      onEnabled: (Boolean) -> Unit,
      onValue: (String) -> Unit,
@@ -58077,7 +58281,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..0dd08ab 100644
+index 9cd82da..ddc38ec 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,17 +21,87 @@ final class RootProxyManager {
@@ -59704,10 +59908,16 @@ index 9cd82da..0dd08ab 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2221,47 @@ final class RootProxyManager {
+@@ -1366,13 +2221,53 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
++        // 3.3.3: Wi-Fi reconnect after a failed real probe (hetu-root.sh wifi-heal) is on by default; this marker
++        // (NetworkRevalidation.WIFI_RECONNECT_OFF_MARKER, pref NetworkRevalidation.PREF_WIFI_TOGGLE) turns it off.
++        String wifiOffMarker=policyDir+"/wifi-reconnect-off";
++        if(prefs.getBoolean("proxyWifiToggleRecovery",true))cmd.append("; rm -f ").append(RootBridge.quote(wifiOffMarker));
++        else cmd.append("; : > ").append(RootBridge.quote(wifiOffMarker)).append("; chmod 600 ").append(RootBridge.quote(wifiOffMarker))
++                .append("; chown 0:0 ").append(RootBridge.quote(wifiOffMarker));
 +        // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
 +        String cnipPolicy=policyDir+"/cnip";
 +        boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
@@ -59752,7 +59962,7 @@ index 9cd82da..0dd08ab 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2273,12 @@ final class RootProxyManager {
+@@ -1384,7 +2279,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -59766,7 +59976,7 @@ index 9cd82da..0dd08ab 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2287,13 @@ final class RootProxyManager {
+@@ -1393,6 +2293,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -59780,7 +59990,7 @@ index 9cd82da..0dd08ab 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2313,61 @@ final class RootProxyManager {
+@@ -1412,14 +2319,61 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -61395,10 +61605,10 @@ index 0000000..b779c0c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt
 new file mode 100644
-index 0000000..6dc54f1
+index 0000000..5f196ab
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,266 @@
 +package io.github.xgl34222220.hetu
 +
 +import java.util.Locale
@@ -61424,6 +61634,12 @@ index 0000000..6dc54f1
 + * every subdomain: fake-ip-filter '+.domain', rule DOMAIN-SUFFIX,domain,DIRECT), plus probe URLs read as Root
 + * from device_config / dumpsys / logcat when available. Only the probe host connectivitycheck.android.com
 + * goes DIRECT, never android.com, google.com, googleapis.com or youtube.com.
++ *
++ * 3.3.3 (real-device report, mainland China): connectivitycheck.gstatic.com and connectivitycheck.android.com
++ * time out on a direct path there, so they are no longer bypassed and go through the proxy as before 3.0.0.
++ * Every Google-owned host (gstatic.com included) is refused by [host], also when a ROM setting or a probe URL
++ * read as Root names it. allawntech.com, google.cn, googleapis.cn, OPPO, Huawei, Xiaomi, Qualcomm and vivo
++ * probe hosts stay DIRECT.
 + */
 +object CaptivePortalBypass {
 +    /** Same list as AdblockDnsPolicy.VALIDATION_PROBE_HOSTS (that pure-Java class is also compiled alone by host tests). */
@@ -61439,7 +61655,7 @@ index 0000000..6dc54f1
 +    @JvmField val SETTINGS_KEYS: List<String> = listOf(
 +        "captive_portal_http_url", "captive_portal_https_url", "captive_portal_fallback_url", "captive_portal_other_fallback_urls")
 +
-+    private val NEVER_DIRECT = listOf("google.com", "android.com", "googleapis.com", "youtube.com")
++    private val NEVER_DIRECT = listOf("google.com", "android.com", "googleapis.com", "gstatic.com", "youtube.com")
 +    private val HOST = Regex("^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$")
 +
 +    class Result(@JvmField val yaml: String, @JvmField val state: String)
@@ -66374,10 +66590,10 @@ index 0000000..4bf546b
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt
 new file mode 100644
-index 0000000..776020c
+index 0000000..8751083
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,100 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -66391,8 +66607,15 @@ index 0000000..776020c
 + * hetu-root.sh already flushes every network's resolver cache and asks for re-evaluation as Root
 + * (`ndc resolver flushnet`, `cmd connectivity reevaluate`). From the App, every network with INTERNET
 + * (no VPN) is reported with the opposite of its VALIDATED state, which makes ConnectivityService force
-+ * a re-evaluation without changing anything else. Only when the user turned on [PREF_WIFI_TOGGLE] and a
-+ * Wi-Fi network is still not validated [WIFI_TOGGLE_DELAY_MS] later is Wi-Fi switched off and on as Root.
++ * a re-evaluation without changing anything else.
++ *
++ * 3.3.3 (real-device report: ColorOS kept the Wi-Fi bad after flushnet + reevaluate; only Wi-Fi off/on helped):
++ * the Wi-Fi escalation moved into hetu-root.sh (`net-recover` after stop/start/restart, `wifi-heal` from the
++ * watchdog on a whole-phone outage). It fetches an HTTP 204 over the Wi-Fi outside Hetu, reads the system's
++ * VALIDATED flag and, if either says the Wi-Fi has no internet, runs flushnet + reevaluate, `cmd wifi reconnect`
++ * and Wi-Fi off/on, rate-limited and with a notification. [PREF_WIFI_TOGGLE] is now on by default
++ * ([WIFI_RECONNECT_DEFAULT]); turning it off writes the Root marker [WIFI_RECONNECT_OFF_MARKER] (also written by
++ * the start transaction's deployment, so the start stays one su invocation). The App no longer toggles Wi-Fi itself.
 + *
 + * After a start the probe URLs NetworkMonitor uses are also read as Root (`hetu-root.sh probe-urls`:
 + * device_config, dumpsys network_stack / connectivity, logcat) at most once per [PROBE_URL_TTL_MS]; the next
@@ -66404,7 +66627,10 @@ index 0000000..776020c
 +    private const val PREF_PROBE_URLS = "proxyProbeUrlsCache"
 +    private const val PREF_PROBE_URLS_AT = "proxyProbeUrlsAt"
 +    private const val SCRIPT = "/data/adb/hetu/hetu-root.sh"
-+    const val WIFI_TOGGLE_DELAY_MS = 12_000L
++    /** 3.3.3: Wi-Fi reconnect after a failed real probe is on unless the user turned it off. */
++    const val WIFI_RECONNECT_DEFAULT = true
++    /** Root policy marker read by hetu-root.sh wifi-heal: present = never reconnect Wi-Fi (same literal in RootProxyManager). */
++    const val WIFI_RECONNECT_OFF_MARKER = "/data/adb/hetu/policy/wifi-reconnect-off"
 +    const val PROBE_URL_DELAY_MS = 60_000L
 +    const val PROBE_URL_TTL_MS = 24L * 60 * 60 * 1000
 +
@@ -66412,6 +66638,16 @@ index 0000000..776020c
 +    fun kick(context: Context, reason: String) {
 +        val app = context.applicationContext ?: context
 +        Thread({ runCatching { recover(app, reason) } }, "hetu-revalidate").apply { isDaemon = true }.start()
++    }
++
++    /** Applies the setting to the Root marker at once (async, best effort); the next start writes it again. */
++    @JvmStatic
++    fun applyWifiReconnectPolicy(context: Context, enabled: Boolean) {
++        val app = context.applicationContext ?: context
++        val marker = RootBridge.quote(WIFI_RECONNECT_OFF_MARKER)
++        val cmd = if (enabled) "rm -f $marker"
++        else "mkdir -p /data/adb/hetu/policy && chmod 700 /data/adb/hetu/policy && : > $marker && chmod 600 $marker && chown 0:0 $marker"
++        Thread({ runCatching { RootBridge.rootShell(app, cmd, 10_000L) } }, "hetu-wifi-policy").apply { isDaemon = true }.start()
 +    }
 +
 +    /** Probe URLs last read as Root (one per line); empty until a start has read them. */
@@ -66440,15 +66676,9 @@ index 0000000..776020c
 +            val ok = runCatching { cm.reportNetworkConnectivity(network, !validated) }.isSuccess
 +            reported.append(if (wifi) " wifi" else " net").append(if (validated) "=valid" else "=invalid").append(if (ok) "" else "(report-failed)")
 +        }
-+        var toggled = ""
-+        if (prefs.getBoolean(PREF_WIFI_TOGGLE, false)) {
-+            Thread.sleep(WIFI_TOGGLE_DELAY_MS)
-+            if (networks(cm).any { it.third && !it.second }) {
-+                val r = runCatching { RootBridge.rootShell(app, "svc wifi disable; sleep 2; svc wifi enable", 15_000L) }.getOrNull()
-+                toggled = if (r != null && r.ok()) " wifi-toggled" else " wifi-toggle-failed"
-+            }
-+        }
-+        prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + toggled).apply()
++        // The Wi-Fi probe / reconnect runs as Root in hetu-root.sh (net-recover), logged to watchdog.log.
++        val wifi = if (prefs.getBoolean(PREF_WIFI_TOGGLE, WIFI_RECONNECT_DEFAULT)) " wifi-reconnect=on" else " wifi-reconnect=off"
++        prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + wifi).apply()
 +        if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) {
 +            // Kept well away from the start transaction: the start path stays a single su invocation.
 +            Thread.sleep(PROBE_URL_DELAY_MS)
@@ -76355,7 +76585,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..198bd43 100644
+index 578ce9d..6296504 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -76731,11 +76961,11 @@ index 578ce9d..198bd43 100644
 +""".trimIndent()
 +
 +
-+// 2026-10-14 3.0.0 network recovery (opt-in Wi-Fi re-toggle after stop/start).
++// 2026-10-14 3.0.0 network recovery; 3.3.3: Wi-Fi reconnect driven by a real probe, on by default.
 +private val vocabularyNetRecovery300 = """
 +网络恢复|Network recovery|網路恢復|Восстановление сети
-+Wi‑Fi 仍无法联网时重开|Restart Wi‑Fi if it still has no internet|Wi‑Fi 仍無法連網時重開|Перезапускать Wi‑Fi, если интернета всё ещё нет
-+启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效|After the proxy starts or stops, DNS caches are flushed and the system re-checks its networks; when this is on and Wi‑Fi still shows no internet, Root turns Wi‑Fi off and on once. Off by default; applies at once|啟動或停止代理後會清除 DNS 快取並讓系統重新偵測網路；開啟後，若 Wi‑Fi 仍顯示無法連線到網路，再用 Root 關閉並重新開啟一次 Wi‑Fi。預設關閉，立即生效|После запуска или остановки прокси очищается кэш DNS и система заново проверяет сети; если включено и Wi‑Fi всё ещё без интернета, Root один раз выключает и включает Wi‑Fi. По умолчанию выключено, действует сразу
++Wi‑Fi 无法联网时自动重连|Reconnect Wi‑Fi when it has no internet|Wi‑Fi 無法連網時自動重新連線|Переподключать Wi‑Fi, если нет интернета
++启动、停止或重启代理后，以及守护进程发现整机断网时，会绕过河图直接访问国内的 204 检测地址并读取系统的 Wi‑Fi 验证状态；若 Wi‑Fi 仍无法联网，先刷新 DNS 并让系统重新检测，再用 Root 重连 Wi‑Fi（必要时关闭再打开）并发出通知。最多每 10 分钟一次、每小时 3 次。默认开启，立即生效|After the proxy starts, stops or restarts, and when the watchdog sees the whole phone offline, Hetu fetches a mainland China 204 check outside the proxy and reads the system's Wi‑Fi validation; if Wi‑Fi still has no internet, DNS caches are flushed and the system re-checks, then Root reconnects Wi‑Fi (off and on if needed) and posts a notification. At most once per 10 minutes and 3 times per hour. On by default; applies at once|啟動、停止或重新啟動代理後，以及守護程序發現整機斷網時，會繞過河圖直接存取國內的 204 偵測位址並讀取系統的 Wi‑Fi 驗證狀態；若 Wi‑Fi 仍無法連網，先清除 DNS 快取並讓系統重新偵測，再用 Root 重新連線 Wi‑Fi（必要時關閉再開啟）並發出通知。最多每 10 分鐘一次、每小時 3 次。預設開啟，立即生效|После запуска, остановки или перезапуска прокси, а также когда сторож видит, что весь телефон без сети, Hetu в обход прокси запрашивает 204-проверку в материковом Китае и читает статус проверки Wi‑Fi в системе; если интернета всё ещё нет, очищается кэш DNS и система заново проверяет сеть, затем Root переподключает Wi‑Fi (при необходимости выключает и включает) и показывает уведомление. Не чаще раза в 10 минут и 3 раз в час. По умолчанию включено, действует сразу
 +""".trimIndent()
 +
 +
@@ -85450,10 +85680,10 @@ index 0000000..ba49c1b
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetlossSelfHeal108Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetlossSelfHeal108Test.kt
 new file mode 100644
-index 0000000..fc3ad76
+index 0000000..ea7ee1e
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetlossSelfHeal108Test.kt
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,103 @@
 +package io.github.xgl34222220.hetu
 +
 +import org.junit.Assert.assertEquals
@@ -85481,7 +85711,7 @@ index 0000000..fc3ad76
 +
 +    @Test
 +    fun hostsAreDefaultsPlusCaptivePortalSettingsWithoutGoogleSearchHosts() {
-+        assertEquals(listOf("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"), CaptivePortalBypass.hosts(null))
++        assertEquals(listOf("connect.rom.miui.com", "www.qualcomm.cn"), CaptivePortalBypass.hosts(null))
 +        val hosts = CaptivePortalBypass.hosts(listOf(
 +            "http://connect.rom.miui.com/generate_204", "https://www.google.com/generate_204",
 +            "http://wifi.vivo.com.cn:80/generate_204,https://clients3.google.com/generate_204", null, "",
@@ -85489,6 +85719,15 @@ index 0000000..fc3ad76
 +        assertEquals(probes + "wifi.vivo.com.cn", hosts)
 +        assertNull(CaptivePortalBypass.host("https://www.google.com/generate_204"))
 +        assertNull(CaptivePortalBypass.host("http://connectivitycheck.android.com/generate_204"))
++        // 3.3.3: Google-owned probe hosts time out direct in mainland China and keep the proxy.
++        assertNull(CaptivePortalBypass.host("http://connectivitycheck.gstatic.com/generate_204"))
++        assertNull(CaptivePortalBypass.host("http://www.gstatic.com/generate_204"))
++        assertEquals("www.google.cn", CaptivePortalBypass.host("http://www.google.cn/generate_204"))
++        val entries = CaptivePortalBypass.validationEntries(listOf("http://connectivitycheck.gstatic.com/generate_204",
++            "https://www.google.com/gen_204", "http://conn-service-cn-04.allawntech.com/generate204"))
++        assertFalse(entries.toString(), entries.any { it.contains("gstatic") || it.contains("android.com") || it.endsWith("google.com") })
++        assertTrue(entries.containsAll(listOf("connect.rom.miui.com", "www.qualcomm.cn", "conn1.oppomobile.com",
++            "connectivitycheck.platform.hicloud.com", "wifi.vivo.com.cn", "+.allawntech.com", "+.google.cn", "+.googleapis.cn")))
 +        assertEquals("captive.example.cn", CaptivePortalBypass.host("HTTPS://Captive.Example.CN./x?y"))
 +    }
 +
@@ -85498,7 +85737,7 @@ index 0000000..fc3ad76
 +        assertEquals("filter", created.state)
 +        assertEquals(probes + AdblockDnsPolicy.MIHOMO_DEFAULT_FAKE_IP_FILTER, dns(created.yaml)["fake-ip-filter"])
 +        val kept = CaptivePortalBypass.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter:\n    - '*.lan'\n    - connect.rom.miui.com\n", probes)
-+        assertEquals(listOf("connectivitycheck.gstatic.com", "www.qualcomm.cn", "*.lan", "connect.rom.miui.com"), dns(kept.yaml)["fake-ip-filter"])
++        assertEquals(listOf("www.qualcomm.cn", "*.lan", "connect.rom.miui.com"), dns(kept.yaml)["fake-ip-filter"])
 +        val rule = CaptivePortalBypass.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter-mode: rule\n  fake-ip-filter:\n  - MATCH,fake-ip\n", probes)
 +        assertEquals("rule", rule.state)
 +        assertEquals(probes.map { "DOMAIN,$it,real-ip" } + "MATCH,fake-ip", dns(rule.yaml)["fake-ip-filter"])
