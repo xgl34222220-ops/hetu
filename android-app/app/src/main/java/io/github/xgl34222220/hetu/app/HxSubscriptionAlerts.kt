@@ -16,7 +16,7 @@ import io.github.xgl34222220.hetu.ui.translateHetuText
 
 /**
  * Audit4 G7: 订阅到期 / 流量不足提醒. Off by default (通知设置 › 订阅提醒). Checked whenever the app
- * reads the subscription list; posts an ordinary notification on the existing 「代理运行状态」
+ * reads the subscription list, and (audit5) twice a day in the background by [checkInBackground]; posts an ordinary notification on the existing 「代理运行状态」
  * channel ([CHANNEL_ID], the same id, name and importance ProxyStatusNotificationService creates),
  * at most once per subscription per day. Uses the already-declared POST_NOTIFICATIONS only when
  * it is granted; never asks for anything.
@@ -77,6 +77,29 @@ internal object HxSubscriptionAlerts {
                 }
             }
             if (changed) edit.apply()
+        }
+    }
+
+    /**
+     * Audit5 G7: background pass of the same check, run by [UpdateJobService] on its own periodic
+     * job ([UpdateJobService.SUBSCRIPTION_ALERT_JOB_ID]) while the switch is on. Reads the running
+     * core's subscription list through the normal controller client (bounded to 20 s); when the core
+     * is not running the read fails and nothing is posted. Blocking: call off the main thread.
+     */
+    fun checkInBackground(context: Context, nowMs: Long = System.currentTimeMillis()) {
+        val app = context.applicationContext
+        if (!enabled(app.getSharedPreferences("hetu", Context.MODE_PRIVATE)) || !canPost(app)) return
+        val providers = runCatching {
+            kotlinx.coroutines.runBlocking { kotlinx.coroutines.withTimeout(20_000L) { ProxyDashboardRepository(app).providers() } }
+        }.getOrNull() ?: return
+        check(app, providers, nowMs)
+    }
+
+    /** Keeps the background job in step with the switch (idempotent; binder work, so off the main thread). */
+    fun syncSchedule(context: Context) {
+        runCatching {
+            val app = context.applicationContext
+            UpdateJobService.scheduleSubscriptionAlerts(app, enabled(app.getSharedPreferences("hetu", Context.MODE_PRIVATE)))
         }
     }
 

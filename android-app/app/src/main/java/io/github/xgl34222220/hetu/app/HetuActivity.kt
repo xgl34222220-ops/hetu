@@ -129,7 +129,11 @@ class HetuActivity : ComponentActivity() {
         if (savedInstanceState == null) applyStartPage(intent)
         if (savedInstanceState == null) applyShortcut(intent)
         // Audit4 G8: (re)publish the launcher shortcuts in the app language; binder work off the main thread.
-        Thread({ HxLauncherShortcuts.publish(applicationContext) }, "hetu-shortcuts").start()
+        Thread({
+            HxLauncherShortcuts.publish(applicationContext)
+            // Audit5 G7: re-arm the background subscription check after an update or a restore.
+            HxSubscriptionAlerts.syncSchedule(applicationContext)
+        }, "hetu-shortcuts").start()
         val launchArt = savedInstanceState == null
         setContent {
             HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
@@ -210,9 +214,11 @@ private fun HetuLaunchArt() {
     var visible by remember { mutableStateOf(true) }
     if (!visible) return
     val alpha = remember { Animatable(1f) }
+    // Audit5 R1: with motion off the art leaves after the first frames instead of fading.
+    val artMotion = LocalHetuMotionEnabled.current
     LaunchedEffect(Unit) {
         delay(60)
-        alpha.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 300))
+        if (artMotion) alpha.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 300, easing = HxMotion.Emphasized))
         visible = false
     }
     androidx.compose.foundation.Image(

@@ -51538,10 +51538,10 @@ index 0000000..fa5d493
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java
 new file mode 100644
-index 0000000..892b51b
+index 0000000..e476de3
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java
-@@ -0,0 +1,207 @@
+@@ -0,0 +1,226 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.util.HashMap;
@@ -51587,10 +51587,29 @@ index 0000000..892b51b
 +
 +    /** The loader asset for the first supported ABI that has one, or null. */
 +    static String loaderAsset(String[] supportedAbis) {
++        return loaderAsset(supportedAbis, null);
++    }
++
++    /**
++     * Audit5 G13: whether a packaged asset is really there. An ABI-split (arm64-only) APK installed
++     * on an x86_64 device that translates ARM no longer carries the x86_64 payloads, so the first
++     * supported ABI is not enough. {@code null} = not checked (the old first-match behaviour).
++     */
++    interface AssetProbe { boolean exists(String path); }
++
++    /** {@link #loaderAsset(String[])} that skips ABIs whose loader is not packaged. */
++    static String loaderAsset(String[] supportedAbis, AssetProbe probe) {
++        return firstAsset(supportedAbis, "hetu-bpf/", "/" + LOADER_NAME, probe);
++    }
++
++    /** prefix + abi + suffix for the first arm64-v8a / x86_64 entry of {@code supportedAbis} the probe accepts. */
++    static String firstAsset(String[] supportedAbis, String prefix, String suffix, AssetProbe probe) {
 +        if (supportedAbis == null) return null;
 +        for (String abi : supportedAbis) {
 +            String value = abi == null ? "" : abi.toLowerCase(Locale.ROOT);
-+            if (value.equals("arm64-v8a") || value.equals("x86_64")) return "hetu-bpf/" + value + "/" + LOADER_NAME;
++            if (!value.equals("arm64-v8a") && !value.equals("x86_64")) continue;
++            String path = prefix + value + suffix;
++            if (probe == null || probe.exists(path)) return path;
 +        }
 +        return null;
 +    }
@@ -56219,7 +56238,7 @@ index 48280df..b453abf 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
-index 2c5e10f..d1ec88c 100644
+index 2c5e10f..f3442ae 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 @@ -6,6 +6,9 @@ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomShe
@@ -56374,7 +56393,7 @@ index 2c5e10f..d1ec88c 100644
          },
      ) {
          item(key = "controls") {
-@@ -472,14 +539,19 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -472,14 +539,20 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  )
              }
          }
@@ -56392,11 +56411,12 @@ index 2c5e10f..d1ec88c 100644
              lines.isEmpty() -> item(key = "empty") { HxEmpty(PanelIcons.SearchX, "当前筛选条件下没有日志") }
 -            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { _, line -> HxLogLine(line) }
 +            // Keys follow the line itself (plus its occurrence), so a refresh that appends lines keeps the list in place.
-+            else -> items(lines, key = { it.first }) { (_, line) -> HxLogLine(line) }
++            // Audit5 L1: lines a live refresh adds fade in and the rest glide (no item animation with motion off).
++            else -> items(lines, key = { it.first }) { (_, line) -> Box(Modifier.hxAnimateItem()) { HxLogLine(line) } }
          }
      }
 
-@@ -508,7 +580,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -508,7 +581,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      } catch (cancel: CancellationException) {
                          throw cancel
                      } catch (failure: Exception) {
@@ -58077,7 +58097,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..0dd08ab 100644
+index 9cd82da..33f01df 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,17 +21,87 @@ final class RootProxyManager {
@@ -58344,7 +58364,8 @@ index 9cd82da..0dd08ab 100644
 +        recordStartupDiagnostics(cleaned.notices,safeDiagnostics(()->StartupDiagnostics.mihomo(cleaned.text,generated.yaml,profile,
 +                generated.tproxyPort,generated.redirectPort,profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF&&prefs.getBoolean("proxyMihomoDnsForward",true),
 +                MihomoStartupConfig.DNS_PORT,controllerPort,controllerPort==fixedControllerPort,fakeIps.ipv4,fakeIps.ipv6)));
-+        writeStartupCopy(startup);
+         writeStartupCopy(startup);
+-        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
 +        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature),override);
 +    }
 +
@@ -58457,8 +58478,7 @@ index 9cd82da..0dd08ab 100644
 +                +built.config+(built.config.endsWith("\n")?"":"\n")
 +                +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
 +                +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
-         writeStartupCopy(startup);
--        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
++        writeStartupCopy(startup);
 +        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature),override);
 +    }
 +
@@ -59780,7 +59800,7 @@ index 9cd82da..0dd08ab 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2313,61 @@ final class RootProxyManager {
+@@ -1412,22 +2313,80 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -59795,7 +59815,7 @@ index 9cd82da..0dd08ab 100644
 +     * ebpf=fallback (payload-missing) and keeps the iptables owner/CIDR rules.
 +     */
 +    private void appendEbpfPayloads(StringBuilder cmd,File stage,String deploySuffix)throws IOException{
-+        String loaderAsset=EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS);
++        String loaderAsset=EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS,this::packagedAsset);
 +        if(loaderAsset==null)return;
 +        File loader=new File(stage,EbpfMatcher.LOADER_NAME),object=new File(stage,EbpfMatcher.OBJECT_NAME);
 +        try{
@@ -59844,7 +59864,32 @@ index 9cd82da..0dd08ab 100644
 +        return out;
      }
      private String rootBinaryAsset()throws IOException{
-         for(String abi:Build.SUPPORTED_ABIS){
+-        for(String abi:Build.SUPPORTED_ABIS){
+-            String v=abi.toLowerCase(Locale.ROOT);
+-            if(v.equals("arm64-v8a"))return"mihomo-root/arm64-v8a/mihomo";
+-            if(v.equals("x86_64"))return"mihomo-root/x86_64/mihomo";
+-        }
+-        throw new IOException("当前 CPU 架构没有内置 Mihomo："+Arrays.toString(Build.SUPPORTED_ABIS));
++        // Audit5 G13: the first supported ABI whose payload this APK really carries (an arm64-only
++        // package on an x86_64 device with ARM translation falls through to arm64-v8a).
++        String found=EbpfMatcher.firstAsset(Build.SUPPORTED_ABIS,"mihomo-root/","/mihomo",this::packagedAsset);
++        if(found!=null)return found;
++        throw new IOException("当前 CPU 架构没有内置 Mihomo："+Arrays.toString(Build.SUPPORTED_ABIS)+"；本安装包不含适配当前 CPU 的内核，请下载通用版");
++    }
++    /** False only when the asset folder lists and the file is not in it; an unreadable listing keeps the old first-match behaviour. */
++    private boolean packagedAsset(String path){
++        int slash=path.lastIndexOf('/');
++        if(slash<=0)return true;
++        try{
++            String[] names=context.getAssets().list(path.substring(0,slash));
++            if(names==null)return true;
++            String name=path.substring(slash+1);
++            for(String entry:names)if(name.equals(entry))return true;
++            return false;
++        }catch(IOException unreadable){return true;}
+     }
+     private void copyScriptAsset(File out)throws IOException{
+         byte[] bytes;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java
 new file mode 100644
 index 0000000..829bbef
@@ -60542,6 +60587,75 @@ index e4053e5..72b8798 100644
          )
      }
 
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/UpdateJobService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/UpdateJobService.java
+index 34c7438..210eb77 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/UpdateJobService.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/UpdateJobService.java
+@@ -18,6 +18,13 @@ import java.util.concurrent.TimeUnit;
+ /** Explicitly opted-in updates; Android chooses the time once conditions allow. */
+ public final class UpdateJobService extends JobService {
+     public static final int JOB_ID = 0x42494348;
++    /**
++     * Audit5 G7: the opt-in 订阅到期/流量提醒 also checks in the background, twice a day, through
++     * this already-declared job service (no manifest change). It only reads the running core's
++     * subscription list; nothing is downloaded or changed.
++     */
++    public static final int SUBSCRIPTION_ALERT_JOB_ID = 0x42494349;
++    private volatile Thread alertThread;
+     private final Object jobLock = new Object();
+     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+     private Run active;
+@@ -61,7 +68,38 @@ public final class UpdateJobService extends JobService {
+         }
+     }
+
++    /** Safe on the UI thread; failures are silent (the foreground check still runs on every read). */
++    public static void scheduleSubscriptionAlerts(Context context, boolean enabled) {
++        Context app=context.getApplicationContext();
++        try {
++            JobScheduler scheduler=(JobScheduler)app.getSystemService(Context.JOB_SCHEDULER_SERVICE);
++            if(scheduler==null) return;
++            if(!enabled) { scheduler.cancel(SUBSCRIPTION_ALERT_JOB_ID); return; }
++            if(scheduler.getPendingJob(SUBSCRIPTION_ALERT_JOB_ID)!=null) return;
++            scheduler.schedule(new JobInfo.Builder(SUBSCRIPTION_ALERT_JOB_ID,new ComponentName(app,UpdateJobService.class))
++                    .setPeriodic(TimeUnit.HOURS.toMillis(12))
++                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
++                    .setPersisted(true)
++                    .build());
++        } catch(Exception ignored) { }
++    }
++
++    private boolean startSubscriptionAlertJob(final JobParameters parameters) {
++        if(!HxSubscriptionAlerts.INSTANCE.enabled(getSharedPreferences("hetu",MODE_PRIVATE))) return false;
++        Thread thread=new Thread(new Runnable() { @Override public void run() {
++            try { HxSubscriptionAlerts.INSTANCE.checkInBackground(getApplicationContext(),System.currentTimeMillis()); }
++            catch(Throwable ignored) { }
++            finally {
++                if(alertThread==Thread.currentThread()) { alertThread=null; jobFinished(parameters,false); }
++            }
++        } },"hetu-subscription-alerts");
++        alertThread=thread;
++        thread.start();
++        return true;
++    }
++
+     @Override public boolean onStartJob(JobParameters parameters) {
++        if(parameters.getJobId()==SUBSCRIPTION_ALERT_JOB_ID) return startSubscriptionAlertJob(parameters);
+         SharedPreferences prefs=getSharedPreferences("hetu",MODE_PRIVATE);
+         if(!prefs.getBoolean("dailyUpdateEnabled",false)) return false;
+         synchronized(jobLock) {
+@@ -105,6 +143,11 @@ public final class UpdateJobService extends JobService {
+     }
+
+     @Override public boolean onStopJob(JobParameters parameters) {
++        if(parameters.getJobId()==SUBSCRIPTION_ALERT_JOB_ID) {
++            Thread thread=alertThread; alertThread=null;
++            if(thread!=null) thread.interrupt();
++            return false;
++        }
+         SharedPreferences prefs=getSharedPreferences("hetu",MODE_PRIVATE);
+         boolean enabled=prefs.getBoolean("dailyUpdateEnabled",false);
+         synchronized(jobLock) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
 index e16a145..ca42e27 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
@@ -62538,7 +62652,7 @@ index 0000000..4bae890
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..dec58ce 100644
+index 2b1a624..ccc08de 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -62590,18 +62704,22 @@ index 2b1a624..dec58ce 100644
  import androidx.compose.ui.unit.dp
  import androidx.lifecycle.ViewModelProvider
  import kotlinx.coroutines.flow.collectLatest
-@@ -113,6 +127,10 @@ class HetuActivity : ComponentActivity() {
+@@ -113,6 +127,14 @@ class HetuActivity : ComponentActivity() {
          enableEdgeToEdge()
          vm = ViewModelProvider(this)[HetuViewModel::class.java]
          if (savedInstanceState == null) applyStartPage(intent)
 +        if (savedInstanceState == null) applyShortcut(intent)
 +        // Audit4 G8: (re)publish the launcher shortcuts in the app language; binder work off the main thread.
-+        Thread({ HxLauncherShortcuts.publish(applicationContext) }, "hetu-shortcuts").start()
++        Thread({
++            HxLauncherShortcuts.publish(applicationContext)
++            // Audit5 G7: re-arm the background subscription check after an update or a restore.
++            HxSubscriptionAlerts.syncSchedule(applicationContext)
++        }, "hetu-shortcuts").start()
 +        val launchArt = savedInstanceState == null
          setContent {
              HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
                  val revision = vm.settingsRevision
-@@ -122,6 +140,7 @@ class HetuActivity : ComponentActivity() {
+@@ -122,6 +144,7 @@ class HetuActivity : ComponentActivity() {
                  CompositionLocalProvider(LocalDensity provides scaledDensity) {
                      HetuRoot(vm, requestedRoute) { requestedRoute = null }
                  }
@@ -62609,7 +62727,7 @@ index 2b1a624..dec58ce 100644
              }
          }
      }
-@@ -130,6 +149,7 @@ class HetuActivity : ComponentActivity() {
+@@ -130,6 +153,7 @@ class HetuActivity : ComponentActivity() {
          super.onNewIntent(intent)
          setIntent(intent)
          applyStartPage(intent)
@@ -62617,7 +62735,7 @@ index 2b1a624..dec58ce 100644
      }
 
      override fun onStart() {
-@@ -153,20 +173,56 @@ class HetuActivity : ComponentActivity() {
+@@ -153,20 +177,58 @@ class HetuActivity : ComponentActivity() {
              "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
              "connections" -> vm.openPanel("conn")
              "providers", "subscriptions" -> vm.openPanel("providers")
@@ -62662,9 +62780,11 @@ index 2b1a624..dec58ce 100644
 +    var visible by remember { mutableStateOf(true) }
 +    if (!visible) return
 +    val alpha = remember { Animatable(1f) }
++    // Audit5 R1: with motion off the art leaves after the first frames instead of fading.
++    val artMotion = LocalHetuMotionEnabled.current
 +    LaunchedEffect(Unit) {
 +        delay(60)
-+        alpha.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 300))
++        if (artMotion) alpha.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 300, easing = HxMotion.Emphasized))
 +        visible = false
 +    }
 +    androidx.compose.foundation.Image(
@@ -62678,7 +62798,7 @@ index 2b1a624..dec58ce 100644
  /* ------------------------------------------------------------------ */
  /*  Navigation                                                          */
  /* ------------------------------------------------------------------ */
-@@ -178,16 +234,10 @@ internal sealed class HxRoute(val key: String) {
+@@ -178,16 +240,10 @@ internal sealed class HxRoute(val key: String) {
      data object Providers : HxRoute("providers")
      data object Adblock : HxRoute("adblock")
      data object Network : HxRoute("network")
@@ -62695,7 +62815,7 @@ index 2b1a624..dec58ce 100644
      data object Notifications : HxRoute("notifications")
      data object Theme : HxRoute("theme")
      data object DefaultPanelSettings : HxRoute("default-panel-settings")
-@@ -195,6 +245,7 @@ internal sealed class HxRoute(val key: String) {
+@@ -195,6 +251,7 @@ internal sealed class HxRoute(val key: String) {
      data object StartupDownloadSettings : HxRoute("startup-download-settings")
      data object PublicIp : HxRoute("public-ip")
      data object Resources : HxRoute("resources")
@@ -62703,7 +62823,7 @@ index 2b1a624..dec58ce 100644
  }
 
  internal class HxNav {
-@@ -232,6 +283,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -232,6 +289,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      val routeHolder = rememberSaveableStateHolder()
      val scope = rememberCoroutineScope()
      val c = Hx.colors
@@ -62712,7 +62832,7 @@ index 2b1a624..dec58ce 100644
      LaunchedEffect(startRoute) {
          if (startRoute != null) {
              nav.openRequested(startRoute)
-@@ -243,11 +296,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -243,11 +302,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
      // rounded corners); releasing completes the normal return transition from there.
      val settingsRevision = vm.settingsRevision
@@ -62734,7 +62854,7 @@ index 2b1a624..dec58ce 100644
      LaunchedEffect(nav.current) {
          if (nav.forward) {
              gestureRoute = null
-@@ -255,6 +317,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -255,6 +323,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          }
      }
      PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
@@ -62742,7 +62862,7 @@ index 2b1a624..dec58ce 100644
          gestureRoute = nav.current
          try {
              events.collect { event ->
-@@ -263,8 +326,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -263,8 +332,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
              }
              nav.pop()
          } catch (cancel: CancellationException) {
@@ -62755,7 +62875,7 @@ index 2b1a624..dec58ce 100644
                  gestureRoute = null
              }
              throw cancel
-@@ -277,13 +342,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -277,13 +348,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
              AnimatedContent(
                  targetState = nav.current,
@@ -62771,7 +62891,7 @@ index 2b1a624..dec58ce 100644
                      label = "routeDim",
                  ) { phase ->
                      when (phase) {
-@@ -300,7 +365,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -300,7 +371,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                          }
                          .then(
@@ -62780,7 +62900,7 @@ index 2b1a624..dec58ce 100644
                                  val p = backProgress.value
                                  val scale = 1f - .1f * p
                                  scaleX = scale
-@@ -313,22 +378,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -313,22 +384,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                  ) {
                      routeHolder.SaveableStateProvider(route.key) {
                          when (route) {
@@ -62804,7 +62924,7 @@ index 2b1a624..dec58ce 100644
                              HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                              HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                              HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
-@@ -336,13 +395,17 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -336,13 +401,17 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                              HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                              HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
@@ -62823,7 +62943,7 @@ index 2b1a624..dec58ce 100644
          }
 
          vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
-@@ -351,7 +414,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -351,7 +420,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      }
  }
 
@@ -62833,7 +62953,7 @@ index 2b1a624..dec58ce 100644
      val duration = HxMotion.Route
      val ease = HxMotion.Emphasized
      // Card-stack navigation: the new page covers the old one from the right edge; the old
-@@ -372,12 +436,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
+@@ -372,12 +442,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
  }
 
  @Composable
@@ -62850,7 +62970,7 @@ index 2b1a624..dec58ce 100644
      val settingsTick = vm.settingsRevision
      val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
      val dockTabs = remember(settingsTick, vm.tab) {
-@@ -389,17 +455,24 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -389,17 +461,24 @@ private fun MainTabs(vm: HetuViewModel) {
          }
      }
      // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
@@ -62884,7 +63004,7 @@ index 2b1a624..dec58ce 100644
      // The concept's collapsed Tools/Settings pages retain their root navigation.
      // Other root pages keep their existing scroll behavior; child routes own no dock.
      var dockVisible by remember { mutableStateOf(true) }
-@@ -417,16 +490,22 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -417,16 +496,22 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
      }
@@ -62910,7 +63030,7 @@ index 2b1a624..dec58ce 100644
                      val order = listOf("Home", "Panel", "Tools", "Settings")
                      val forward = order.indexOf(targetState) > order.indexOf(initialState)
                      (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
-@@ -435,6 +514,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -435,6 +520,7 @@ private fun MainTabs(vm: HetuViewModel) {
                              fadeOut(tween(110)) +
                                  slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                          )
@@ -62918,7 +63038,7 @@ index 2b1a624..dec58ce 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -449,12 +529,14 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -449,12 +535,14 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
@@ -62936,7 +63056,7 @@ index 2b1a624..dec58ce 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -463,23 +545,54 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -463,23 +551,54 @@ private fun MainTabs(vm: HetuViewModel) {
                  if (next == vm.tab) vm.reselect++ else vm.tab = next
              },
              hazeState = dockHaze,
@@ -62994,7 +63114,7 @@ index 2b1a624..dec58ce 100644
              // Longer messages stay a little longer so they can actually be read.
              delay((1500L + message.length * 45L).coerceAtMost(4200L))
              floatingMessage = null
-@@ -489,14 +602,27 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+@@ -489,14 +608,27 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -63027,7 +63147,7 @@ index 2b1a624..dec58ce 100644
      }
  }
 
-@@ -513,6 +639,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
+@@ -513,6 +645,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
                  Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                      content(vm)
                      HxToastHost(vm)
@@ -63035,7 +63155,7 @@ index 2b1a624..dec58ce 100644
                  }
              }
          }
-@@ -544,15 +671,21 @@ internal fun hxToastTone(message: String): HxTone = when {
+@@ -544,15 +677,21 @@ internal fun hxToastTone(message: String): HxTone = when {
      else -> HxTone.Neutral
  }
 
@@ -63061,7 +63181,7 @@ index 2b1a624..dec58ce 100644
              .graphicsLayer {
                  translationY = drag
                  alpha = (1f - drag / 160f).coerceIn(0f, 1f)
-@@ -563,12 +696,14 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+@@ -563,12 +702,14 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
                  onDragStopped = { velocity ->
                      if (drag > 36f || velocity > 900f) {
                          onDismiss()
@@ -63077,7 +63197,7 @@ index 2b1a624..dec58ce 100644
              .homeGlassPanel(shape, c.raised, raised = true)
              .heightIn(min = 48.dp)
              .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
-@@ -588,6 +723,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+@@ -588,6 +729,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
              )
          }
          Spacer(Modifier.width(10.dp))
@@ -64767,10 +64887,22 @@ index 0000000..2763314
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index e337597..97aaad6 100644
+index e337597..cfd0834 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-@@ -271,8 +271,8 @@ internal fun HxPage(
+@@ -239,8 +239,10 @@ internal fun HxPage(
+     }
+     // Re-tapping the current dock item scrolls the page back to the top.
+     val initialSignal = remember { scrollToTopSignal }
++    // Audit5 R1: with motion off (system animator scale 0, in-app switch, power save) the jump is instant.
++    val pageMotion = LocalHomeMotionEnabled.current
+     LaunchedEffect(scrollToTopSignal) {
+-        if (scrollToTopSignal != initialSignal) listState.animateScrollToItem(0)
++        if (scrollToTopSignal != initialSignal) { if (pageMotion) listState.animateScrollToItem(0) else listState.scrollToItem(0) }
+     }
+     val c = LocalHomeColors.current
+     val density = LocalDensity.current
+@@ -271,8 +273,8 @@ internal fun HxPage(
          root -> HomeLargeTitleDims.titleTop
          else -> barHeight
      }
@@ -64781,7 +64913,16 @@ index e337597..97aaad6 100644
 
      val stagger = rememberHomeStagger()
      val entrance = remember(stagger) { HxEntrance(stagger) }
-@@ -466,7 +466,9 @@ private fun HxEmbeddedPage(
+@@ -351,7 +353,7 @@ internal fun HxPage(
+             // Long lists get a small "back to top" button once the user is deep in them.
+             val scrollScope = rememberCoroutineScope()
+             HomePop(showScrollTop && scrollTopWanted, Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = listBottom - 6.dp)) {
+-                HxScrollTopButton { scrollScope.launch { listState.animateScrollToItem(0) } }
++                HxScrollTopButton { scrollScope.launch { if (pageMotion) listState.animateScrollToItem(0) else listState.scrollToItem(0) } }
+             }
+             overlay()
+         }
+@@ -466,7 +468,9 @@ private fun HxEmbeddedPage(
  @Composable
  internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
      val pressed by source.collectIsPressedAsState()
@@ -64792,7 +64933,33 @@ index e337597..97aaad6 100644
      return this.graphicsLayer { scaleX = scale; scaleY = scale }
  }
 
-@@ -1203,3 +1205,20 @@ internal fun HxTextField(
+@@ -742,7 +746,7 @@ internal fun HxSearchField(
+ internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = LocalHomeColors.current.t1) {
+     val c = LocalHomeColors.current
+     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+-        Text(label, style = HomeType.caption, color = c.t2, maxLines = 1)
++        Text(label, style = HomeType.caption, color = c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+             Text(value, style = HomeType.value, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             if (!unit.isNullOrBlank()) Text(unit, Modifier.padding(bottom = 2.dp), style = HomeType.badge, color = c.t2)
+@@ -757,7 +761,15 @@ internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifie
+ internal fun hxCopy(context: Context, label: String, text: String) {
+     val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+     manager.setPrimaryClip(ClipData.newPlainText(label, text))
+-    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
++    // Audit5 T2: the platform toast follows the app language like every other message.
++    Toast.makeText(context, hxPlainText(context, "已复制"), Toast.LENGTH_SHORT).show()
++}
++
++/** [ht] outside composition: the app-language setting read straight from preferences. */
++internal fun hxPlainText(context: Context, source: String): String {
++    val setting = context.getSharedPreferences("hetu", Context.MODE_PRIVATE).getString("appLanguage", "system").orEmpty()
++    val language = if (setting.isBlank() || setting == "system") java.util.Locale.getDefault().toLanguageTag() else setting
++    return io.github.xgl34222220.hetu.ui.translateHetuText(source, language)
+ }
+
+ /** Bottom sheet dressed with the home tokens: 28 dp top corners, a grab handle, an optional title row. */
+@@ -1203,3 +1215,20 @@ internal fun HxTextField(
          )
      }
  }
@@ -65766,10 +65933,10 @@ index 0000000..7d49de3
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxSubscriptionAlerts.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxSubscriptionAlerts.kt
 new file mode 100644
-index 0000000..65c7fce
+index 0000000..76a10e6
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxSubscriptionAlerts.kt
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,158 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Notification
@@ -65788,7 +65955,7 @@ index 0000000..65c7fce
 +
 +/**
 + * Audit4 G7: 订阅到期 / 流量不足提醒. Off by default (通知设置 › 订阅提醒). Checked whenever the app
-+ * reads the subscription list; posts an ordinary notification on the existing 「代理运行状态」
++ * reads the subscription list, and (audit5) twice a day in the background by [checkInBackground]; posts an ordinary notification on the existing 「代理运行状态」
 + * channel ([CHANNEL_ID], the same id, name and importance ProxyStatusNotificationService creates),
 + * at most once per subscription per day. Uses the already-declared POST_NOTIFICATIONS only when
 + * it is granted; never asks for anything.
@@ -65852,6 +66019,29 @@ index 0000000..65c7fce
 +        }
 +    }
 +
++    /**
++     * Audit5 G7: background pass of the same check, run by [UpdateJobService] on its own periodic
++     * job ([UpdateJobService.SUBSCRIPTION_ALERT_JOB_ID]) while the switch is on. Reads the running
++     * core's subscription list through the normal controller client (bounded to 20 s); when the core
++     * is not running the read fails and nothing is posted. Blocking: call off the main thread.
++     */
++    fun checkInBackground(context: Context, nowMs: Long = System.currentTimeMillis()) {
++        val app = context.applicationContext
++        if (!enabled(app.getSharedPreferences("hetu", Context.MODE_PRIVATE)) || !canPost(app)) return
++        val providers = runCatching {
++            kotlinx.coroutines.runBlocking { kotlinx.coroutines.withTimeout(20_000L) { ProxyDashboardRepository(app).providers() } }
++        }.getOrNull() ?: return
++        check(app, providers, nowMs)
++    }
++
++    /** Keeps the background job in step with the switch (idempotent; binder work, so off the main thread). */
++    fun syncSchedule(context: Context) {
++        runCatching {
++            val app = context.applicationContext
++            UpdateJobService.scheduleSubscriptionAlerts(app, enabled(app.getSharedPreferences("hetu", Context.MODE_PRIVATE)))
++        }
++    }
++
 +    private fun canPost(context: Context): Boolean {
 +        if (Build.VERSION.SDK_INT >= 33 &&
 +            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -65906,7 +66096,7 @@ index 0000000..65c7fce
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
-index fa7fd9d..b857864 100644
+index fa7fd9d..00d6a8b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
 @@ -181,9 +181,13 @@ internal fun HxTabbedPage(
@@ -65956,6 +66146,29 @@ index fa7fd9d..b857864 100644
              HorizontalPager(
                  state = pagerState,
                  modifier = Modifier.fillMaxSize().nestedScroll(foldConnection),
+@@ -360,7 +369,7 @@ internal fun HxTabbedPage(
+                 pagerState = pagerState,
+                 onSelect = { index ->
+                     val key = tabs[index].key
+-                    if (key != selected) onSelect(key) else scope.launch { listStates[key]?.animateScrollToItem(0) }
++                    if (key != selected) onSelect(key) else scope.launch { listStates[key]?.let { if (tabMotion) it.animateScrollToItem(0) else it.scrollToItem(0) } }
+                 },
+             )
+             HorizontalDivider(
+@@ -389,10 +398,12 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
+     val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
+     val refOutline = Color(0xFF646775).copy(alpha = .78f)
+     val refSelected = Color(0xE8F8F7FF)
++    val chipMotion = hxMotion()
+     LaunchedEffect(pagerState.targetPage) {
+         val left = lefts.getOrNull(pagerState.targetPage) ?: return@LaunchedEffect
+         val margin = with(density) { 56.dp.toPx() }.toInt()
+-        scroll.animateScrollTo((left - margin).coerceAtLeast(0))
++        // Audit5 R1: the chip strip follows the page without a sweep when motion is off.
++        if (chipMotion) scroll.animateScrollTo((left - margin).coerceAtLeast(0)) else scroll.scrollTo((left - margin).coerceAtLeast(0))
+     }
+     Row(
+         Modifier
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
 index 5a9c877..6802546 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
@@ -66974,10 +67187,10 @@ index 0000000..6c667a6
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
 new file mode 100644
-index 0000000..4931395
+index 0000000..f08adc2
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,562 @@
+@@ -0,0 +1,572 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.animation.core.animateFloatAsState
@@ -67136,6 +67349,8 @@ index 0000000..4931395
 +    val interruptedLabel = ht("测试中断")
 +    var runFailed by remember { mutableStateOf(false) }
 +    val unlockIds = remember { NetworkUnlock.checkIds }
++    // Audit5 N3: a finished run confirms with a light haptic, an interrupted one rejects; leaving the page says nothing.
++    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
 +
 +    LaunchedEffect(runId) {
 +        if (runId == 0) return@LaunchedEffect
@@ -67146,6 +67361,7 @@ index 0000000..4931395
 +        exits = null
 +        exitTesting = true
 +        val results = ArrayList<NetSiteResult>()
++        var finished = false
 +        try {
 +            coroutineScope {
 +                // Unlock checks and exit IPs go through the system network and run beside the latency rows.
@@ -67171,6 +67387,7 @@ index 0000000..4931395
 +                    rows[result.id]?.let { it.value = it.value.copy(testing = false, result = result) }
 +                }
 +            }
++            finished = true
 +        } catch (cancel: CancellationException) {
 +            throw cancel
 +        } catch (_: Exception) {
@@ -67182,6 +67399,8 @@ index 0000000..4931395
 +            val done = rows.values.mapNotNull { it.value.result }
 +            // A run that failed outright (no network, port probe error) says so instead of leaving dashes.
 +            summary = hxNetTestSummary(done.count { it.ok && !it.blocked }, NetworkTest.sites.size, done.size, runFailed, availableLabel, interruptedLabel)
++            if (finished) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Confirm)
++            else if (runFailed) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Reject)
 +        }
 +    }
 +
@@ -67252,7 +67471,7 @@ index 0000000..4931395
 +                        },
 +                        Modifier.weight(1f), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis,
 +                    )
-+                    if (summary.isNotBlank()) Text(summary, color = if (runFailed) c.badText else c.t2, style = HomeType.noteStrong, maxLines = 1)
++                    if (summary.isNotBlank()) Text(summary, Modifier.padding(start = 8.dp), color = if (runFailed) c.badText else c.t2, style = HomeType.noteStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +                }
 +            }
 +            item(key = "conn-exit") { ExitIpCard(exits, exitTesting) }
@@ -67332,6 +67551,10 @@ index 0000000..4931395
 +    }
 +    val regionText = if (region == null) "" else (NetworkTest.flag(region) + " " + region).trim()
 +    val unlockText = unlock?.let { unlockChipText(it) }.orEmpty()
++    // Audit5 N2: the result colour settles in instead of snapping (instant with motion off).
++    val shownStatusColor by androidx.compose.animation.animateColorAsState(
++        statusColor, if (LocalHomeMotionEnabled.current) tween(220) else tween(0), label = "net-site-status",
++    )
 +    Row(
 +        Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(start = HomeRowDims.start, end = HomeRowDims.end, top = 9.dp, bottom = 9.dp)
 +            .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, unlockText, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
@@ -67352,9 +67575,9 @@ index 0000000..4931395
 +                Row(verticalAlignment = Alignment.CenterVertically) {
 +                    HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
 +                    Spacer(Modifier.width(6.dp))
-+                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(status, color = shownStatusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +                }
-+            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            } else Text(status, color = shownStatusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
 +    }
 +}
@@ -70348,7 +70571,7 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..599812e 100644
+index b41cf98..88c41f8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -54,12 +54,14 @@ import androidx.compose.runtime.setValue
@@ -70564,7 +70787,7 @@ index b41cf98..599812e 100644
 
      val targetOptions = listOf(
          "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
-@@ -993,6 +1051,17 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -993,6 +1051,19 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          }
      }
 
@@ -70574,6 +70797,8 @@ index b41cf98..599812e 100644
 +        subscriptionAlerts = on
 +        prefs.edit().putBoolean(HxSubscriptionAlerts.PREF_ENABLED, on).apply()
 +        if (on) HxSubscriptionAlerts.check(context, vm.providers)
++        // Audit5 G7: the background check follows the switch (scheduled on, cancelled off).
++        UpdateJobService.scheduleSubscriptionAlerts(context, on)
 +    }
 +    val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
 +        if (granted) setSubscriptionAlerts(true) else vm.toast("没有通知权限，无法发送订阅提醒")
@@ -70582,7 +70807,7 @@ index b41cf98..599812e 100644
      fun save() {
          val edit = prefs.edit()
              .putString(ProxyStatusNotificationService.PREF_TITLE_TEMPLATE, titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE })
-@@ -1008,11 +1077,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1008,11 +1079,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          vm.toast("通知设置已保存")
          onBack()
      }
@@ -70599,7 +70824,7 @@ index b41cf98..599812e 100644
          actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
      ) {
          item(key = "master") {
-@@ -1027,7 +1100,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1027,7 +1102,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          } else {
                              enabled = on
                          }
@@ -70608,7 +70833,7 @@ index b41cf98..599812e 100644
                      SettingsDivider()
                      SettingsNavRow(ht("刷新频率"), icon = HomeIcons.RefreshCw, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
                      SettingsDivider()
-@@ -1042,7 +1115,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1042,7 +1117,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  SettingsGroup(title = ht("通知标题")) {
                      SettingsInput(
                          value = titleTemplate, onValueChange = { titleTemplate = it.take(96) }, label = "标题模板",
@@ -70617,7 +70842,7 @@ index b41cf98..599812e 100644
                      )
                  }
              }
-@@ -1050,16 +1123,21 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1050,16 +1125,21 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "template") {
              SettingsSection {
                  SettingsGroup(title = ht("通知内容")) {
@@ -70641,7 +70866,7 @@ index b41cf98..599812e 100644
                          NotificationVariables.forEach { variable ->
                              HomePill(
                                  variable, tone = HomeTone.Neutral, height = 28.dp,
-@@ -1068,6 +1146,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1068,6 +1148,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                              )
                          }
                      }
@@ -70662,7 +70887,7 @@ index b41cf98..599812e 100644
                  }
              }
          }
-@@ -1075,18 +1167,34 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1075,18 +1169,34 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              item(key = "action$index") {
                  SettingsSection {
                      SettingsGroup(title = "快捷按钮 ${index + 1}") {
@@ -70699,7 +70924,7 @@ index b41cf98..599812e 100644
      }
 
      picker?.let { (kind, index) ->
-@@ -1118,4 +1226,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1118,4 +1228,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              )
          }
      }
@@ -73186,7 +73411,7 @@ index 9f66ac0..ab51d6a 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-index b187a2f..af70d1a 100644
+index b187a2f..8d9f33c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 @@ -1,9 +1,18 @@
@@ -73225,6 +73450,24 @@ index b187a2f..af70d1a 100644
              .horizontalScroll(scroll)
              .panelGutter()
              .drawBehind {
+@@ -262,7 +274,7 @@ internal fun PanelSearchField(value: String, onValueChange: (String) -> Unit, pl
+                 Icon(PanelIcons.Search, null, Modifier.size(22.dp), tint = c.t1)
+                 Spacer(Modifier.width(10.dp))
+                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+-                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body.copy(fontSize = 17.sp), maxLines = 1)
++                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body.copy(fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     inner()
+                 }
+                 if (value.isNotEmpty()) {
+@@ -308,7 +320,7 @@ internal fun PanelChip(
+         horizontalArrangement = Arrangement.spacedBy(5.dp),
+     ) {
+         if (leading != null) leading()
+-        Text(ht(text), color = tint, style = if (selected) PanelType.chip.copy(fontWeight = FontWeight.SemiBold) else PanelType.chip, maxLines = 1)
++        Text(ht(text), color = tint, style = if (selected) PanelType.chip.copy(fontWeight = FontWeight.SemiBold) else PanelType.chip, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         if (trailingIcon != null) Icon(trailingIcon, null, Modifier.size(16.dp), tint = tint)
+     }
+ }
 @@ -411,41 +423,67 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
   * only and gets a comfortable touch box that grows up and to the left of it.
   */
@@ -74441,7 +74684,7 @@ index 3e938c4..b7aaf12 100644
 
  /** Two-letter region code from a node name; the table and the emoji detection live in [HomeRegions]. */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
-index 149c8e1..8e9c749 100644
+index 149c8e1..e2bbdcf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
 @@ -1,5 +1,7 @@
@@ -74466,6 +74709,15 @@ index 149c8e1..8e9c749 100644
              else HomeSheetContent(title = "连接已结束", onClose = { onOverlay(null) }) {
                  Text(ht("这个连接已经关闭，列表会在下次刷新时更新。"), Modifier.padding(horizontal = 6.dp), color = LocalHomeColors.current.t2, style = HomeType.body)
              }
+@@ -267,7 +274,7 @@ private fun FieldError(message: String?) {
+ @Composable
+ private fun DetailRow(label: String, trailing: @Composable () -> Unit) {
+     Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+-        Text(ht(label), color = LocalHomeColors.current.t2, style = HomeType.label, maxLines = 1)
++        Text(ht(label), color = LocalHomeColors.current.t2, style = HomeType.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { trailing() }
+     }
+ }
 @@ -312,7 +319,15 @@ private fun NodeInfoSheet(name: String, data: PanelData, onClose: () -> Unit, on
 
  /** 连接详情: who (app, package, rule), where (chain, network), how much (totals, rates); footer 断开此连接. */
@@ -74968,7 +75220,7 @@ index 800055c..0bbdbc9 100644
 -    }
 -}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index d256004..cadffea 100644
+index d256004..954cdae 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 @@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
@@ -75075,7 +75327,14 @@ index d256004..cadffea 100644
          )
          ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.t1, c.sunken, ht("已开启"), ht("启动代理后自动验证运行链。"))
          ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnText, c.warnSoft, ht("运行链未确认"), ht("尚未确认规则模式及广告规则加载；下拉刷新后重试验证。"))
-@@ -213,7 +242,13 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
+@@ -207,13 +236,19 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
+ private fun Metric(label: String, value: String, color: Color, modifier: Modifier) {
+     val c = LocalHomeColors.current
+     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+-        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1)
++        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+         HomeRollingText(value, color, HomeType.metric.copy(fontSize = HomeType.sheetTitle.fontSize), alignment = Alignment.Center)
+     }
  }
 
  @Composable
@@ -75340,6 +75599,28 @@ index ee40a76..8c39531 100644
          }
      }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
+index 9ec8a80..a9aebfe 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
+@@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.home.HomeIconButton
+ import io.github.xgl34222220.hetu.home.HomeIcons
+ import io.github.xgl34222220.hetu.home.HomeNotice
+ import io.github.xgl34222220.hetu.home.HomeReveal
+-import io.github.xgl34222220.hetu.home.HomeSpinner
+ import io.github.xgl34222220.hetu.home.HomeTone
+ import io.github.xgl34222220.hetu.home.HomeType
+ import io.github.xgl34222220.hetu.home.HomeVerticalDivider
+@@ -106,7 +105,8 @@ internal fun ToolsEditorScreen(
+                 }
+                 HomeCard(Modifier.fillMaxWidth().weight(1f)) {
+                     when (val load = state.load) {
+-                        ToolsLoad.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HomeSpinner(size = 22.dp, color = c.t3) }
++                        // Audit5 E1: code-line placeholders while the file is read (static with motion off), like the config editor.
++                        ToolsLoad.Loading -> Box(Modifier.fillMaxSize()) { io.github.xgl34222220.hetu.HxSkeletonLines(count = 8, modifier = Modifier.padding(top = 8.dp), rowHeight = 44.dp, icon = false) }
+                         is ToolsLoad.Failed -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
+                             ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message, topPadding = 24.dp) {
+                                 ToolsButton("重新读取", onReload, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 index f575100..e818d42 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
@@ -75556,6 +75837,19 @@ index f575100..e818d42 100644
  }
 
  /**
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
+index 378e395..d49eb16 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
+@@ -132,7 +132,7 @@ internal fun ToolsBarTextButton(
+         horizontalArrangement = Arrangement.spacedBy(6.dp),
+     ) {
+         if (loading) HomeSpinner(size = 18.dp, color = tint) else Icon(icon, null, Modifier.size(20.dp), tint = tint)
+-        Text(ht(text), color = tint, style = HomeType.button.copy(fontWeight = FontWeight.Bold), maxLines = 1)
++        Text(ht(text), color = tint, style = HomeType.button.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+     }
+ }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 index 40111ed..cb17fc4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
@@ -75825,7 +76119,7 @@ index 6e1e067..08e9255 100644
 
      when (val current = overlay) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
-index 60a38ad..1cdba86 100644
+index 60a38ad..afcdc79 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
 @@ -10,7 +10,7 @@ import java.util.Locale
@@ -75845,9 +76139,12 @@ index 60a38ad..1cdba86 100644
      WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
  }
 
-@@ -39,16 +40,19 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
+@@ -37,18 +38,33 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
+ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEntry>)
+
  internal object ToolsCatalog {
-     /** Concept layout (03A page 1): six untitled cards. This is the default. */
+-    /** Concept layout (03A page 1): six untitled cards. This is the default. */
++    /** Concept layout (03A page 1): six untitled cards (the default before 3.3.3). */
      val concept: List<ToolsGroupSpec> = listOf(
 -        ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
 +        // 网络测试 is the most used tool: it opens the first card (approved concept c2), and
@@ -75859,6 +76156,18 @@ index 60a38ad..1cdba86 100644
          ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
 -        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
 +        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
++    )
++
++    /**
++     * Audit5 U14 (3.3.3, default): the concept order kept row for row, folded into four titled
++     * cards so the single-row cards (日志文件, 应用管理) join their neighbours and every card says
++     * what it holds. Titles never repeat an entry's own text, so a search hit is never doubled.
++     */
++    val grouped: List<ToolsGroupSpec> = listOf(
++        ToolsGroupSpec("常用工具", listOf(ToolsEntry.NetTest, ToolsEntry.Files, ToolsEntry.Logs)),
++        ToolsGroupSpec("分流与网络", listOf(ToolsEntry.Apps, ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
++        ToolsGroupSpec("配置与规则", listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
++        ToolsGroupSpec("核心与维护", listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
      )
 
      /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
@@ -75867,6 +76176,15 @@ index 60a38ad..1cdba86 100644
          ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
          ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
          ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
+@@ -81,7 +97,7 @@ internal object ToolsCatalog {
+ internal data class ToolsRootState(
+     val searching: Boolean = false,
+     val query: String = "",
+-    val groups: List<ToolsGroupSpec> = ToolsCatalog.concept,
++    val groups: List<ToolsGroupSpec> = ToolsCatalog.grouped,
+ ) {
+     /** Non-null while a query is typed: the filtered cards (possibly empty → empty state). */
+     val results: List<ToolsGroupSpec>? get() = if (searching && query.isNotBlank()) ToolsCatalog.search(groups, query) else null
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 index 4bdee7e..dd32845 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
@@ -76099,10 +76417,20 @@ index 7967521..17acd48 100644
 
      AnimatedContent(
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
-index af5a645..065d546 100644
+index af5a645..88d5a32 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
-@@ -53,6 +53,7 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
+@@ -20,6 +20,9 @@ import androidx.compose.runtime.remember
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.semantics.heading
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import io.github.xgl34222220.hetu.home.HomeCard
+ import io.github.xgl34222220.hetu.home.HomeDims
+@@ -53,6 +56,7 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
      ToolsEntry.Cores -> ToolsIcons.Cpu
      ToolsEntry.Adblock -> ToolsIcons.ShieldX
      ToolsEntry.Diag -> ToolsIcons.Activity
@@ -76110,6 +76438,33 @@ index af5a645..065d546 100644
      ToolsEntry.WebUi -> ToolsIcons.Monitor
  }
 
+@@ -136,7 +140,7 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
+     val c = LocalHomeColors.current
+     Column(Modifier.fillMaxWidth().padding(bottom = HomeDims.gap).homeEnter(stagger, index), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+         if (group.title != null) {
+-            Text(ht(group.title), Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp), color = c.t2, style = HomeType.noteStrong)
++            Text(ht(group.title), Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp).semantics { heading() }, color = c.t2, style = HomeType.noteStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+         HomeCard(Modifier.fillMaxWidth()) {
+             group.entries.forEach { entry ->
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt
+index f0de985..fc3ccb4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt
+@@ -294,9 +294,12 @@ internal fun ToolsYamlEditor(
+     val gutter = remember(lines) { ToolsYaml.gutter(lines) }
+     val focusLine = state.focusLine
+
++    val jumpMotion = io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled.current
+     LaunchedEffect(state.jumpTick) {
+         val line = state.focusLine ?: return@LaunchedEffect
+-        vertical.animateScrollTo(((line - 4).coerceAtLeast(0) * lineHeightPx).toInt())
++        val target = ((line - 4).coerceAtLeast(0) * lineHeightPx).toInt()
++        // Audit5 R1: a go-to-line jump is instant when motion is off.
++        if (jumpMotion) vertical.animateScrollTo(target) else vertical.scrollTo(target)
+     }
+
+     BoxWithConstraints(modifier) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt
 index 1265384..25902d4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt
@@ -76355,7 +76710,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..198bd43 100644
+index 578ce9d..b5c1660 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -76402,7 +76757,7 @@ index 578ce9d..198bd43 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,356 @@ private val vocabularyConnection = """
+@@ -969,16 +990,365 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -76689,6 +77044,15 @@ index 578ce9d..198bd43 100644
 +
 +
 +// 2026-10-14 audit4 functions: stopped 本机直测, connection details actions, subscription alerts, launcher shortcuts, update check, restore undo.
++// 2026-10-15 3.3.3 polish (audit5): tools group titles (U14) and the plain copy toast.
++private val vocabularyAudit5 = """
++常用工具|Frequently used|常用工具|Часто используемые
++分流与网络|Routing & network|分流與網路|Маршрутизация и сеть
++配置与规则|Configs & rules|設定檔與規則|Конфигурации и правила
++核心与维护|Core & maintenance|核心與維護|Ядро и обслуживание
++已复制|Copied|已複製|Скопировано
++""".trimIndent()
++
 +private val vocabularyAudit4Func = """
 +直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
 +上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
@@ -76739,7 +77103,7 @@ index 578ce9d..198bd43 100644
 +""".trimIndent()
 +
 +
-+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -81469,6 +81833,286 @@ index 0000000..cd25ec1
 +        assertEquals("上次啟動失敗", translateHetuText("上次启动失败", "zh-TW"))
 +        val table = source("ui/HetuLanguage.kt")
 +        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Ui, "))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit5Polish108Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit5Polish108Test.kt
+new file mode 100644
+index 0000000..603ed09
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit5Polish108Test.kt
+@@ -0,0 +1,274 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.app.job.JobScheduler
++import android.content.Context
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.os.Looper
++import android.view.View
++import android.view.ViewGroup
++import android.view.inspector.WindowInspector
++import androidx.activity.ComponentActivity
++import androidx.activity.compose.setContent
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.semantics.SemanticsNode
++import androidx.compose.ui.semantics.SemanticsOwner
++import androidx.compose.ui.semantics.SemanticsProperties
++import androidx.compose.ui.semantics.getOrNull
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.unit.Density
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.tools.ToolsCatalog
++import io.github.xgl34222220.hetu.tools.ToolsEntry
++import io.github.xgl34222220.hetu.tools.ToolsRootState
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import java.io.File
++import java.time.Duration
++import java.util.concurrent.TimeUnit
++import kotlinx.coroutines.cancel
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/**
++ * 2026-10-15 3.3.3 polish (work/audit5-2026-10-15.md): reduced-motion gates (R1), network test
++ * feedback (N2/N3), tools groups (U14), ABI fallback (G13), background subscription alerts (G7)
++ * and the screenshot coverage of pages that had none (G11). The captures are layout evidence only
++ * (test-only data, no Root, no controller, no network).
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class Audit5Polish108Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++    private var vm: HetuViewModel? = null
++    private val output = File(System.getProperty("hetu.qa.output", "build/outputs/concept-remaining-coverage"), "audit5-coverage")
++
++    @Before fun clean() {
++        prefs.edit().clear().putString("appearance", "light").putBoolean("hetuDynamicColor", false)
++            .putBoolean("enableBlur", false).putBoolean("predictiveBackAnimation", false).commit()
++    }
++
++    @After fun finish() {
++        runCatching { rule.runOnUiThread { rule.activity.setContent {} } }
++        runCatching { frame() }
++        vm?.viewModelScope?.cancel()
++        UpdateJobService.scheduleSubscriptionAlerts(app, false)
++    }
++
++    /* ---------------- R1 / N2 / N3 / L1 / E1 / T2 (source shape) ---------------- */
++
++    @Test fun motionOffMakesJumpsAndTheSplashInstant() {
++        val page = source("app/HxComponents.kt")
++        assertTrue(page.contains("if (pageMotion) listState.animateScrollToItem(0) else listState.scrollToItem(0)"))
++        assertFalse("every HxPage jump reads the motion switch", page.contains("{ listState.animateScrollToItem(0) }"))
++        val tabs = source("app/HxTabbedPage.kt")
++        assertTrue(tabs.contains("if (tabMotion) it.animateScrollToItem(0) else it.scrollToItem(0)"))
++        assertTrue(tabs.contains("if (chipMotion) scroll.animateScrollTo("))
++        assertTrue(source("tools/ToolsYamlEditor.kt").contains("if (jumpMotion) vertical.animateScrollTo(target) else vertical.scrollTo(target)"))
++        assertTrue(source("app/HetuActivity.kt").contains("if (artMotion) alpha.animateTo(0f"))
++    }
++
++    @Test fun networkTestSettlesColoursAndConfirmsAFinishedRun() {
++        val screen = source("app/NetworkTestScreen.kt")
++        assertTrue(screen.contains("label = \"net-site-status\""))
++        assertTrue(screen.contains("if (finished) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Confirm)"))
++        assertTrue(screen.contains("else if (runFailed) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Reject)"))
++        assertTrue(screen.contains("style = HomeType.noteStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)"))
++    }
++
++    @Test fun logLinesAnimateAndTheEditorShowsPlaceholders() {
++        assertTrue(source("ProxyLogViewerActivity.kt").contains("Box(Modifier.hxAnimateItem()) { HxLogLine(line) }"))
++        val editor = source("tools/ToolsEditorScreen.kt")
++        assertTrue(editor.contains("ToolsLoad.Loading -> Box(Modifier.fillMaxSize()) { io.github.xgl34222220.hetu.HxSkeletonLines("))
++        assertFalse(editor.contains("HomeSpinner(size = 22.dp"))
++    }
++
++    @Test fun plainCopyToastFollowsTheAppLanguage() {
++        prefs.edit().putString("appLanguage", "en").commit()
++        assertEquals("Copied", hxPlainText(app, "已复制"))
++        prefs.edit().putString("appLanguage", "zh-CN").commit()
++        assertEquals("已复制", hxPlainText(app, "已复制"))
++        listOf("常用工具", "分流与网络", "配置与规则", "核心与维护", "已复制").forEach { key ->
++            assertTrue(key, translateHetuText(key, "en") != key)
++            assertTrue(key, translateHetuText(key, "ru") != key)
++        }
++    }
++
++    /* ---------------- U14 ---------------- */
++
++    @Test fun toolsAreFourTitledCardsInTheConceptOrder() {
++        val grouped = ToolsCatalog.grouped
++        assertEquals(grouped, ToolsRootState().groups)
++        assertEquals(listOf("常用工具", "分流与网络", "配置与规则", "核心与维护"), grouped.map { it.title })
++        assertEquals(ToolsCatalog.concept.flatMap { it.entries }, grouped.flatMap { it.entries })
++        assertEquals(ToolsEntry.entries.toSet(), grouped.flatMap { it.entries }.toSet())
++        val entryTexts = ToolsEntry.entries.flatMap { listOf(it.title, it.summary, it.brief) }.toSet()
++        grouped.forEach { assertFalse("title ${it.title} repeats an entry", it.title in entryTexts) }
++    }
++
++    /* ---------------- G13 ---------------- */
++
++    @Test fun abiFallbackSkipsPayloadsThisPackageDoesNotCarry() {
++        val armOnly = EbpfMatcher.AssetProbe { path -> !path.contains("x86_64") }
++        assertEquals("mihomo-root/arm64-v8a/mihomo", EbpfMatcher.firstAsset(arrayOf("x86_64", "arm64-v8a"), "mihomo-root/", "/mihomo", armOnly))
++        assertEquals("mihomo-root/x86_64/mihomo", EbpfMatcher.firstAsset(arrayOf("x86_64", "arm64-v8a"), "mihomo-root/", "/mihomo", null))
++        assertNull(EbpfMatcher.firstAsset(arrayOf("x86_64", "x86"), "mihomo-root/", "/mihomo", armOnly))
++        assertEquals("hetu-bpf/arm64-v8a/hetu-bpf", EbpfMatcher.loaderAsset(arrayOf("x86_64", "arm64-v8a"), armOnly))
++        assertEquals("hetu-bpf/x86_64/hetu-bpf", EbpfMatcher.loaderAsset(arrayOf("x86", "x86_64")))
++        val manager = source("RootProxyManager.java")
++        assertTrue(manager.contains("EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS,this::packagedAsset)"))
++        assertTrue(manager.contains("EbpfMatcher.firstAsset(Build.SUPPORTED_ABIS,\"mihomo-root/\",\"/mihomo\",this::packagedAsset)"))
++        assertTrue(manager.contains("本安装包不含适配当前 CPU 的内核，请下载通用版"))
++    }
++
++    /* ---------------- G7 ---------------- */
++
++    @Test fun backgroundSubscriptionCheckFollowsTheSwitch() {
++        val scheduler = app.getSystemService(JobScheduler::class.java)
++        assertNull(scheduler.getPendingJob(UpdateJobService.SUBSCRIPTION_ALERT_JOB_ID))
++        UpdateJobService.scheduleSubscriptionAlerts(app, true)
++        val job = scheduler.getPendingJob(UpdateJobService.SUBSCRIPTION_ALERT_JOB_ID)
++        assertNotNull(job)
++        assertTrue(job!!.isPeriodic)
++        assertEquals(TimeUnit.HOURS.toMillis(12), job.intervalMillis)
++        assertTrue(job.isPersisted)
++        assertTrue("never replaces the daily rule update", UpdateJobService.SUBSCRIPTION_ALERT_JOB_ID != UpdateJobService.JOB_ID)
++        UpdateJobService.scheduleSubscriptionAlerts(app, false)
++        assertNull(scheduler.getPendingJob(UpdateJobService.SUBSCRIPTION_ALERT_JOB_ID))
++        // Off by default: the background pass returns without reading anything.
++        HxSubscriptionAlerts.checkInBackground(app)
++        val service = source("UpdateJobService.java")
++        assertTrue(service.contains("if(parameters.getJobId()==SUBSCRIPTION_ALERT_JOB_ID) return startSubscriptionAlertJob(parameters);"))
++        assertTrue(source("app/ToolScreens.kt").contains("UpdateJobService.scheduleSubscriptionAlerts(context, on)"))
++        assertTrue(source("app/HetuActivity.kt").contains("HxSubscriptionAlerts.syncSchedule(applicationContext)"))
++        val manifest = File("src/main/AndroidManifest.xml").readText()
++        assertEquals("No permission added", 11, Regex("<uses-permission ").findAll(manifest).count())
++    }
++
++    /* ---------------- G11: screenshot coverage ---------------- */
++
++    private fun frame() {
++        repeat(4) {
++            rule.mainClock.advanceTimeBy(200)
++            rule.runOnUiThread { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }
++        }
++    }
++
++    private fun nativeTexts(): List<String> {
++        val result = mutableListOf<String>()
++        fun visitNode(n: SemanticsNode) {
++            result += n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
++            n.children.forEach(::visitNode)
++        }
++        fun visitView(v: View) {
++            v.javaClass.methods.firstOrNull { it.name == "getSemanticsOwner" }?.let { visitNode((it.invoke(v) as SemanticsOwner).unmergedRootSemanticsNode) }
++            if (v is ViewGroup) (0 until v.childCount).forEach { visitView(v.getChildAt(it)) }
++        }
++        WindowInspector.getGlobalWindowViews().forEach(::visitView)
++        return result
++    }
++
++    private fun capture(root: View, id: String) {
++        rule.runOnUiThread {
++            assertTrue("$id must be laid out", root.width > 0 && root.height > 0)
++            val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
++            root.draw(Canvas(bitmap))
++            output.mkdirs()
++            val file = File(output, "$id.png")
++            file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
++            bitmap.recycle()
++            assertTrue("$id has bytes", file.length() > 0)
++        }
++    }
++
++    private fun show(appearance: String, fontScale: Float, content: @Composable () -> Unit) {
++        rule.runOnUiThread {
++            rule.activity.setContent {
++                HetuAppTheme(appearance, false) {
++                    val density = LocalDensity.current
++                    CompositionLocalProvider(
++                        LocalNav provides HxNav(), LocalHxBlur provides false,
++                        LocalDensity provides Density(density.density, fontScale),
++                    ) { Box(Modifier.fillMaxSize()) { content() } }
++                }
++            }
++        }
++        frame()
++    }
++
++    @Test fun pagesWithoutEvidenceAreCapturedInLightDarkAndLargeText() {
++        rule.mainClock.autoAdvance = false
++        val now = System.currentTimeMillis()
++        SpeedTestHistory.add(app, SpeedTestHistory.bandwidthRecord("网速测试", 38L, 182.4 to 46_000_000L, 41.7 to 12_000_000L, 46_000_000L, 12_000_000L, null, now))
++        prefs.edit().putBoolean("networkMatchEnabled", true).putString("networkMatchLastEnvironment", "Wi-Fi · Test Network").commit()
++        val model = HetuViewModel(app).also { vm = it }
++        val pages = listOf("speed-history", "override-scripts", "traffic-ranking", "network-match-daemon")
++        val variants = listOf(Triple("light", "light", 1f), Triple("dark", "dark", 1f), Triple("light-2x", "light", 2f))
++        pages.forEach { name ->
++            variants.forEach { (suffix, appearance, scale) ->
++                show(appearance, scale) { CoveragePage(name, model) }
++                capture(rule.activity.window.decorView, "$name-$suffix")
++            }
++        }
++        show("light", 1f) { Column { SpeedTestHistorySection(0) } }
++        var texts = emptyList<String>()
++        rule.runOnUiThread { texts = nativeTexts() }
++        assertTrue("speed history renders its run: $texts", texts.contains("测速历史"))
++    }
++
++    @Test fun advancedSettingsWithEbpfAndWechatSwitchesIsCaptured() {
++        rule.mainClock.autoAdvance = false
++        show("light", 1f) {}
++        listOf("light", "dark").forEach { appearance ->
++            prefs.edit().putString("appearance", appearance).commit()
++            val controller = Robolectric.buildActivity(ProxyAdvancedSettingsActivity::class.java).setup()
++            try {
++                frame()
++                capture(controller.get().window.decorView, "advanced-settings-ebpf-wechat-$appearance")
++            } finally {
++                controller.pause().stop().destroy()
++                frame()
++            }
++        }
++    }
++}
++
++@Composable
++private fun CoveragePage(name: String, model: HetuViewModel) {
++    when (name) {
++        "speed-history" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { SpeedTestHistorySection(0) }
++        "override-scripts" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { OverrideScriptsSection() }
++        "traffic-ranking" -> {
++            val rank = rememberRankState(model)
++            LazyColumn(Modifier.fillMaxSize()) { rankItems(model, rank) }
++        }
++        else -> HxNetworkMatchScreen(model) {}
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt

@@ -239,8 +239,10 @@ internal fun HxPage(
     }
     // Re-tapping the current dock item scrolls the page back to the top.
     val initialSignal = remember { scrollToTopSignal }
+    // Audit5 R1: with motion off (system animator scale 0, in-app switch, power save) the jump is instant.
+    val pageMotion = LocalHomeMotionEnabled.current
     LaunchedEffect(scrollToTopSignal) {
-        if (scrollToTopSignal != initialSignal) listState.animateScrollToItem(0)
+        if (scrollToTopSignal != initialSignal) { if (pageMotion) listState.animateScrollToItem(0) else listState.scrollToItem(0) }
     }
     val c = LocalHomeColors.current
     val density = LocalDensity.current
@@ -351,7 +353,7 @@ internal fun HxPage(
             // Long lists get a small "back to top" button once the user is deep in them.
             val scrollScope = rememberCoroutineScope()
             HomePop(showScrollTop && scrollTopWanted, Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = listBottom - 6.dp)) {
-                HxScrollTopButton { scrollScope.launch { listState.animateScrollToItem(0) } }
+                HxScrollTopButton { scrollScope.launch { if (pageMotion) listState.animateScrollToItem(0) else listState.scrollToItem(0) } }
             }
             overlay()
         }
@@ -744,7 +746,7 @@ internal fun HxSearchField(
 internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = LocalHomeColors.current.t1) {
     val c = LocalHomeColors.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = HomeType.caption, color = c.t2, maxLines = 1)
+        Text(label, style = HomeType.caption, color = c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(value, style = HomeType.value, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!unit.isNullOrBlank()) Text(unit, Modifier.padding(bottom = 2.dp), style = HomeType.badge, color = c.t2)
@@ -759,7 +761,15 @@ internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifie
 internal fun hxCopy(context: Context, label: String, text: String) {
     val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
     manager.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+    // Audit5 T2: the platform toast follows the app language like every other message.
+    Toast.makeText(context, hxPlainText(context, "已复制"), Toast.LENGTH_SHORT).show()
+}
+
+/** [ht] outside composition: the app-language setting read straight from preferences. */
+internal fun hxPlainText(context: Context, source: String): String {
+    val setting = context.getSharedPreferences("hetu", Context.MODE_PRIVATE).getString("appLanguage", "system").orEmpty()
+    val language = if (setting.isBlank() || setting == "system") java.util.Locale.getDefault().toLanguageTag() else setting
+    return io.github.xgl34222220.hetu.ui.translateHetuText(source, language)
 }
 
 /** Bottom sheet dressed with the home tokens: 28 dp top corners, a grab handle, an optional title row. */

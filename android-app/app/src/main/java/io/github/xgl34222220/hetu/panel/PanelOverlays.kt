@@ -274,7 +274,7 @@ private fun FieldError(message: String?) {
 @Composable
 private fun DetailRow(label: String, trailing: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(ht(label), color = LocalHomeColors.current.t2, style = HomeType.label, maxLines = 1)
+        Text(ht(label), color = LocalHomeColors.current.t2, style = HomeType.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { trailing() }
     }
 }

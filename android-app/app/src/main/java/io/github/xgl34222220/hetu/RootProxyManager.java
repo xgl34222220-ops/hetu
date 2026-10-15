@@ -2322,7 +2322,7 @@ final class RootProxyManager {
      * ebpf=fallback (payload-missing) and keeps the iptables owner/CIDR rules.
      */
     private void appendEbpfPayloads(StringBuilder cmd,File stage,String deploySuffix)throws IOException{
-        String loaderAsset=EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS);
+        String loaderAsset=EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS,this::packagedAsset);
         if(loaderAsset==null)return;
         File loader=new File(stage,EbpfMatcher.LOADER_NAME),object=new File(stage,EbpfMatcher.OBJECT_NAME);
         try{
@@ -2370,12 +2370,23 @@ final class RootProxyManager {
         return out;
     }
     private String rootBinaryAsset()throws IOException{
-        for(String abi:Build.SUPPORTED_ABIS){
-            String v=abi.toLowerCase(Locale.ROOT);
-            if(v.equals("arm64-v8a"))return"mihomo-root/arm64-v8a/mihomo";
-            if(v.equals("x86_64"))return"mihomo-root/x86_64/mihomo";
-        }
-        throw new IOException("当前 CPU 架构没有内置 Mihomo："+Arrays.toString(Build.SUPPORTED_ABIS));
+        // Audit5 G13: the first supported ABI whose payload this APK really carries (an arm64-only
+        // package on an x86_64 device with ARM translation falls through to arm64-v8a).
+        String found=EbpfMatcher.firstAsset(Build.SUPPORTED_ABIS,"mihomo-root/","/mihomo",this::packagedAsset);
+        if(found!=null)return found;
+        throw new IOException("当前 CPU 架构没有内置 Mihomo："+Arrays.toString(Build.SUPPORTED_ABIS)+"；本安装包不含适配当前 CPU 的内核，请下载通用版");
+    }
+    /** False only when the asset folder lists and the file is not in it; an unreadable listing keeps the old first-match behaviour. */
+    private boolean packagedAsset(String path){
+        int slash=path.lastIndexOf('/');
+        if(slash<=0)return true;
+        try{
+            String[] names=context.getAssets().list(path.substring(0,slash));
+            if(names==null)return true;
+            String name=path.substring(slash+1);
+            for(String entry:names)if(name.equals(entry))return true;
+            return false;
+        }catch(IOException unreadable){return true;}
     }
     private void copyScriptAsset(File out)throws IOException{
         byte[] bytes;
