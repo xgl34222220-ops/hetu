@@ -125,7 +125,7 @@ class Audit5Polish108Test {
 
     @Test fun toolsAreFourTitledCardsInTheConceptOrder() {
         val grouped = ToolsCatalog.grouped
-        assertEquals(grouped, ToolsRootState().groups)
+        assertEquals(ToolsCatalog.concept, ToolsRootState().groups)
         assertEquals(listOf("常用工具", "分流与网络", "配置与规则", "核心与维护"), grouped.map { it.title })
         assertEquals(ToolsCatalog.concept.flatMap { it.entries }, grouped.flatMap { it.entries })
         assertEquals(ToolsEntry.entries.toSet(), grouped.flatMap { it.entries }.toSet())

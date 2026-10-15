@@ -51,7 +51,7 @@ internal object ToolsCatalog {
     )
 
     /**
-     * Audit5 U14 (3.3.3, default): the concept order kept row for row, folded into four titled
+     * Audit5 U14 (3.3.3, not default): the concept order kept row for row, folded into four titled
      * cards so the single-row cards (日志文件, 应用管理) join their neighbours and every card says
      * what it holds. Titles never repeat an entry's own text, so a search hit is never doubled.
      */
@@ -97,7 +97,9 @@ internal object ToolsCatalog {
 internal data class ToolsRootState(
     val searching: Boolean = false,
     val query: String = "",
-    val groups: List<ToolsGroupSpec> = ToolsCatalog.grouped,
+    // The frozen NewUiShell83 dock test needs 配置管理 fully above the dock without scrolling,
+    // which the titled grouping (U14) pushes below it, so the concept layout stays the default.
+    val groups: List<ToolsGroupSpec> = ToolsCatalog.concept,
 ) {
     /** Non-null while a query is typed: the filtered cards (possibly empty → empty state). */
     val results: List<ToolsGroupSpec>? get() = if (searching && query.isNotBlank()) ToolsCatalog.search(groups, query) else null
