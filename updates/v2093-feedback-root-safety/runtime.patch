@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..fa79730 100644
+index 8a43698..1764a4d 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -8,8 +8,8 @@ index 8a43698..fa79730 100644
          targetSdk = 35
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
-+        versionCode = 2099
-+        versionName = "3.3.3"
++        versionCode = 2100
++        versionName = "4.0.0"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -52103,6 +52103,82 @@ index 0000000..e476de3
 +        return "'" + value.replace("'", "'\\''") + "'";
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt
+index 21dd3d3..398eaf5 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt
+@@ -1,6 +1,9 @@
+ package io.github.xgl34222220.hetu
+
++import android.content.ComponentName
++import android.content.Context
+ import android.os.Build
++import android.widget.Toast
+ import android.service.quicksettings.Tile
+ import android.service.quicksettings.TileService
+ import kotlinx.coroutines.CancellationException
+@@ -44,7 +47,7 @@ class HetuProxyTileService : TileService() {
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (failure: Exception) {
+-                error = failure.message ?: "代理切换失败"
++                error = hxErrorMessage(failure, "代理切换失败")
+                 getSharedPreferences("hetu", MODE_PRIVATE)
+                     .edit()
+                     .putString("proxyTileLastError", error)
+@@ -53,6 +56,10 @@ class HetuProxyTileService : TileService() {
+                 switching = false
+                 withContext(Dispatchers.Main) {
+                     renderTile(error = error)
++                    // func-400 T1: the reason is shown, not only 「切换失败」 in the tile subtitle.
++                    if (error.isNotBlank()) runCatching {
++                        Toast.makeText(applicationContext, text("代理切换失败") + "：" + error, Toast.LENGTH_LONG).show()
++                    }
+                 }
+             }
+         }
+@@ -61,25 +68,38 @@ class HetuProxyTileService : TileService() {
+     private fun renderTile(stage: String = "", error: String = "") {
+         val tile = qsTile ?: return
+         val running = ProxyStatusBridge.rootProxyRunning(this)
+-        tile.label = "河图代理"
++        tile.label = text("河图代理")
+         tile.state = when {
+             switching -> Tile.STATE_UNAVAILABLE
+             running -> Tile.STATE_ACTIVE
+             else -> Tile.STATE_INACTIVE
+         }
+         if (Build.VERSION.SDK_INT >= 29) {
+-            tile.subtitle = when {
++            tile.subtitle = text(when {
+                 error.isNotBlank() -> "切换失败"
+                 stage.isNotBlank() -> stage
+                 running -> "运行中"
+                 else -> "已停止"
+-            }
++            })
+         }
+         tile.updateTile()
+     }
+
++    /** func-400 T1: tile texts follow the App language, as toasts do. */
++    private fun text(source: String): String = runCatching { hxPlainText(this, source) }.getOrDefault(source)
++
+     override fun onDestroy() {
+         scope.cancel()
+         super.onDestroy()
+     }
++
++    companion object {
++        /**
++         * func-400 T2: asks System UI to re-read the tile after the proxy was started or stopped
++         * elsewhere (App, notification, shortcut), so an open Quick Settings panel is not stale.
++         */
++        fun requestRefresh(context: Context) {
++            runCatching { TileService.requestListeningState(context, ComponentName(context, HetuProxyTileService::class.java)) }
++        }
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
 index 0000000..3d9f572
@@ -56677,7 +56753,7 @@ index e94e425..8754616 100644
 
      fun save(prefs: SharedPreferences, values: List<ProxyLatencyTarget>) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
-index 2c5e10f..626094b 100644
+index 2c5e10f..625776c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 @@ -6,6 +6,9 @@ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomShe
@@ -56864,6 +56940,24 @@ index 2c5e10f..626094b 100644
                      }
                  }
              },
+@@ -556,7 +629,7 @@ private fun HxLogControls(
+         ) {
+             Icon(HomeIcons.RefreshCw, null, Modifier.size(22.dp).graphicsLayer { rotationZ = angle }, tint = liveTint)
+             Spacer(Modifier.width(8.dp))
+-            Text(ht(if (autoRefresh) "自动刷新中" else "自动刷新"), color = liveTint, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1)
++            Text(ht(if (autoRefresh) "自动刷新中" else "自动刷新"), color = liveTint, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+         val orderSource = remember { MutableInteractionSource() }
+         val flip by animateFloatAsState(if (newestFirst) 0f else 180f, HomeMotion.glide(motion), label = "log-order-flip")
+@@ -569,7 +642,7 @@ private fun HxLogControls(
+         ) {
+             Icon(ToolsFeatureIcons.ArrowDownWideNarrow, null, Modifier.size(22.dp).graphicsLayer { rotationX = flip }, tint = c.t2)
+             Spacer(Modifier.width(8.dp))
+-            Text(ht(if (newestFirst) "最新在前" else "最早在前"), color = c.t2, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1)
++            Text(ht(if (newestFirst) "最新在前" else "最早在前"), color = c.t2, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
 index 9aa0aba..5a6242e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
@@ -58463,6 +58557,139 @@ index 190ce6c..4f03ba6 100644
          )
      }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
+index bb3e75d..6a2d41a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
+@@ -40,6 +40,7 @@ class ProxyStatusNotificationService : Service() {
+     private var lastProcessTicks = 0L
+     private var lastSystemTicks = 0L
+     private var cpuPercent = 0f
++    @Volatile private var controlBusy = false
+
+     override fun onCreate() {
+         super.onCreate()
+@@ -67,12 +68,14 @@ class ProxyStatusNotificationService : Service() {
+             ACTION_RELOAD -> runControl("正在重载…") { controller.reload() }
+             ACTION_RESTART -> runControl("正在重启…") { controller.restart() }
+             ACTION_STOP_PROXY -> runControl("正在停止…") { controller.stop() }
++            // func-400 N1: the 「停止」 slot becomes 「启动」 while the proxy is stopped.
++            ACTION_START_PROXY -> runControl("正在启动…") { controller.start() }
+         }
+         if (!prefs.getBoolean(PREF_ENABLED, false)) {
+             stopSelf()
+             return START_NOT_STICKY
+         }
+-        ensureForeground("正在读取代理状态…")
++        ensureForeground(text("正在读取代理状态…"))
+         if (loopJob?.isActive != true) {
+             loopJob = scope.launch {
+                 while (isActive && prefs.getBoolean(PREF_ENABLED, false)) {
+@@ -86,23 +89,42 @@ class ProxyStatusNotificationService : Service() {
+     }
+
+     private fun runControl(stage: String, action: suspend () -> Any?) {
+-        ensureForeground(stage)
++        // One control at a time: a second tap while starting/stopping is ignored, not queued.
++        if (controlBusy) return
++        controlBusy = true
++        ensureForeground(text(stage))
+         scope.launch {
+             try {
+                 action()
++                prefs.edit().remove(PREF_ERROR).remove(PREF_ERROR_AT).apply()
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                prefs.edit().putString("proxyStatusNotificationError", error.message ?: "通知栏操作失败").apply()
++                // func-400 N2: the failure is shown in the notification itself (for ten minutes).
++                prefs.edit().putString(PREF_ERROR, hxErrorMessage(error, "通知栏操作失败"))
++                    .putLong(PREF_ERROR_AT, System.currentTimeMillis()).apply()
++            } finally {
++                controlBusy = false
+             }
++            runCatching { HetuProxyTileService.requestRefresh(this@ProxyStatusNotificationService) }
+             updateNotification()
+         }
+     }
+
++    /** func-400 N3: notification texts follow the App language (hxPlainText, as toasts do). */
++    private fun text(source: String): String = runCatching { hxPlainText(this, source) }.getOrDefault(source)
++
++    /** The last control failure while it is recent, else blank. */
++    private fun recentError(): String {
++        val at = prefs.getLong(PREF_ERROR_AT, 0L)
++        if (at <= 0L || System.currentTimeMillis() - at > ERROR_VISIBLE_MS) return ""
++        return prefs.getString(PREF_ERROR, "").orEmpty()
++    }
++
+     private suspend fun updateNotification() {
+         val state = runCatching { controller.state() }.getOrElse {
+-            val body = prefs.getString("proxyStatusNotificationError", "").orEmpty().ifBlank { "暂时无法读取代理状态" }
+-            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification("河图 · 代理状态", body, false))
++            val body = prefs.getString(PREF_ERROR, "").orEmpty().ifBlank { text("暂时无法读取代理状态") }
++            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text("河图 · 代理状态"), body, false))
+             return
+         }
+         val runtime = runCatching { inspector.sample() }.getOrDefault(ProxyRuntimeSnapshot(running = state.running))
+@@ -132,7 +154,7 @@ class ProxyStatusNotificationService : Service() {
+         lastSystemTicks = runtime.systemTicks
+
+         val values = mapOf(
+-            "status" to if (state.running) "运行中" else "已停止",
++            "status" to text(if (state.running) "运行中" else "已停止"),
+             "uptime" to HxFormat.duration(runtime.elapsedSeconds),
+             "upload" to HxFormat.speed(uploadRate),
+             "download" to HxFormat.speed(downloadRate),
+@@ -153,6 +175,7 @@ class ProxyStatusNotificationService : Service() {
+             body = body.replace("{$key}", value)
+             title = title.replace("{$key}", value)
+         }
++        recentError().takeIf { it.isNotBlank() }?.let { body = text("上次操作失败") + "：" + it + "\n" + body }
+         getSystemService(NotificationManager::class.java)
+             .notify(NOTIFICATION_ID, buildNotification(title, body, state.running))
+     }
+@@ -184,7 +207,8 @@ class ProxyStatusNotificationService : Service() {
+             prefs.getString(PREF_ACTION_3, "stop").orEmpty() to prefs.getString(PREF_ACTION_LABEL_3, "").orEmpty(),
+         )
+         actions.filter { it.first != "none" }.forEachIndexed { index, (action, customLabel) ->
+-            actionSpec(action, running)?.let { (defaultLabel, intentAction) ->
++            actionSpec(action, running)?.let { (rawLabel, intentAction) ->
++                val defaultLabel = text(rawLabel)
+                 val pending = PendingIntent.getService(
+                     this,
+                     40 + index,
+@@ -201,15 +225,15 @@ class ProxyStatusNotificationService : Service() {
+     private fun actionSpec(value: String, running: Boolean): Pair<String, String>? = when (value) {
+         "reload" -> if (running) "重载" to ACTION_RELOAD else null
+         "restart" -> if (running) "重启" to ACTION_RESTART else null
+-        "stop" -> if (running) "停止" to ACTION_STOP_PROXY else null
++        "stop" -> if (running) "停止" to ACTION_STOP_PROXY else "启动" to ACTION_START_PROXY
+         "hide" -> "隐藏" to ACTION_DISABLE
+         else -> null
+     }
+
+-    private fun ensureForeground(text: String) {
++    private fun ensureForeground(stageText: String) {
+         val notification = buildNotification(
+-            "河图 · 代理状态",
+-            text,
++            text("河图 · 代理状态"),
++            stageText,
+             prefs.getBoolean("proxyRootRuntimeRunning", false) && prefs.getBoolean("proxyRootWanted", false),
+         )
+         if (Build.VERSION.SDK_INT >= 34) {
+@@ -247,6 +271,10 @@ class ProxyStatusNotificationService : Service() {
+         private const val ACTION_RELOAD = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_RELOAD"
+         private const val ACTION_RESTART = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_RESTART"
+         private const val ACTION_STOP_PROXY = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_STOP_PROXY"
++        private const val ACTION_START_PROXY = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_START_PROXY"
++        const val PREF_ERROR = "proxyStatusNotificationError"
++        const val PREF_ERROR_AT = "proxyStatusNotificationErrorAt"
++        const val ERROR_VISIBLE_MS = 10 * 60_000L
+
+         fun setEnabled(context: Context, enabled: Boolean) {
+             context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putBoolean(PREF_ENABLED, enabled).apply()
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
 index 93a3d3d..3462cef 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
@@ -62225,10 +62452,17 @@ index 0000000..5f196ab
 +    private fun spaces(n: Int): String = " ".repeat(maxOf(0, n))
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
-index 63c8e03..fc20a79 100644
+index 63c8e03..47e4143 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
-@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.sp
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+
++import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
+ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
+ import android.content.Context
+ import android.graphics.Typeface
+@@ -65,6 +66,9 @@ import androidx.compose.ui.unit.sp
  import androidx.compose.ui.viewinterop.AndroidView
  import androidx.lifecycle.ViewModelProvider
  import io.github.rosemoe.sora.event.ContentChangeEvent
@@ -62238,7 +62472,15 @@ index 63c8e03..fc20a79 100644
  import io.github.rosemoe.sora.widget.CodeEditor
  import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
  import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
-@@ -99,11 +102,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
+@@ -78,6 +82,7 @@ import io.github.xgl34222220.hetu.home.HomeFormField
+ import io.github.xgl34222220.hetu.home.HomeHaptic
+ import io.github.xgl34222220.hetu.home.HomeIconButton
+ import io.github.xgl34222220.hetu.home.HomeIcons
++import io.github.xgl34222220.hetu.home.HomeNotice
+ import io.github.xgl34222220.hetu.home.HomeMotion
+ import io.github.xgl34222220.hetu.home.HomePill
+ import io.github.xgl34222220.hetu.home.HomePop
+@@ -99,11 +104,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
  import io.github.xgl34222220.hetu.ui.ht
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.Dispatchers
@@ -62251,16 +62493,30 @@ index 63c8e03..fc20a79 100644
 
  /* ------------------------------------------------------------------ */
  /*  Config library + subscriptions                                      */
-@@ -137,7 +139,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -119,6 +123,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
+     var subscriptions by remember { mutableStateOf<List<ProxySubscriptionUi>>(emptyList()) }
+     var loading by remember { mutableStateOf(true) }
++    // 4.0.0: a failed read stays on the page (with 重试) instead of only a toast over empty groups.
++    var loadError by remember { mutableStateOf<String?>(null) }
+     var busy by remember { mutableStateOf(false) }
+     var menuFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
+     var confirmDelete by remember { mutableStateOf<ProxyConfigUi?>(null) }
+@@ -134,10 +140,12 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+         try {
+             configs = vm.controller.configLibrary()
+             subscriptions = vm.controller.subscriptions()
++            loadError = null
          } catch (cancel: CancellationException) {
              throw cancel
          } catch (error: Exception) {
 -            vm.toast(error.message ?: "配置读取失败")
++            loadError = hxErrorMessage(error, "配置读取失败")
 +            vm.toastAs(HxTone.Bad, hxErrorMessage(error, "配置读取失败"))
          } finally {
              loading = false
          }
-@@ -155,7 +157,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -155,7 +163,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62269,7 +62525,7 @@ index 63c8e03..fc20a79 100644
              } finally {
                  busy = false
              }
-@@ -178,10 +180,10 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -178,10 +186,10 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
      }
 
      if (form == "import") {
@@ -62282,9 +62538,16 @@ index 63c8e03..fc20a79 100644
              form = null
          }
          return
-@@ -208,7 +210,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -207,8 +215,15 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+         item(key = "configs") {
              HxSection {
                  HxGroup(title = ht("配置管理")) {
++                    loadError?.takeIf { !loading }?.let { failure ->
++                        HomeNotice(
++                            ht(failure), HomeIcons.CircleAlert, Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
++                            tone = HomeTone.Bad, actionLabel = "重试", onAction = { revision++ },
++                        )
++                    }
                      if (loading && configs.isEmpty()) {
 -                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
 +                        // First read: rows in the shape of config entries instead of a spinner.
@@ -62292,7 +62555,20 @@ index 63c8e03..fc20a79 100644
                      }
                      configs.forEach { config ->
                          // Tap to make it the current config; hold, or use ···, for everything else.
-@@ -353,7 +356,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
+@@ -240,7 +255,11 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+                         HomeIconButton(ToolsIcons.Plus, "添加订阅", { editSub = null; form = "subscription" }, enabled = !busy)
+                     }
+                     Text(ht("当前配置的 proxy-providers。"), Modifier.padding(start = 18.dp, end = 18.dp, bottom = 6.dp), color = c.t2, style = HomeRowSubStyle)
+-                    if (subscriptions.isEmpty() && !loading) {
++                    if (subscriptions.isEmpty() && loading) {
++                        // First read: the subscription rows take shape instead of an empty card.
++                        HxSkeletonLines(count = 2)
++                    }
++                    if (subscriptions.isEmpty() && !loading && loadError == null) {
+                         HxRow(ht("当前配置没有订阅段"), subtitle = ht("完整的 YAML 配置无需订阅；如需添加，请在编辑器中加入 proxy-providers"), icon = PanelIcons.Unlink)
+                     }
+                     subscriptions.forEachIndexed { index, sub ->
+@@ -353,7 +372,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
                  else vm.controller.updateSubscription(subscription.name, url.trim())
                  onSaved()
              } catch (cancel: CancellationException) { throw cancel }
@@ -62301,7 +62577,7 @@ index 63c8e03..fc20a79 100644
              finally { busy = false }
          }
      }
-@@ -387,7 +390,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
+@@ -387,7 +406,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
  }
 
  @Composable
@@ -62310,7 +62586,7 @@ index 63c8e03..fc20a79 100644
      val context = LocalContext.current
      val c = LocalHomeColors.current
      val scope = rememberCoroutineScope()
-@@ -395,28 +398,59 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -395,28 +414,59 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
      var uri by remember { mutableStateOf<Uri?>(null) }
      var fileName by remember { mutableStateOf("") }
      var url by remember { mutableStateOf("") }
@@ -62376,7 +62652,7 @@ index 63c8e03..fc20a79 100644
              finally { busy = false }
          }
      }
-@@ -425,10 +459,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -425,10 +475,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
          item("mode") {
              HxSection {
                  HomeSegmented(
@@ -62389,7 +62665,7 @@ index 63c8e03..fc20a79 100644
                  )
              }
          }
-@@ -443,6 +477,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -443,6 +493,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                          )
                          Spacer(Modifier.height(22.dp))
                          HomeFormField("配置名称（可选）", name, { name = it; problem = null }, placeholder = "例如 旅行.yaml", enabled = !busy)
@@ -62429,7 +62705,7 @@ index 63c8e03..fc20a79 100644
                      } else {
                          Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.cardLabel)
                          Spacer(Modifier.height(8.dp))
-@@ -475,7 +542,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -475,7 +558,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                      }
                      Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                          Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.t3)
@@ -62438,7 +62714,7 @@ index 63c8e03..fc20a79 100644
                      }
                      HomeReveal(problem != null) { HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 14.dp)) }
                  }
-@@ -504,7 +571,8 @@ internal fun hxConfigHttpUrl(raw: String): Boolean = runCatching {
+@@ -504,7 +587,8 @@ internal fun hxConfigHttpUrl(raw: String): Boolean = runCatching {
          value.length <= 4096 && value.none { it.isWhitespace() || it.isISOControl() }
  }.getOrDefault(false)
 
@@ -62448,7 +62724,7 @@ index 63c8e03..fc20a79 100644
      val uri = Uri.parse(url)
      val host = uri.host.orEmpty()
      if (host.isBlank()) url.take(40) else "${uri.scheme}://$host/…"
-@@ -532,46 +600,6 @@ private fun normalizeConfigName(raw: String): String {
+@@ -532,46 +616,6 @@ private fun normalizeConfigName(raw: String): String {
      return name
  }
 
@@ -62495,7 +62771,7 @@ index 63c8e03..fc20a79 100644
  /* ------------------------------------------------------------------ */
  /*  Providers (live subscription usage)                                 */
  /* ------------------------------------------------------------------ */
-@@ -634,18 +662,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
+@@ -634,18 +678,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
 
  private data class HxConfigSource(val core: ProxyRuntimeProfile.Core, val name: String, val text: String)
 
@@ -62531,7 +62807,7 @@ index 63c8e03..fc20a79 100644
      val nav = if (onBackOverride == null) LocalNav.current else null
      val context = LocalContext.current
      val scope = rememberCoroutineScope()
-@@ -663,6 +705,13 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -663,6 +721,13 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
      var confirmLeave by remember { mutableStateOf(false) }
      var confirmReload by remember { mutableStateOf(false) }
      var showOutline by remember { mutableStateOf(false) }
@@ -62545,7 +62821,7 @@ index 63c8e03..fc20a79 100644
      val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
      val editorColors = remember(c.dark, c.surface) {
          HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
-@@ -678,14 +727,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -678,14 +743,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          loadFailure = null
          source = null
          try {
@@ -62570,7 +62846,7 @@ index 63c8e03..fc20a79 100644
      fun leave() {
          if (saving) return
          if (dirty) confirmLeave = true
-@@ -695,7 +752,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -695,7 +768,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          conflict = null
          if (dirty) confirmReload = true else loadRevision++
      }
@@ -62579,7 +62855,7 @@ index 63c8e03..fc20a79 100644
 
      // Returning from another editor must never silently replace this page's draft.
      val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
-@@ -705,7 +762,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -705,7 +778,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                  val expected = source
                  if (expected != null && !loading && !saving) scope.launch {
                      try {
@@ -62588,7 +62864,7 @@ index 63c8e03..fc20a79 100644
                          if (latest.core != expected.core || latest.name != expected.name)
                              conflict = HxConfigSourceConflict(true, latest.name)
                          else if (latest.text != expected.text) conflict = HxConfigSourceConflict(false, latest.name)
-@@ -734,29 +791,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -734,29 +807,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          val expected = source ?: return
          val current = editor?.text?.toString() ?: return
          if (saving || validating) return
@@ -62672,7 +62948,7 @@ index 63c8e03..fc20a79 100644
              finally { saving = false }
          }
      }
-@@ -765,8 +862,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -765,8 +878,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
      Column(Modifier.fillMaxSize().homeDiffuseCanvas().statusBarsPadding().navigationBarsPadding().imePadding()) {
          Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
              HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
@@ -62686,7 +62962,7 @@ index 63c8e03..fc20a79 100644
                  HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
                  enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
              )
-@@ -775,7 +875,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -775,7 +891,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
              HomeRowLayout(
                  AnnotatedString(source?.name ?: ht("读取配置")),
@@ -62695,7 +62971,7 @@ index 63c8e03..fc20a79 100644
                  icon = ToolsIcons.FileCog,
                  iconTint = if (source == null) c.t3 else c.t1,
                  subtitleColor = if (dirty) c.warnText else c.t2,
-@@ -786,20 +886,31 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -786,20 +902,31 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
              Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
              verticalAlignment = Alignment.CenterVertically,
          ) {
@@ -62732,7 +63008,7 @@ index 63c8e03..fc20a79 100644
                  loadFailure != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                      HomeEmptyState(HomeIcons.CircleAlert, "配置读取失败", loadFailure.orEmpty(), topPadding = 0.dp, verbatimSubtitle = true) {
                          HxButton("重新读取", { loadRevision++ }, icon = HomeIcons.RefreshCw)
-@@ -811,7 +922,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -811,7 +938,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                              CodeEditor(viewContext).apply {
                                  setEditorLanguage(HetuYamlLanguage())
                                  setText(initial.text)
@@ -62741,7 +63017,7 @@ index 63c8e03..fc20a79 100644
                                  setSoftKeyboardEnabled(true)
                                  typefaceText = Typeface.MONOSPACE
                                  setTextSize(14f)
-@@ -825,18 +936,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -825,20 +952,24 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                                  setHighlightCurrentLine(true)
                                  colorScheme = editorColors
                                  subscribeAlways<ContentChangeEvent> { dirty = this.text.toString() != source?.text }
@@ -62764,9 +63040,12 @@ index 63c8e03..fc20a79 100644
 -        Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
 +        if (!readOnly && !search) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
              .clip(HomeDims.cardShape).background(c.surface)
-             .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+-            .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
++            .let { val keys = rememberScrollState(); it.panelHorizontalEdgeFade(keys).horizontalScroll(keys) }.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
              HxYamlSymbols.forEach { symbol ->
-@@ -893,6 +1008,19 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+                 val keySource = remember { MutableInteractionSource() }
+                 Box(Modifier.heightIn(min = 44.dp).widthIn(min = 44.dp).clip(RoundedCornerShape(13.dp)).background(c.sunken)
+@@ -893,6 +1024,19 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
              }
          }
      }
@@ -62786,7 +63065,7 @@ index 63c8e03..fc20a79 100644
      if (confirmReload) HxConfirmDialog("放弃草稿并重新读取？",
          "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true,
          onConfirm = { confirmReload = false; dirty = false; loadRevision++ }, onDismiss = { confirmReload = false })
-@@ -904,7 +1032,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -904,7 +1048,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
  /** One tool of the editor: a glyph over its name; a spinner takes the glyph's place while it works. */
  @Composable
  private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier,
@@ -62795,7 +63074,7 @@ index 63c8e03..fc20a79 100644
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      val source = remember { MutableInteractionSource() }
-@@ -916,9 +1044,9 @@ private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVe
+@@ -916,9 +1060,9 @@ private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVe
          horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
      ) {
          Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
@@ -62809,10 +63088,10 @@ index 63c8e03..fc20a79 100644
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
 new file mode 100644
-index 0000000..6c1130f
+index 0000000..1aa1d9b
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,172 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -62854,6 +63133,11 @@ index 0000000..6c1130f
 +
 +    private val configKeys = Regex("^(proxies|proxy-providers|proxy-groups|rules)\\s*:", RegexOption.MULTILINE)
 +
++    private val htmlStart = Regex("^\\s*<(?:!doctype\\s+html|html|head|body)[\\s>]", RegexOption.IGNORE_CASE)
++
++    /** True when [text] opens like an HTML document (a portal, login or error page). */
++    fun looksLikeHtml(text: String): Boolean = htmlStart.containsMatchIn(text.take(512))
++
 +    /** True when [text] has at least one top-level Clash/Mihomo section a usable config needs. */
 +    fun looksLikeConfig(text: String): Boolean = configKeys.containsMatchIn(text)
 +
@@ -62873,6 +63157,8 @@ index 0000000..6c1130f
 +        val body = text.removePrefix("\uFEFF")
 +        if (body.isBlank()) throw IOException("配置为空")
 +        if (body.indexOf('\u0000') >= 0) throw IOException("配置不是文本文件")
++        // func-400 S3: a login / captcha / error page is not a config; say so instead of hinting Base64.
++        if (looksLikeHtml(body) && !looksLikeConfig(body)) throw IOException("下载到的是网页而不是配置，请检查链接是否正确或需要登录")
 +        if (!looksLikeConfig(body)) throw IOException("内容不是 Clash/Mihomo YAML 配置（可能是 Base64 节点列表，请改用「添加订阅」）")
 +        return body
 +    }
@@ -62936,8 +63222,30 @@ index 0000000..6c1130f
 +        readBounded(context.contentResolver.openInputStream(uri) ?: throw IOException("无法读取配置文件"))
 +    }
 +
-+    /** Downloads a full YAML config. Returns the body and the file name the server suggested (may be blank). */
++    /**
++     * Downloads a full YAML config. Returns the body and the file name the server suggested (may be blank).
++     * func-400 S1: a transient failure (timeout, reset, HTTP 408/429/5xx) is tried up to three times
++     * with a short backoff; a final answer (4xx, TLS, oversize) is reported at once.
++     */
 +    suspend fun download(url: String): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
++        var attempt = 0
++        var result: Pair<ByteArray, String>? = null
++        while (result == null) {
++            result = try {
++                downloadOnce(url)
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: IOException) {
++                if (attempt >= HxNetRetry.DOWNLOAD_BACKOFF_MS.size || !HxNetRetry.transient(error)) throw error
++                kotlinx.coroutines.delay(HxNetRetry.DOWNLOAD_BACKOFF_MS[attempt])
++                attempt++
++                null
++            }
++        }
++        checkNotNull(result)
++    }
++
++    private fun downloadOnce(url: String): Pair<ByteArray, String> {
 +        val connection = (URL(url).openConnection() as? HttpURLConnection) ?: throw IOException("请输入有效的 http/https 链接")
 +        try {
 +            connection.connectTimeout = 15_000
@@ -62950,7 +63258,7 @@ index 0000000..6c1130f
 +            val disposition = connection.getHeaderField("Content-Disposition").orEmpty()
 +            val suggested = Regex("filename\\*?=(?:UTF-8'')?\"?([^\";]+)\"?", RegexOption.IGNORE_CASE)
 +                .find(disposition)?.groupValues?.getOrNull(1)?.let { Uri.decode(it) }.orEmpty()
-+            readBounded(connection.inputStream) to suggested
++            return readBounded(connection.inputStream) to suggested
 +        } finally {
 +            connection.disconnect()
 +        }
@@ -62973,17 +63281,27 @@ index e743350..50e5171 100644
              else -> {
                  if (!state.running) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
-index 2243235..900c185 100644
+index 2243235..b8d6493 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
-@@ -1,5 +1,6 @@
+@@ -1,5 +1,7 @@
  package io.github.xgl34222220.hetu
 
++import androidx.compose.ui.text.style.TextOverflow
 +import io.github.xgl34222220.hetu.ui.ht
  import androidx.compose.foundation.Canvas
  import androidx.compose.foundation.background
  import androidx.compose.foundation.clickable
-@@ -91,14 +92,14 @@ internal fun CoreManagerPicker(family: String, current: String, statuses: List<P
+@@ -63,7 +65,7 @@ internal fun CoreConceptButton(text: String,onClick: () -> Unit,modifier: Modifi
+     Row(modifier.heightIn(min=50.dp).clip(RoundedCornerShape(18.dp)).background(background)
+         .clickable(enabled=actionable,onClick={ if (actionable) onClick() }).padding(horizontal=10.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
+         if(busy){HxSpinner(21.dp,foreground);Spacer(Modifier.width(9.dp))}
+-        Text(if (busy) "处理中" else text,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=foreground,maxLines=1)
++        Text(if (busy) "处理中" else text,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=foreground,maxLines = 1, overflow = TextOverflow.Ellipsis)
+     }
+ }
+
+@@ -91,14 +93,14 @@ internal fun CoreManagerPicker(family: String, current: String, statuses: List<P
      @Composable fun ColumnScope.choices() {
          coreFamilyVariantIds(family).mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
              HxMenuItem(coreManagerDisplayName(item.id, item.label), { onPick(item.id) }, selected = item.id == current,
@@ -63840,7 +64158,7 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..11edaad 100644
+index 250b8a8..60c7718 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -16,11 +16,14 @@ import androidx.lifecycle.AndroidViewModel
@@ -63930,13 +64248,13 @@ index 250b8a8..11edaad 100644
 +        if (text.isBlank()) return
 +        explicitToastTones.remove(text)
 +        _messages.tryEmit(text)
-     }
++    }
 +    /** Posts [text] with a fixed colour instead of reading it from the wording. */
 +    fun toastAs(tone: HxTone, text: String) {
 +        if (text.isBlank()) return
 +        explicitToastTones[text] = tone
 +        _messages.tryEmit(text)
-+    }
+     }
 +    /** The tone of a posted toast: the caller's explicit tone, else the keyword fallback. */
 +    internal fun toastTone(text: String): HxTone = explicitToastTones[text] ?: hxToastTone(text)
 
@@ -64236,7 +64554,7 @@ index 250b8a8..11edaad 100644
              finally { autoStartBusy = false; bumpSettings() }
          }
      }
-@@ -674,24 +849,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -674,33 +849,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          val stopping = state.running
          invalidateRuntimeRequests()
          operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
@@ -64279,7 +64597,11 @@ index 250b8a8..11edaad 100644
                          "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                      } else if (configProblem) {
                          reason
-@@ -700,7 +888,47 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
++                    } else if (!HxRootCheck.granted(app)) {
++                        // func-400 E1: without Root every diagnostic read fails too; say what to fix.
++                        HxRootCheck.message(reason)
+                     } else {
+                         val diagnostics = try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
                          if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                      }
                  } else {
@@ -64289,6 +64611,8 @@ index 250b8a8..11edaad 100644
 +            } finally {
 +                operation = null
 +                operationText = ""
++                // func-400 T2: an open Quick Settings panel re-reads the tile after an in-App start/stop.
++                HetuProxyTileService.requestRefresh(app)
 +                refreshNow()
 +            }
 +        }
@@ -64328,7 +64652,7 @@ index 250b8a8..11edaad 100644
                  }
              } finally {
                  operation = null
-@@ -727,14 +955,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -727,14 +960,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              operationText = "正在重启…"
              ProxyRuntimeSettings.beginApply(prefs)
              try {
@@ -64346,7 +64670,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -746,6 +974,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +979,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -64360,7 +64684,7 @@ index 250b8a8..11edaad 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -755,7 +990,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -755,7 +995,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64369,7 +64693,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -764,8 +999,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +1004,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -64404,7 +64728,7 @@ index 250b8a8..11edaad 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,19 +1034,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,19 +1039,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64440,7 +64764,7 @@ index 250b8a8..11edaad 100644
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
          if (current.now == node || current.nodes.none { it.name == node }) return
-@@ -827,13 +1101,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,13 +1106,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -64462,7 +64786,7 @@ index 250b8a8..11edaad 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1122,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1127,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -64501,7 +64825,7 @@ index 250b8a8..11edaad 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1157,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1162,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -64522,7 +64846,7 @@ index 250b8a8..11edaad 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1179,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1184,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -64578,7 +64902,7 @@ index 250b8a8..11edaad 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,22 +1255,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,22 +1260,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -64694,7 +65018,7 @@ index 250b8a8..11edaad 100644
      fun measureSites() {
          val request = activeRuntimeRequest() ?: return
          if (siteTesting) return
-@@ -964,7 +1379,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1384,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64703,7 +65027,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1396,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1401,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64712,7 +65036,7 @@ index 250b8a8..11edaad 100644
              }
          }
      }
-@@ -995,7 +1410,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1415,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64721,7 +65045,7 @@ index 250b8a8..11edaad 100644
              }
          }
      }
-@@ -1014,7 +1429,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1434,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64730,7 +65054,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1448,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1453,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64739,7 +65063,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1456,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1461,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -64748,7 +65072,7 @@ index 250b8a8..11edaad 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1488,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1493,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -64757,7 +65081,7 @@ index 250b8a8..11edaad 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1549,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1554,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64766,7 +65090,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1153,18 +1568,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1153,18 +1573,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val fresh = repo.providers()
                  if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                      providers = fresh
@@ -64788,7 +65112,7 @@ index 250b8a8..11edaad 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1175,6 +1591,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1175,6 +1596,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                  beginProviderRead()
                  if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
@@ -64796,7 +65120,7 @@ index 250b8a8..11edaad 100644
                  providerTasks[name] = HxTask(ok = true, message = "已更新")
                  refreshNow()
              } catch (cancel: CancellationException) {
-@@ -1193,7 +1610,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1615,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -64805,7 +65129,27 @@ index 250b8a8..11edaad 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1239,6 +1656,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1216,7 +1638,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                             async {
+                                 if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
+                                 try {
+-                                    repo.refreshProvider(item.name)
++                                    // func-400 S2: one quiet retry for a transient failure (timeout, 5xx,
++                                    // a provider busy with its own interval update) before reporting it.
++                                    try {
++                                        repo.refreshProvider(item.name)
++                                    } catch (cancel: CancellationException) {
++                                        throw cancel
++                                    } catch (first: Exception) {
++                                        if (!HxNetRetry.transient(first)) throw first
++                                        delay(HxNetRetry.PROVIDER_RETRY_DELAY_MS)
++                                        if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
++                                        repo.refreshProvider(item.name)
++                                    }
+                                     if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
+                                         providerTasks[item.name] = HxTask(ok = true, message = "已更新")
+                                         ok++
+@@ -1239,6 +1672,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                  if (readOwner == latestProviderRead) {
                      providers = fresh
@@ -64813,7 +65157,7 @@ index 250b8a8..11edaad 100644
                      lastProviderRefreshAt = SystemClock.elapsedRealtime()
                  }
                  toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
-@@ -1246,7 +1664,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1246,7 +1680,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64822,7 +65166,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1263,6 +1681,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1697,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -65512,6 +65856,117 @@ index e337597..5b0c7a4 100644
 +    }
 +    return progressive
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDiagnosticsBundle.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDiagnosticsBundle.kt
+new file mode 100644
+index 0000000..b4ef1da
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDiagnosticsBundle.kt
+@@ -0,0 +1,105 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.net.Uri
++import android.os.Build
++import java.io.IOException
++import java.text.SimpleDateFormat
++import java.util.Date
++import java.util.Locale
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/**
++ * func-400 D1: 工具 › 诊断与维护 › 导出诊断包.
++ *
++ * One text file with everything a network-loss / start-failure report needs: the existing
++ * 消息与网络诊断 report (already redacted), plus the self-heal state the watchdog keeps under
++ * /data/adb/hetu/run (watchdog.log, selfheal/egress/cgroup-escape state, Wi-Fi heal count), the
++ * policy-routing / iptables state and the core processes. Read-only: the Root command only reads
++ * files and lists rules; nothing is started, stopped or rewritten. Controller secret and full URLs
++ * are redacted with the same [DiagnosticReport.redact] as the on-screen report.
++ */
++internal object HxDiagnosticsBundle {
++    const val MIME = "text/plain"
++    private const val RUN = "/data/adb/hetu/run"
++    private const val ROOT_TIMEOUT_MS = 15_000L
++    private const val SECTION_LIMIT = 400_000
++
++    fun fileName(now: Long = System.currentTimeMillis()): String =
++        "hetu-diagnostics-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(now)) + ".txt"
++
++    /** The read-only Root script; every step tolerates a missing file or tool. */
++    val ROOT_COMMAND: String = listOf(
++        "R=$RUN",
++        "for f in start-state last-start-error last-crash selfheal-state egress-state cgroup-escape rollback-state " +
++            "network-repair-at sysctl-tune.state state/selfheal-budget state/wifi-reconnects state/core.kind; do " +
++            "echo \"--- \$f ---\"; cat \"\$R/\$f\" 2>/dev/null; echo; done",
++        "echo '--- watchdog.log (last 300 lines) ---'; tail -n 300 \"\$R/watchdog.log\" 2>/dev/null",
++        "echo '--- network-repair.log ---'; tail -n 60 \"\$R/network-repair.log\" 2>/dev/null",
++        "echo '--- ebpf.log ---'; tail -n 40 \"\$R/ebpf.log\" 2>/dev/null",
++        "echo '--- share.log ---'; tail -n 30 \"\$R/share.log\" 2>/dev/null",
++        "echo '--- core.log (last 200 lines) ---'; tail -n 200 \"\$R/core.log\" 2>/dev/null",
++        "echo '--- processes ---'; ps -A -o PID,PPID,STAT,NAME 2>/dev/null | grep -iE 'mihomo|clash|sing-box|xray|v2ray|hysteria|hetu' | grep -v grep",
++        "echo '--- ip rule ---'; ip rule show 2>/dev/null; echo '--- ip -6 rule ---'; ip -6 rule show 2>/dev/null",
++        "echo '--- ip route (policy tables) ---'; ip route show table all 2>/dev/null | grep -vE '^(local|broadcast) ' | head -n 120",
++        "echo '--- iptables mangle ---'; iptables-save -t mangle 2>/dev/null | head -n 260",
++        "echo '--- iptables nat ---'; iptables-save -t nat 2>/dev/null | head -n 200",
++        "echo '--- iptables filter (Hetu) ---'; iptables-save -t filter 2>/dev/null | grep -E 'HETU|BICHEN|^\\*|^:' | head -n 160",
++        "echo '--- ip6tables mangle ---'; ip6tables-save -t mangle 2>/dev/null | head -n 200",
++        "echo '--- ip6tables nat ---'; ip6tables-save -t nat 2>/dev/null | head -n 120",
++        "echo '--- connectivity ---'; dumpsys connectivity 2>/dev/null | grep -E 'NetworkAgentInfo|VALIDATED|PARTIAL_CONNECTIVITY|CAPTIVE|Active default network' | head -n 40",
++        "true",
++    ).joinToString("\n")
++
++    /** Device / App header; no identifiers beyond model and versions. */
++    fun header(context: Context, now: Long = System.currentTimeMillis()): String {
++        val version = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
++        return buildString {
++            append("河图诊断包 / Hetu diagnostics\n")
++            append("time=").append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(Date(now))).append('\n')
++            append("app=").append(version).append('\n')
++            append("device=").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n')
++            append("android=").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n")
++            append("abis=").append(Build.SUPPORTED_ABIS.joinToString(",")).append('\n')
++            append("note=密钥与完整 URL 已脱敏；包含本机 IP 与路由信息，分享前请确认\n")
++        }
++    }
++
++    /**
++     * Builds the bundle. [report] is the existing on-screen diagnostics; [rootRead] runs [ROOT_COMMAND]
++     * (replaceable in tests). A failing part is written as its error text, never aborting the bundle.
++     */
++    suspend fun build(
++        context: Context,
++        report: suspend () -> String,
++        rootRead: (String) -> String = { command -> readRoot(context, command) },
++    ): String = withContext(Dispatchers.IO) {
++        val secret = context.getSharedPreferences("hetu", Context.MODE_PRIVATE).getString("proxyControllerSecret", "").orEmpty()
++        val diagnostics = try { report() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) {
++            "读取失败：" + hxErrorMessage(error, "读取失败")
++        }
++        val selfHeal = try { rootRead(ROOT_COMMAND) } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) {
++            "读取失败：" + hxErrorMessage(error, "读取失败")
++        }
++        buildString {
++            append(header(context)).append('\n')
++            append("===== 消息与网络诊断 =====\n")
++            append(DiagnosticReport.redact(diagnostics, secret).take(SECTION_LIMIT)).append("\n\n")
++            append("===== 看门狗 / 自愈 / 路由与防火墙状态 =====\n")
++            append(DiagnosticReport.redact(selfHeal, secret).take(SECTION_LIMIT)).append('\n')
++        }
++    }
++
++    private fun readRoot(context: Context, command: String): String {
++        val result = RootBridge.rootShell(context, command, ROOT_TIMEOUT_MS)
++        return if (result.ok()) result.output else "exit=${result.code}\n${result.output}"
++    }
++
++    /** Writes [text] to the document the user picked. */
++    suspend fun write(context: Context, uri: Uri, text: String) = withContext(Dispatchers.IO) {
++        val output = context.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("无法写入导出文件")
++        output.use { it.write(text.toByteArray(Charsets.UTF_8)) }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt
 new file mode 100644
 index 0000000..96449d6
@@ -66099,6 +66554,57 @@ index 241408e..3bf669d 100644
 +internal fun androidx.compose.foundation.lazy.LazyItemScope.hxAnimateItem(motion: Boolean = hxMotion()): Modifier =
 +    if (motion) Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
 +    else Modifier
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxNetRetry.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxNetRetry.kt
+new file mode 100644
+index 0000000..0664abe
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxNetRetry.kt
+@@ -0,0 +1,45 @@
++package io.github.xgl34222220.hetu
++
++import java.io.EOFException
++import java.io.InterruptedIOException
++import java.net.ConnectException
++import java.net.NoRouteToHostException
++import java.net.SocketException
++import java.net.UnknownHostException
++import javax.net.ssl.SSLException
++
++/**
++ * func-400 S1/S2: which download / subscription failures are worth one more attempt.
++ *
++ * Transient = the network or the server hiccupped (timeout, reset, refused, DNS during a network
++ * switch, HTTP 408 / 425 / 429 / 5xx). A 4xx answer (bad link, expired token), a TLS / certificate
++ * failure, an oversize or non-config body are final: retrying them only delays the real message.
++ */
++internal object HxNetRetry {
++    const val PROVIDER_RETRY_DELAY_MS = 1_500L
++    /** Waits before the 2nd and 3rd download attempt. */
++    val DOWNLOAD_BACKOFF_MS = longArrayOf(1_000L, 3_000L)
++
++    private val httpStatus = Regex("""HTTP(?:/\d(?:\.\d)?)?\s*[:：]?\s*([1-5]\d{2})(?!\d)""")
++
++    fun transientStatus(code: Int): Boolean = code == 408 || code == 425 || code == 429 || code in 500..599
++
++    fun transient(error: Throwable): Boolean {
++        var cause: Throwable? = error
++        var depth = 0
++        while (cause != null && depth < 6) {
++            when (cause) {
++                is SSLException -> return false
++                // Mihomo answers a failed provider fetch with 503 (body = the fetch error).
++                is MihomoControllerClient.ControllerHttpException -> return transientStatus(cause.statusCode)
++                is InterruptedIOException, is ConnectException, is NoRouteToHostException,
++                is UnknownHostException, is EOFException, is SocketException -> return true
++            }
++            val status = httpStatus.find(cause.message.orEmpty())?.groupValues?.get(1)?.toIntOrNull()
++            if (status != null) return transientStatus(status)
++            cause = cause.cause?.takeIf { it !== cause }
++            depth++
++        }
++        return false
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt
 new file mode 100644
 index 0000000..3798192
@@ -66807,6 +67313,41 @@ index 0000000..5594bbe
 +    private fun sha256(text: String): String =
 +        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxRootCheck.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxRootCheck.kt
+new file mode 100644
+index 0000000..221eb1e
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxRootCheck.kt
+@@ -0,0 +1,29 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/**
++ * func-400 E1: a failed start on a phone where Root is not granted (denied in the Root manager,
++ * no su, a pending grant prompt that timed out) gets one clear instruction instead of a page of
++ * diagnostics that all failed for the same reason.
++ */
++internal object HxRootCheck {
++    const val NO_ROOT = "未获得 Root 权限，河图无法接管网络。请在 Magisk / KernelSU / APatch 中允许河图后重试。"
++
++    /** Runs `id -u` through su (≤5 s); any failure counts as not granted. */
++    suspend fun granted(context: Context): Boolean = withContext(Dispatchers.IO) {
++        try {
++            RootBridge.hasRoot(context)
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (_: Exception) {
++            false
++        }
++    }
++
++    /** The start-failure text: the instruction first, the original reason as detail. */
++    fun message(reason: String): String = if (reason.isBlank()) NO_ROOT else "$NO_ROOT\n\n$reason"
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt
 new file mode 100644
 index 0000000..7d49de3
@@ -67268,7 +67809,7 @@ index 0000000..4ebb7ff
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
-index 1ee2881..dee59f4 100644
+index 1ee2881..12a4730 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 @@ -68,9 +68,11 @@ import androidx.compose.ui.geometry.Offset
@@ -67369,7 +67910,7 @@ index 1ee2881..dee59f4 100644
 +                            coreVersion.ifBlank { ht("启动后显示版本") },
 +                            color = if (coreVersion.isBlank()) c.t3 else c.t2,
 +                            style = if (coreVersion.isBlank()) HomeType.caption else HomeType.value.copy(fontWeight = FontWeight.Medium),
-+                            maxLines = 1,
++                            maxLines = 1, overflow = TextOverflow.Ellipsis,
 +                        )
                      }
                      SettingsDivider()
@@ -69772,12 +70313,13 @@ index 0000000..e526ede
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt
 new file mode 100644
-index 0000000..9173a5f
+index 0000000..f15c8ed
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt
-@@ -0,0 +1,356 @@
+@@ -0,0 +1,359 @@
 +package io.github.xgl34222220.hetu
 +
++import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
 +import android.graphics.Typeface
 +import androidx.activity.compose.rememberLauncherForActivityResult
 +import androidx.activity.result.contract.ActivityResultContracts
@@ -70067,7 +70609,8 @@ index 0000000..9173a5f
 +                decorationBox = { inner -> Box { if (name.isEmpty()) Text(nameLabel, color = c.t3, style = HomeType.body); inner() } },
 +            )
 +            if (draft.id == null) {
-+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                val exampleScroll = rememberScrollState()
++                Row(Modifier.fillMaxWidth().panelHorizontalEdgeFade(exampleScroll).horizontalScroll(exampleScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 +                    OverrideScriptExamples.ALL.forEach { example ->
 +                        HomePill(ht(example.title), tone = HomeTone.Neutral, height = 32.dp, onClick = {
 +                            editor?.setText(example.source)
@@ -70103,7 +70646,8 @@ index 0000000..9173a5f
 +                    onRelease = { native -> if (editor === native) editor = null; native.release() },
 +                )
 +            }
-+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
++            val symbolScroll = rememberScrollState()
++            Row(Modifier.fillMaxWidth().panelHorizontalEdgeFade(symbolScroll).horizontalScroll(symbolScroll), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
 +                overrideJsSymbols.forEach { symbol ->
 +                    val keySource = remember { MutableInteractionSource() }
 +                    Box(
@@ -70423,7 +70967,7 @@ index b7d3a38..4887afc 100644
                              onDismiss()
                          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
-index a2928ea..09aff81 100644
+index a2928ea..961feb8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
 @@ -170,7 +170,7 @@ private fun LazyListScope.ruleSetItems(vm: HetuViewModel, query: String = "", sh
@@ -70444,6 +70988,15 @@ index a2928ea..09aff81 100644
          )
      }
  }
+@@ -384,7 +384,7 @@ private fun ProviderFigure(value: String, label: String, color: Color, modifier:
+             lineHeight = 21.sp,
+             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+             color = color,
+-            maxLines = 1,
++            maxLines = 1, overflow = TextOverflow.Ellipsis,
+         )
+         Text(label, style = MaterialTheme.typography.labelSmall, color = Hx.colors.textMuted)
+     }
 @@ -405,7 +405,7 @@ private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, showSearch
          item(key = "rules-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (vm.rules.isEmpty()) "没有规则" else "没有匹配的规则", if (query.isBlank()) null else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
      }
@@ -71508,10 +72061,17 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..88c41f8 100644
+index b41cf98..b5586bc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-@@ -54,12 +54,14 @@ import androidx.compose.runtime.setValue
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+
++import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
+ import android.content.Intent
+ import android.net.Uri
+ import androidx.activity.compose.BackHandler
+@@ -54,12 +55,14 @@ import androidx.compose.runtime.setValue
  import androidx.compose.runtime.snapshots.SnapshotStateList
  import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
@@ -71526,7 +72086,7 @@ index b41cf98..88c41f8 100644
  import androidx.compose.ui.unit.dp
  import androidx.compose.ui.unit.sp
  import io.github.xgl34222220.hetu.home.HomeButton
-@@ -207,7 +209,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -207,7 +210,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
              }
          }
          item(key = "error") {
@@ -71535,7 +72095,7 @@ index b41cf98..88c41f8 100644
                  HxBanner(error.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter))
              }
          }
-@@ -238,12 +240,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -238,12 +241,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var refresh by remember { mutableIntStateOf(0) }
      var loading by remember { mutableStateOf(true) }
      var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
@@ -71553,7 +72113,7 @@ index b41cf98..88c41f8 100644
 
      LaunchedEffect(refresh) {
          loading = true
-@@ -263,9 +269,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -263,9 +270,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      }
 
      fun saveIfaces(next: Set<String>) {
@@ -71566,7 +72126,7 @@ index b41cf98..88c41f8 100644
      }
 
      fun saveMacs(values: List<String>): Boolean {
-@@ -286,21 +292,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -286,21 +293,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
          return true
      }
 
@@ -71598,7 +72158,7 @@ index b41cf98..88c41f8 100644
          },
      ) {
          item(key = "note") { HxNote("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root PREROUTING / FORWARD 层生效，修改后重启代理。") }
-@@ -321,14 +329,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -321,14 +330,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      when {
                          loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
                          snapshot.interfaces.isEmpty() -> SettingsRow(snapshot.error.ifBlank { "没有读取到活动接口" }, icon = Icons.Rounded.Cable)
@@ -71618,7 +72178,7 @@ index b41cf98..88c41f8 100644
                                  icon = Icons.Rounded.Router,
                              )
                          }
-@@ -364,12 +372,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -364,12 +373,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "macs") {
              SettingsSection {
                  HxEditableList("MAC 列表", "MAC 地址", "aa:bb:cc:dd:ee:ff", macs, onEdited = { macError = null })
@@ -71646,7 +72206,7 @@ index b41cf98..88c41f8 100644
  }
 
  /* ------------------------------------------------------------------ */
-@@ -464,14 +486,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -464,14 +487,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
          path = parent.takeIf { it == root || it.startsWith("$root/") } ?: root
      }
      BackHandler(enabled = path != root) { goUp() }
@@ -71665,7 +72225,27 @@ index b41cf98..88c41f8 100644
          label = "folder",
      ) { shown ->
          FileFolderPage(vm, shown, onOpen = { path = it }, onBack = { if (shown == root) onBack() else goUp() })
-@@ -820,6 +840,18 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -599,8 +620,9 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+         },
+     ) {
+         item(key = "breadcrumbs") {
++            val crumbScroll = rememberScrollState()
+             Row(
+-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
++                Modifier.fillMaxWidth().panelHorizontalEdgeFade(crumbScroll).horizontalScroll(crumbScroll)
+                     .padding(horizontal = HomeDims.gutter + 4.dp).padding(bottom = 12.dp),
+                 verticalAlignment = Alignment.CenterVertically,
+             ) {
+@@ -615,7 +637,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+                             .padding(horizontal = 14.dp),
+                         contentAlignment = Alignment.Center,
+                     ) {
+-                        Text(label, color = if (active) c.accent else c.t2, maxLines = 1,
++                        Text(label, color = if (active) c.accent else c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                             style = HomeType.label.copy(fontWeight = if (active) FontWeight.Bold else FontWeight.Medium))
+                     }
+                     if (index < breadcrumb.lastIndex) {
+@@ -820,6 +842,18 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var preflight by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
      var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
      var confirmRecover by remember { mutableStateOf(false) }
@@ -71684,7 +72264,7 @@ index b41cf98..88c41f8 100644
 
      fun task(key: String, block: suspend () -> Unit) {
          if (busy != null) return
-@@ -870,6 +902,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -870,6 +904,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  }
              }
          }
@@ -71707,7 +72287,7 @@ index b41cf98..88c41f8 100644
          item(key = "inspect") {
              SettingsSection {
                  SettingsGroup(title = ht("查看")) {
-@@ -976,6 +1024,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -976,6 +1026,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
      val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
          actions.toList() != initialActions || labels.toList() != initialLabels
@@ -71724,7 +72304,7 @@ index b41cf98..88c41f8 100644
 
      val targetOptions = listOf(
          "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
-@@ -993,6 +1051,19 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -993,6 +1053,19 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          }
      }
 
@@ -71744,7 +72324,7 @@ index b41cf98..88c41f8 100644
      fun save() {
          val edit = prefs.edit()
              .putString(ProxyStatusNotificationService.PREF_TITLE_TEMPLATE, titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE })
-@@ -1008,11 +1079,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1008,11 +1081,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          vm.toast("通知设置已保存")
          onBack()
      }
@@ -71761,7 +72341,7 @@ index b41cf98..88c41f8 100644
          actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
      ) {
          item(key = "master") {
-@@ -1027,7 +1102,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1027,7 +1104,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          } else {
                              enabled = on
                          }
@@ -71770,7 +72350,7 @@ index b41cf98..88c41f8 100644
                      SettingsDivider()
                      SettingsNavRow(ht("刷新频率"), icon = HomeIcons.RefreshCw, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
                      SettingsDivider()
-@@ -1042,7 +1117,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1042,7 +1119,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  SettingsGroup(title = ht("通知标题")) {
                      SettingsInput(
                          value = titleTemplate, onValueChange = { titleTemplate = it.take(96) }, label = "标题模板",
@@ -71779,7 +72359,7 @@ index b41cf98..88c41f8 100644
                      )
                  }
              }
-@@ -1050,16 +1125,21 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1050,16 +1127,22 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "template") {
              SettingsSection {
                  SettingsGroup(title = ht("通知内容")) {
@@ -71790,9 +72370,10 @@ index b41cf98..88c41f8 100644
                      }
                      // Every variable the service understands, one tap away from the template. One
                      // line that slides under the card's edges, so the buttons below stay close.
++                    val variableScroll = rememberScrollState()
                      Row(
 -                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
-+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
++                        Modifier.fillMaxWidth().panelHorizontalEdgeFade(variableScroll).horizontalScroll(variableScroll).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
                          horizontalArrangement = Arrangement.spacedBy(6.dp),
                      ) {
 +                        HomePill(
@@ -71803,7 +72384,7 @@ index b41cf98..88c41f8 100644
                          NotificationVariables.forEach { variable ->
                              HomePill(
                                  variable, tone = HomeTone.Neutral, height = 28.dp,
-@@ -1068,6 +1148,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1068,6 +1151,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                              )
                          }
                      }
@@ -71824,7 +72405,7 @@ index b41cf98..88c41f8 100644
                  }
              }
          }
-@@ -1075,18 +1169,34 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1075,18 +1172,34 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              item(key = "action$index") {
                  SettingsSection {
                      SettingsGroup(title = "快捷按钮 ${index + 1}") {
@@ -71861,7 +72442,7 @@ index b41cf98..88c41f8 100644
      }
 
      picker?.let { (kind, index) ->
-@@ -1118,4 +1228,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1118,4 +1231,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              )
          }
      }
@@ -72586,7 +73167,7 @@ index 0ceaa23..2f6e885 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-index 9afc132..e82b580 100644
+index 9afc132..af093a8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 @@ -1,6 +1,7 @@
@@ -72647,6 +73228,15 @@ index 9afc132..e82b580 100644
 +        }
      }
      Column(tappable.homeGlassPanel(shape, background), content = content)
+ }
+@@ -240,7 +258,7 @@ internal fun HomeBanner(
+                 Modifier.clip(SharedBadgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
+                     .heightIn(min = 32.dp).padding(horizontal = 8.dp),
+                 contentAlignment = Alignment.Center,
+-            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1) }
++            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+         }
+     }
  }
 @@ -313,15 +331,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
   */
@@ -72717,20 +73307,22 @@ index 9afc132..e82b580 100644
          verticalAlignment = Alignment.CenterVertically,
      ) {
          Icon(icon, null, Modifier.size(18.dp), tint = tone.foreground())
-@@ -659,6 +692,13 @@ internal fun HomeNotice(
+@@ -657,7 +690,14 @@ internal fun HomeNotice(
+             Box(
+                 Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                  contentAlignment = Alignment.Center,
-             ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
-         }
+-            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
++            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
++        }
 +        if (onClose != null) {
 +            Box(
 +                Modifier.size(40.dp).clip(HomeDims.badgeShape)
 +                    .homeTap(onClickLabel = ht(closeLabel), role = Role.Button) { haptics(HomeHaptic.Tap); onClose() },
 +                contentAlignment = Alignment.Center,
 +            ) { Icon(HomeIcons.X, ht(closeLabel), Modifier.size(16.dp), tint = tone.foreground()) }
-+        }
+         }
      }
  }
-
 @@ -724,30 +764,38 @@ internal class HomeBarGlass internal constructor(
 
  @Composable
@@ -72787,6 +73379,15 @@ index 9afc132..e82b580 100644
      Box(
          modifier
              .graphicsLayer { alpha = glass.shown }
+@@ -890,7 +938,7 @@ internal fun HomeTextField(
+                         .padding(horizontal = 14.dp),
+                     contentAlignment = Alignment.CenterStart,
+                 ) {
+-                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1)
++                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     inner()
+                 }
+             },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt
 new file mode 100644
 index 0000000..6e10b86
@@ -73383,7 +73984,7 @@ index a6f5728..401aa54 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..1f52b0f 100644
+index e31ca99..3a11a97 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -50,16 +50,23 @@ import androidx.compose.ui.platform.testTag
@@ -73632,10 +74233,11 @@ index e31ca99..1f52b0f 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -378,94 +474,51 @@ private fun RowScope.ControlAction(
+@@ -377,95 +473,52 @@ private fun RowScope.ControlAction(
+         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
      ) {
          if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
-         Text(text, color = tint, style = HomeType.control, maxLines = 1)
+-        Text(text, color = tint, style = HomeType.control, maxLines = 1)
 -        if (loading && !loadingLeads) HomeSpinner(size = 18.dp, color = color, strokeWidth = 2.5.dp)
 -    }
 -}
@@ -73694,6 +74296,7 @@ index e31ca99..1f52b0f 100644
 -            drawCircle(cut, slab * .15f, Offset(size.width * .19f, y + slab / 2f))
 -            drawRoundRect(cut, Offset(size.width * .36f, y + slab * .40f), Size(size.width * .46f, slab * .20f), CornerRadius(slab * .1f, slab * .1f))
 -        }
++        Text(text, color = tint, style = HomeType.control, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
 +        if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
      }
@@ -73725,7 +74328,7 @@ index e31ca99..1f52b0f 100644
          Row(Modifier.fillMaxWidth().padding(start = HomeDims.cardPadding, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.Top) {
              Column(Modifier.weight(1f).padding(top = 8.dp)) {
 -                Text(ht("本机直测"), color = c.t1, style = HomeType.section)
-+                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1)
++                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  Text(
 -                    ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。"),
 -                    Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
@@ -73782,6 +74385,24 @@ index e31ca99..1f52b0f 100644
          Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
              Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
              content()
+@@ -497,7 +565,7 @@ private fun MetricCard(
+
+ @Composable
+ private fun MetricTitle(text: String) {
+-    Text(ht(text), color = LocalHomeColors.current.t1, style = HomeType.cardLabel, maxLines = 1)
++    Text(ht(text), color = LocalHomeColors.current.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+ }
+
+ /** Label on the left, live value on the right. A null [value] is an honest dash, never a zero. */
+@@ -511,7 +579,7 @@ private fun MetricLine(
+ ) {
+     val c = LocalHomeColors.current
+     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically) {
+-        Text(ht(label), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
++        Text(ht(label), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+         Spacer(Modifier.width(8.dp))
+         Spacer(Modifier.weight(1f))
+         when {
 @@ -536,7 +604,6 @@ private fun addressStyle(text: String?): TextStyle = when {
  private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onSide: (HomeNetSide) -> Unit) {
      val c = LocalHomeColors.current
@@ -73790,6 +74411,15 @@ index e31ca99..1f52b0f 100644
      val wan = state.netSide == HomeNetSide.Wan
      MetricCard(
          modifier = modifier, onClick = onOpen, clickLabel = "查看 IP 详情",
+@@ -551,7 +618,7 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
+                         .padding(end = 10.dp, top = 4.dp, bottom = 4.dp),
+                     color = tint,
+                     style = if (active) HomeType.cardLabel else HomeType.cardLabel.copy(fontWeight = FontWeight.Medium),
+-                    maxLines = 1,
++                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                 )
+             }
+             Spacer(Modifier.weight(1f))
 @@ -559,18 +626,25 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
          },
      ) {
@@ -73809,21 +74439,26 @@ index e31ca99..1f52b0f 100644
 +                state.wan.region != null ->
                      MetricLine("地区", state.wan.region, leading = { HomeFlag(state.wan.countryCode, height = 15.dp) })
 -                live && state.wan.state == HomeWanState.Failed ->
-+                ip == null && state.wan.state == HomeWanState.Failed ->
-                     MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1) })
+-                    MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1) })
 -                else -> MetricLine("地区", null, placeholder = {
++                ip == null && state.wan.state == HomeWanState.Failed ->
++                    MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) })
 +                ip == null || state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle -> MetricLine("地区", null, placeholder = {
                      Icon(HomeIcons.Hourglass, null, Modifier.size(15.dp), tint = c.t2)
                      Spacer(Modifier.width(5.dp))
 -                    Text(ht(if (live) "正在查询" else "等待连接"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
-+                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
++                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                  })
 +                else -> MetricLine("地区", null)
              }
          } else {
              MetricLine("IP", state.lan.ip, addressStyle(state.lan.ip))
-@@ -591,26 +665,37 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
-             Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1)
+@@ -588,29 +662,40 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
+         header = {
+             MetricTitle("网速")
+             Spacer(Modifier.weight(1f))
+-            Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1)
++            Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
          },
      ) {
 -        MetricLine("上行", state.uploadBytesPerSecond?.takeIf { live }?.let(HomeFormat::speed))
@@ -73849,7 +74484,7 @@ index e31ca99..1f52b0f 100644
              MetricTitle("订阅")
              Spacer(Modifier.weight(1f))
 -            Text(sub?.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
-+            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1)
++            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
          },
      ) {
 -        MetricLine("已用", sub?.let { HomeFormat.bytes(it.usedBytes) })
@@ -74537,7 +75172,7 @@ index 9f66ac0..ab51d6a 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-index b187a2f..8d9f33c 100644
+index b187a2f..a1d7863 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 @@ -1,9 +1,18 @@
@@ -74576,6 +75211,15 @@ index b187a2f..8d9f33c 100644
              .horizontalScroll(scroll)
              .panelGutter()
              .drawBehind {
+@@ -234,7 +246,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
+                     .padding(horizontal = 13.dp),
+                 contentAlignment = Alignment.Center,
+             ) {
+-                Text(ht(tab.label), color = text, style = if (active) PanelType.tab.copy(fontWeight = FontWeight.Bold) else PanelType.tab, maxLines = 1)
++                Text(ht(tab.label), color = text, style = if (active) PanelType.tab.copy(fontWeight = FontWeight.Bold) else PanelType.tab, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+         }
+     }
 @@ -262,7 +274,7 @@ internal fun PanelSearchField(value: String, onValueChange: (String) -> Unit, pl
                  Icon(PanelIcons.Search, null, Modifier.size(22.dp), tint = c.t1)
                  Spacer(Modifier.width(10.dp))
@@ -74643,7 +75287,7 @@ index b187a2f..8d9f33c 100644
 +                PanelDelay.Failed -> ht("失败")
 +                is PanelDelay.Ms -> "${shown.value} ms"
 +            }
-+            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1)
++            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
 +    }
      val capsule: @Composable () -> Unit = {
@@ -75336,7 +75980,7 @@ index c95890c..5099f52 100644
 +    Crossfade(busy, animationSpec = tween(140), label = "panelSwap") { shown -> content(shown) }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-index 253b603..9686210 100644
+index 253b603..bdedb01 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 @@ -21,6 +21,11 @@ import androidx.compose.material3.Icon
@@ -75412,7 +76056,19 @@ index 253b603..9686210 100644
                  }
              }
          }
-@@ -142,9 +160,18 @@ internal fun LazyListScope.panelConnectionsTab(
+@@ -130,8 +148,10 @@ internal fun LazyListScope.panelConnectionsTab(
+     val list = PanelLogic.connections(data, view)
+     if (view.searching) item(key = "conn-tools") {
+         val c = LocalHomeColors.current
++        val chipScroll = rememberScrollState()
+         Row(
+-            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).horizontalScroll(rememberScrollState()).panelGutter(),
++            // 4.0.0: the last chip slides under a fade instead of being cut at the screen edge.
++            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).panelHorizontalEdgeFade(chipScroll).horizontalScroll(chipScroll).panelGutter(),
+             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+         ) {
+             HomeSegmented(
+@@ -142,9 +162,18 @@ internal fun LazyListScope.panelConnectionsTab(
              PanelChip("按应用", { onView(view.copy(groupByApp = !view.groupByApp)) }, selected = view.groupByApp, selectedColor = c.t1, selectedFill = c.surface)
          }
      }
@@ -75432,7 +76088,7 @@ index 253b603..9686210 100644
              if (narrowed) PanelEmptyState(PanelIcons.SearchX, "没有匹配的连接", if (view.needle.isNotEmpty()) "尝试其他关键词" else "当前筛选下没有连接")
              else PanelEmptyState(PanelIcons.Unlink, "暂无连接", "新的连接建立后会显示在这里")
          }
-@@ -152,8 +179,10 @@ internal fun LazyListScope.panelConnectionsTab(
+@@ -152,8 +181,10 @@ internal fun LazyListScope.panelConnectionsTab(
      }
      item(key = "conn-header") {
          val c = LocalHomeColors.current
@@ -75445,7 +76101,7 @@ index 253b603..9686210 100644
          }
      }
      if (view.groupByApp) {
-@@ -173,7 +202,7 @@ internal fun LazyListScope.panelConnectionsTab(
+@@ -173,7 +204,7 @@ internal fun LazyListScope.panelConnectionsTab(
                          Column(Modifier.weight(1f)) {
                              Text(if (group.app == PanelLogic.UnattributedApp) ht(group.app) else group.app, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                              Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -75454,7 +76110,7 @@ index 253b603..9686210 100644
                                  FlowTotal(PanelIcons.ArrowDown, HomeFormat.bytes(group.connections.sumOf { it.downloadTotalBytes }))
                                  FlowTotal(PanelIcons.ArrowUp, HomeFormat.bytes(group.connections.sumOf { it.uploadTotalBytes }))
                              }
-@@ -183,12 +212,12 @@ internal fun LazyListScope.panelConnectionsTab(
+@@ -183,12 +214,12 @@ internal fun LazyListScope.panelConnectionsTab(
                  }
              }
              if (open) items(count = group.connections.size, key = { "conn:" + group.app + ":" + group.connections[it].id }) {
@@ -75469,7 +76125,7 @@ index 253b603..9686210 100644
          }
      }
  }
-@@ -198,27 +227,28 @@ private fun FlowTotal(icon: ImageVector, text: String) {
+@@ -198,27 +229,28 @@ private fun FlowTotal(icon: ImageVector, text: String) {
      val c = LocalHomeColors.current
      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
          Icon(icon, null, Modifier.size(13.dp), tint = c.t2)
@@ -75503,7 +76159,7 @@ index 253b603..9686210 100644
                  Text(
                      conn.chain.joinToString(" / ").ifEmpty { "DIRECT" }, Modifier.weight(1f),
                      color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
-@@ -234,10 +264,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+@@ -234,10 +266,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
 
  /** The icon of the strategy group that carries the connection, when the host supplies group artwork. */
  @Composable
@@ -75516,7 +76172,7 @@ index 253b603..9686210 100644
      slot(group, Modifier.size(16.dp))
  }
 
-@@ -246,8 +276,8 @@ private fun FlowStat(icon: ImageVector, tint: Color, rate: String, total: String
+@@ -246,8 +278,8 @@ private fun FlowStat(icon: ImageVector, tint: Color, rate: String, total: String
      val c = LocalHomeColors.current
      Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
          Icon(icon, null, Modifier.size(15.dp), tint = tint)
@@ -75527,7 +76183,7 @@ index 253b603..9686210 100644
      }
  }
 
-@@ -263,29 +293,64 @@ internal fun policyColor(policy: String): Color {
+@@ -263,29 +295,64 @@ internal fun policyColor(policy: String): Color {
  }
 
  /** 规则 tab: one card per rule, in config order. */
@@ -75603,7 +76259,7 @@ index 253b603..9686210 100644
      item(key = "rules-note") {
          val c = LocalHomeColors.current
          val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""
-@@ -310,18 +375,23 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
+@@ -310,18 +377,23 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
          val c = LocalHomeColors.current
          val haptics = LocalHomeHaptics.current
          val motion = LocalHomeMotionEnabled.current
@@ -75630,7 +76286,19 @@ index 253b603..9686210 100644
                      }
                  }
                  when (set.update) {
-@@ -399,7 +469,7 @@ internal fun LazyListScope.panelLogsTab(
+@@ -362,8 +434,10 @@ internal fun LazyListScope.panelLogsTab(
+ ) {
+     item(key = "log-filters") {
+         val c = LocalHomeColors.current
++        val chipScroll = rememberScrollState()
+         Row(
+-            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).horizontalScroll(rememberScrollState()).panelGutter(),
++            // 4.0.0: the last chip slides under a fade instead of being cut at the screen edge.
++            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).panelHorizontalEdgeFade(chipScroll).horizontalScroll(chipScroll).panelGutter(),
+             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+         ) {
+             PanelLogFilter.entries.forEach { filter ->
+@@ -399,7 +473,7 @@ internal fun LazyListScope.panelLogsTab(
                  Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                      HomePill(entry.level.label, tone = entry.level.tone())
                      Spacer(Modifier.weight(1f))
@@ -75639,7 +76307,7 @@ index 253b603..9686210 100644
                  }
                  Text(panelHighlight(entry.message, view.needle), color = c.t1, style = PanelType.log, maxLines = if (open || !entry.foldable) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
                  if (entry.foldable) Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
-@@ -415,3 +485,16 @@ internal fun LazyListScope.panelLogsTab(
+@@ -415,3 +489,16 @@ internal fun LazyListScope.panelLogsTab(
          }
      }
  }
@@ -75810,7 +76478,7 @@ index 3e938c4..b7aaf12 100644
 
  /** Two-letter region code from a node name; the table and the emoji detection live in [HomeRegions]. */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
-index 149c8e1..e2bbdcf 100644
+index 149c8e1..3272fd2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
 @@ -1,5 +1,7 @@
@@ -75861,13 +76529,14 @@ index 149c8e1..e2bbdcf 100644
      val c = LocalHomeColors.current
      HomeSheetContent(
          title = conn.host,
-@@ -322,6 +337,15 @@ private fun ConnectionSheet(conn: PanelConnection, data: PanelData, onClose: ()
+@@ -322,6 +337,16 @@ private fun ConnectionSheet(conn: PanelConnection, data: PanelData, onClose: ()
          footer = { PanelDangerButton("断开此连接", onDisconnect, Modifier.weight(1f), soft = true, icon = PanelIcons.Unlink) },
      ) {
          Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
 +            // Audit4 G6: copy the host, narrow the list to this app, or jump to the matched rule.
++            val actionScroll = rememberScrollState()
 +            Row(
-+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp),
++                Modifier.fillMaxWidth().panelHorizontalEdgeFade(actionScroll).horizontalScroll(actionScroll).padding(horizontal = 2.dp),
 +                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
 +            ) {
 +                PanelChip("复制主机", onCopyHost, height = 34.dp, leading = { Icon(HomeIcons.Copy, null, Modifier.size(16.dp), tint = c.t1) })
@@ -75878,7 +76547,7 @@ index 149c8e1..e2bbdcf 100644
                  DetailRow("应用") {
                      if (conn.app.isBlank()) Text(ht(PanelLogic.UnattributedApp), color = c.t3, style = HomeType.label)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
-index 2a4844e..8ec06cb 100644
+index 2a4844e..af51181 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
 @@ -1,5 +1,6 @@
@@ -75941,6 +76610,15 @@ index 2a4844e..8ec06cb 100644
                  )
              }
          }
+@@ -179,7 +182,7 @@ internal fun LazyListScope.panelOverviewTab(
+                     }
+                     Text(
+                         if (view.rankMode == PanelRankMode.Connections) ht("%d 条连接").fill(rank.connections) else HomeFormat.bytes(rank.totalBytes),
+-                        color = c.t2, style = HomeType.rowSub, maxLines = 1,
++                        color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                     )
+                 }
+             }
 @@ -204,7 +207,7 @@ private fun SpeedCard(label: String, value: String, icon: ImageVector, tint: Col
              }
              Spacer(Modifier.width(12.dp))
@@ -75991,10 +76669,17 @@ index e7112d0..2b444df 100644
      BackHandler(enabled = view.searching) { view = view.toggleSearch() }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-index fb308a8..fced467 100644
+index fb308a8..4b48e82 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxScope
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu.panel
+
++import androidx.compose.ui.text.style.TextOverflow
+ import io.github.xgl34222220.hetu.home.homeGlassPanel
+ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
+ import androidx.compose.foundation.background
+@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.BoxScope
  import androidx.compose.foundation.layout.Column
  import androidx.compose.foundation.layout.PaddingValues
  import androidx.compose.foundation.layout.Row
@@ -76002,7 +76687,7 @@ index fb308a8..fced467 100644
  import androidx.compose.foundation.layout.Spacer
  import androidx.compose.foundation.layout.WindowInsets
  import androidx.compose.foundation.layout.asPaddingValues
-@@ -45,18 +46,25 @@ import androidx.compose.ui.graphics.graphicsLayer
+@@ -45,18 +47,25 @@ import androidx.compose.ui.graphics.graphicsLayer
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.platform.LocalConfiguration
  import androidx.compose.ui.platform.LocalDensity
@@ -76028,7 +76713,7 @@ index fb308a8..fced467 100644
  import io.github.xgl34222220.hetu.home.HomeType
  import io.github.xgl34222220.hetu.home.LocalHomeColors
  import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
-@@ -102,6 +110,11 @@ internal fun PanelScreen(
+@@ -102,6 +111,11 @@ internal fun PanelScreen(
      val density = LocalDensity.current
      val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
      val bottomPad = contentPadding.calculateBottomPadding()
@@ -76040,7 +76725,7 @@ index fb308a8..fced467 100644
      // The title block follows the font scale, so a large system font never spills into the tabs.
      val titleHeight = with(density) { HomeType.largeTitle.lineHeight.toDp() } + 8.dp
      val titlePx = with(density) { titleHeight.toPx() }
-@@ -113,9 +126,19 @@ internal fun PanelScreen(
+@@ -113,9 +127,19 @@ internal fun PanelScreen(
      val running = data.running
      val configuration = LocalConfiguration.current
      val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
@@ -76062,7 +76747,7 @@ index fb308a8..fced467 100644
      val headerItems = panelHeaderItemCount(data, view)
      // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
      val stagger = key(view.tab) { rememberHomeStagger() }
-@@ -134,7 +157,7 @@ internal fun PanelScreen(
+@@ -134,7 +158,7 @@ internal fun PanelScreen(
          LazyColumn(
              modifier = Modifier.fillMaxSize().homeGlassSource(glass),
              state = listState,
@@ -76071,7 +76756,7 @@ index fb308a8..fced467 100644
          ) {
              // The header itself is drawn above the list; these two items only reserve its room.
              item(key = "panel-title") { Spacer(Modifier.height(titleHeight)) }
-@@ -147,6 +170,21 @@ internal fun PanelScreen(
+@@ -147,6 +171,21 @@ internal fun PanelScreen(
                  }
                  return@LazyColumn
              }
@@ -76093,7 +76778,7 @@ index fb308a8..fced467 100644
              if (data.readError.isNotBlank()) {
                  item(key = "panel-read-error") {
                      PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError, verbatimSubtitle = true) {
-@@ -171,14 +209,14 @@ internal fun PanelScreen(
+@@ -171,14 +210,14 @@ internal fun PanelScreen(
              }
              when (view.tab) {
                  PanelTab.Groups -> panelGroupsTab(
@@ -76110,7 +76795,7 @@ index fb308a8..fced467 100644
                          onView(next)
                          if (anchor != null && at >= 0) {
                              // Apply with the new rows on the next measure, retaining the tapped
-@@ -199,7 +237,7 @@ internal fun PanelScreen(
+@@ -199,7 +238,7 @@ internal fun PanelScreen(
                  )
                  PanelTab.Subscriptions -> panelSubscriptionsTab(PanelLogic.subscriptions(data, view), view.needle, stagger, actions.onUpdateSubscription)
                  PanelTab.Connections -> panelConnectionsTab(data, view, stagger, onView, onOpen = { onOverlay(PanelOverlay.ConnectionDetail(it)) }, onCloseAll = { onOverlay(PanelOverlay.CloseAllDialog) })
@@ -76119,7 +76804,7 @@ index fb308a8..fced467 100644
                  PanelTab.RuleSets -> panelRuleSetsTab(PanelLogic.ruleSets(data, view), view.needle, stagger, actions.onUpdateRuleSet)
                  PanelTab.Logs -> panelLogsTab(PanelLogic.logs(data, view), view, stagger, onView, onOrderMenu = { onOverlay(PanelOverlay.LogOrderMenu) }, orderMenu = { menu(PanelOverlay.LogOrderMenu) })
              }
-@@ -208,12 +246,13 @@ internal fun PanelScreen(
+@@ -208,12 +247,13 @@ internal fun PanelScreen(
          PanelHeader(data, view, overlay, actions, glass, collapse, titleHeight, statusTop, listState, onView, onOverlay, menu)
 
          // 策略: once a group is open, “定位当前节点” and a collapse capsule float above the dock.
@@ -76135,14 +76820,14 @@ index fb308a8..fced467 100644
              horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp),
          ) {
              HomePop(openGroup != null) {
-@@ -281,7 +320,13 @@ private fun BoxScope.PanelHeader(
+@@ -281,7 +321,13 @@ private fun BoxScope.PanelHeader(
              alpha = (1f - moved / (titlePx * .62f)).coerceIn(0f, 1f)
          },
          contentAlignment = Alignment.CenterStart,
 -    ) { Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1) }
 +    ) {
 +        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-+            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1)
++            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +            // Restored cards are display-only until the first fresh read lands; say so quietly.
 +            HomePop(data.running && data.syncing) { PanelSyncChip() }
 +        }
@@ -76150,16 +76835,19 @@ index fb308a8..fced467 100644
 
      // The strip floats above the list, so a vertical drag that starts on it is handed to the
      // list by hand; horizontal drags still scroll the strip itself.
-@@ -308,7 +353,7 @@ private fun BoxScope.PanelHeader(
+@@ -306,9 +352,9 @@ private fun BoxScope.PanelHeader(
+                 alpha = shown
+                 translationY = (1f - shown) * 8.dp.toPx()
              },
-             color = c.t1, style = HomeType.barTitle, maxLines = 1,
+-            color = c.t1, style = HomeType.barTitle, maxLines = 1,
++            color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis,
          )
 -        if (data.running && data.readError.isBlank()) {
 +        if (data.running && data.readError.isBlank() && data.core.supports(tab)) {
              val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
                  Box {
                      HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint, glyph = 26.dp)
-@@ -413,3 +458,19 @@ private fun PanelInlineOverlay(
+@@ -413,3 +459,19 @@ private fun PanelInlineOverlay(
          }
      }
  }
@@ -76176,7 +76864,7 @@ index fb308a8..fced467 100644
 +        horizontalArrangement = Arrangement.spacedBy(6.dp),
 +    ) {
 +        HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
-+        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1)
++        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
@@ -76607,7 +77295,7 @@ index 67585f1..2702aa2 100644
                              core.latest.isNotBlank() -> HomePill(ht("已是最新"), tone = HomeTone.Good)
                          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-index ee40a76..8c39531 100644
+index ee40a76..d227f15 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 @@ -1,17 +1,25 @@
@@ -76644,15 +77332,31 @@ index ee40a76..8c39531 100644
 
  /**
   * 诊断与维护 (工具 › 诊断工具). Stateless.
-@@ -42,6 +51,7 @@ internal fun ToolsDiagScreen(
+@@ -42,6 +51,9 @@ internal fun ToolsDiagScreen(
      onRestore: () -> Unit,
      modifier: Modifier = Modifier,
      onOpenDiagnosticsDetails: (() -> Unit)? = null,
 +    onRepairRecord: (() -> Unit)? = null,
++    onExport: (() -> Unit)? = null,
++    exporting: Boolean = false,
  ) {
      val c = LocalHomeColors.current
      val checking = state.preflight is ToolsPreflight.Running
-@@ -85,9 +95,16 @@ internal fun ToolsDiagScreen(
+@@ -80,14 +92,30 @@ internal fun ToolsDiagScreen(
+                 AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
+                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
+             )
++            if (onExport != null) {
++                HomeRowDivider(start = HomeRowDims.textStart)
++                ToolsRow(
++                    AnnotatedString(ht("导出诊断包")), icon = ToolsIcons.Share,
++                    subtitle = ht("诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件"),
++                    enabled = !exporting, onClick = onExport,
++                    trailing = { if (exporting) HomeSpinner(size = 20.dp, color = c.accent) else ToolsChevron() },
++                )
++            }
+         }
+         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
              ToolsCardTitle("运行记录")
              ToolsRow(
                  AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,
@@ -76670,7 +77374,7 @@ index ee40a76..8c39531 100644
          }
          HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
              ToolsCardTitle("紧急")
-@@ -108,9 +125,19 @@ internal fun ToolsDiagScreen(
+@@ -108,9 +136,19 @@ internal fun ToolsDiagScreen(
  internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      val palette = remember(c) { ToolsYamlPalette(key = c.t1, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
@@ -76693,7 +77397,7 @@ index ee40a76..8c39531 100644
  }
 
  /** The plain-text report, with 复制. */
-@@ -126,19 +153,29 @@ private fun DiagTextSheet(
+@@ -126,19 +164,29 @@ private fun DiagTextSheet(
      content: ToolsDiagText,
      onCopy: (String) -> Unit,
      modifier: Modifier,
@@ -76726,7 +77430,7 @@ index ee40a76..8c39531 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
-index 9ec8a80..a9aebfe 100644
+index 9ec8a80..babe6f1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 @@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.home.HomeIconButton
@@ -76747,8 +77451,17 @@ index 9ec8a80..a9aebfe 100644
                          is ToolsLoad.Failed -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
                              ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message, topPadding = 24.dp) {
                                  ToolsButton("重新读取", onReload, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
+@@ -178,7 +178,7 @@ private fun SymbolBar(enabled: Boolean, onInsert: (String) -> Unit) {
+                         .background(if (c.dark) c.sunken else c.bg)
+                         .semantics { contentDescription = spoken },
+                     contentAlignment = Alignment.Center,
+-                ) { Text(label, color = c.t1, style = ToolsTypography.mono.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1) }
++                ) { Text(label, color = c.t1, style = ToolsTypography.mono.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+             }
+         }
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..e818d42 100644
+index f575100..2d5cdfb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -76781,7 +77494,7 @@ index f575100..e818d42 100644
                      }
                      request.second(message)
                  }
-@@ -183,39 +189,81 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -183,49 +189,93 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              /* ------------------------------ 共享网络 ------------------------------ */
              loadShare = {
                  val live = ProxySharedNetworkInspector.inspect(app)
@@ -76876,7 +77589,10 @@ index f575100..e818d42 100644
              runPreflight = {
                  val (passed, message) = ToolsRuntimeBridge.preflight(app)
                  if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
-@@ -225,7 +273,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+             },
+             startupConfig = { proxy.startupConfig() },
+             diagnostics = { proxy.diagnostics() },
++            exportDiagnostics = { io.github.xgl34222220.hetu.HxDiagnosticsBundle.build(app, report = { proxy.diagnostics() }) },
              restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
              onCopy = { label, text ->
                  val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -76886,7 +77602,7 @@ index f575100..e818d42 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +282,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +283,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
@@ -76899,7 +77615,7 @@ index f575100..e818d42 100644
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -243,6 +298,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -243,6 +299,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          modeLabel = when (chain.mode.lowercase()) { "global" -> "全局"; "direct" -> "直连"; else -> "" },
                          ruleCount = snapshot.count,
                          hits = chain.hits,
@@ -76913,7 +77629,7 @@ index f575100..e818d42 100644
                          allow = snapshot.allow,
                          block = snapshot.block,
                          sources = snapshot.sources.map { source ->
-@@ -262,12 +324,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -262,12 +325,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -76944,7 +77660,7 @@ index f575100..e818d42 100644
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
-@@ -339,10 +418,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+@@ -339,10 +419,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
  /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
  @Composable
  private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
@@ -76977,7 +77693,7 @@ index 378e395..d49eb16 100644
  }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..cb17fc4 100644
+index 40111ed..fd9a0fa 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 @@ -144,17 +144,28 @@ internal data class ToolsBypassState(
@@ -77112,7 +77828,7 @@ index 40111ed..cb17fc4 100644
          return null
      }
 
-@@ -363,10 +428,18 @@ internal class ToolsFeatureActions(
+@@ -363,12 +428,22 @@ internal class ToolsFeatureActions(
      /* CNIP */
      val loadCnIp: (suspend () -> Boolean)? = null,
      val setCnIp: suspend (Boolean) -> Unit = {},
@@ -77130,8 +77846,12 @@ index 40111ed..cb17fc4 100644
 +    val repairSessionRecord: (suspend () -> String)? = null,
      val startupConfig: suspend () -> String = { "" },
      val diagnostics: suspend () -> String = { "" },
++    /** func-400 D1: builds the 导出诊断包 text; null hides the row. */
++    val exportDiagnostics: (suspend () -> String)? = null,
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
-@@ -385,6 +458,12 @@ internal class ToolsFeatureActions(
+     val restoreNetwork: suspend () -> String = { "已停止代理并回滚网络规则" },
+     val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
+@@ -385,6 +460,12 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
@@ -77145,7 +77865,7 @@ index 40111ed..cb17fc4 100644
      val onMessage: (String) -> Unit = {},
  ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-index 6e1e067..08e9255 100644
+index 6e1e067..7a12c24 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 @@ -328,7 +328,10 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
@@ -77183,11 +77903,44 @@ index 6e1e067..08e9255 100644
      )
  }
 
-@@ -388,7 +407,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -357,6 +376,24 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+     var state by remember { mutableStateOf(ToolsDiagState()) }
+     var overlay by remember { mutableStateOf<ToolsDiagOverlay?>(null) }
+
++    // func-400 D1: pick the file first, then collect (Root reads take a few seconds) and write it.
++    val context = androidx.compose.ui.platform.LocalContext.current
++    var exporting by remember { mutableStateOf(false) }
++    // Hosts without an activity-result registry (previews) simply do not offer the row.
++    val canExport = actions.exportDiagnostics != null &&
++        androidx.activity.compose.LocalActivityResultRegistryOwner.current != null
++    val exportLauncher = if (!canExport) null else androidx.activity.compose.rememberLauncherForActivityResult(
++        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(io.github.xgl34222220.hetu.HxDiagnosticsBundle.MIME),
++    ) { uri ->
++        val build = actions.exportDiagnostics
++        if (uri == null || build == null) { exporting = false; return@rememberLauncherForActivityResult }
++        scope.attempt({ error -> exporting = false; actions.onMessage(error.reason("诊断包导出失败")) }) {
++            io.github.xgl34222220.hetu.HxDiagnosticsBundle.write(context, uri, build())
++            exporting = false
++            actions.onMessage("诊断包已导出")
++        }
++    }
++
+     fun preflight() {
+         val runner = actions.runPreflight ?: return
+         if (state.preflight is ToolsPreflight.Running) return
+@@ -388,7 +425,20 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
          onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
          onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
 -        onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
++        onExport = if (exportLauncher == null) null else { {
++            if (!exporting) {
++                exporting = true
++                try { exportLauncher.launch(io.github.xgl34222220.hetu.HxDiagnosticsBundle.fileName()) }
++                catch (_: android.content.ActivityNotFoundException) { exporting = false; actions.onMessage("没有可用的文件保存应用") }
++            }
++        } },
++        exporting = exporting,
 +        onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
 +            { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
 +        } ?: actions.onOpenDiagnosticsDetails,
@@ -77197,7 +77950,7 @@ index 6e1e067..08e9255 100644
          modifier = modifier,
      )
 
-@@ -399,6 +423,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -399,6 +449,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
              ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
          }
@@ -77207,7 +77960,7 @@ index 6e1e067..08e9255 100644
          is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
              ToolsRestoreNetworkDialogCard(
                  loading = current.running,
-@@ -427,7 +454,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -427,7 +480,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
      suspend fun read() {
          val snapshot = (actions.loadAdblock ?: return)()
@@ -77217,7 +77970,7 @@ index 6e1e067..08e9255 100644
      }
 
      fun reload(announce: String? = null) {
-@@ -506,8 +534,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -506,8 +560,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
          },
          onStandaloneDnsChange = { on -> change(state.copy(standaloneDns = on), "独立 DNS 过滤切换失败") { actions.setStandaloneDns(on) } },
          onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
@@ -77606,10 +78359,17 @@ index 1265384..25902d4 100644
          iconCache.get(packageName)?.let { return@withContext it }
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-index fa7fa0d..b79bcff 100644
+index fa7fa0d..938d379 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-@@ -32,8 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu.ui
+
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.animation.animateColorAsState
+ import androidx.compose.animation.core.Animatable
+ import androidx.compose.animation.core.Spring
+@@ -32,8 +33,10 @@ import androidx.compose.ui.graphics.graphicsLayer
  import androidx.compose.ui.graphics.luminance
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.platform.LocalContext
@@ -77620,7 +78380,7 @@ index fa7fa0d..b79bcff 100644
  import androidx.compose.ui.layout.positionInParent
  import kotlinx.coroutines.launch
  import androidx.compose.ui.semantics.contentDescription
-@@ -42,6 +44,7 @@ import androidx.compose.animation.core.snap
+@@ -42,6 +45,7 @@ import androidx.compose.animation.core.snap
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.unit.dp
@@ -77628,7 +78388,7 @@ index fa7fa0d..b79bcff 100644
  import androidx.compose.ui.unit.sp
  import dev.chrisbanes.haze.HazeState
  import dev.chrisbanes.haze.hazeEffect
-@@ -54,12 +57,18 @@ import top.yukonga.miuix.kmp.blur.colorControls
+@@ -54,12 +58,18 @@ import top.yukonga.miuix.kmp.blur.colorControls
  import top.yukonga.miuix.kmp.blur.drawBackdrop
  import top.yukonga.miuix.kmp.blur.highlight.Highlight
  import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
@@ -77649,7 +78409,7 @@ index fa7fa0d..b79bcff 100644
  /**
   * V20.45: real MIUIX drawBackdrop liquid dock. Uses miuix-blur drawBackdrop/blur/highlight
   * plus the runtime refraction lens instead of an opaque Card/textureBlur shell.
-@@ -77,23 +86,22 @@ fun HetuGlassDock(
+@@ -77,23 +87,22 @@ fun HetuGlassDock(
      hazeState: HazeState,
      backdrop: LayerBackdrop?,
      modifier: Modifier = Modifier,
@@ -77676,7 +78436,7 @@ index fa7fa0d..b79bcff 100644
              }
          }
          prefs.registerOnSharedPreferenceChangeListener(listener)
-@@ -102,10 +110,11 @@ fun HetuGlassDock(
+@@ -102,10 +111,11 @@ fun HetuGlassDock(
      val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
      // Never render a translucent glass shell without a real blur/backdrop behind it.
      // That fallback was the source of the opaque white slab when either appearance switch was disabled.
@@ -77692,7 +78452,7 @@ index fa7fa0d..b79bcff 100644
      val hazeModifier = if (activeHaze) {
          Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
              blurRadius = 32.dp
-@@ -114,10 +123,10 @@ fun HetuGlassDock(
+@@ -114,10 +124,10 @@ fun HetuGlassDock(
      } else Modifier
      val glassBrush = when {
          renderGlass && dark -> Brush.verticalGradient(
@@ -77705,7 +78465,7 @@ index fa7fa0d..b79bcff 100644
          )
          else -> Brush.verticalGradient(
              if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
-@@ -134,7 +143,7 @@ fun HetuGlassDock(
+@@ -134,7 +144,7 @@ fun HetuGlassDock(
                  colorControls(
                      brightness = if (dark) -.015f else .025f,
                      contrast = 1.05f,
@@ -77714,7 +78474,7 @@ index fa7fa0d..b79bcff 100644
                  )
                  blur(26.dp.toPx(), 26.dp.toPx())
                  liquidGlassLens(
-@@ -183,43 +192,49 @@ fun HetuGlassDock(
+@@ -183,43 +193,49 @@ fun HetuGlassDock(
              }
      }
 
@@ -77779,7 +78539,7 @@ index fa7fa0d..b79bcff 100644
              dark = dark,
          )
      }
-@@ -268,7 +283,14 @@ private fun DockItems(
+@@ -268,7 +284,14 @@ private fun DockItems(
              val x = lensLeft.value + (width - w) / 2f
              val y = (size.height - h) / 2f
              val r = CornerRadius(h / 2f)
@@ -77794,7 +78554,7 @@ index fa7fa0d..b79bcff 100644
              // Specular rim: bright top edge fading down, like the reference lens.
              drawRoundRect(
                  Brush.verticalGradient(listOf(highlight, Color.Transparent), startY = y, endY = y + h * .55f),
-@@ -288,7 +310,8 @@ private fun DockItems(
+@@ -288,7 +311,8 @@ private fun DockItems(
                      if (motion) tween(200) else snap(), label = "dock-tint-$index")
                  val iconPop = remember { Animatable(1f) }
                  var wasActive by remember { mutableStateOf(active) }
@@ -77804,7 +78564,7 @@ index fa7fa0d..b79bcff 100644
                      if (active && !wasActive && motion) {
                          iconPop.snapTo(1f)
                          iconPop.animateTo(1.14f, tween(120, easing = HetuMotion.Standard))
-@@ -298,6 +321,7 @@ private fun DockItems(
+@@ -298,6 +322,7 @@ private fun DockItems(
                  }
                  // Pressing the active slot squeezes the lens itself (tactile "glass" feel).
                  LaunchedEffect(interaction, active, motion) {
@@ -77812,7 +78572,7 @@ index fa7fa0d..b79bcff 100644
                      if (!active || !motion) return@LaunchedEffect
                      interaction.interactions.collect { event ->
                          when (event) {
-@@ -313,7 +337,12 @@ private fun DockItems(
+@@ -313,7 +338,12 @@ private fun DockItems(
                  }
                  Column(
                      Modifier.weight(1f).height(itemHeight).testTag("dock-tab-$index")
@@ -77826,17 +78586,40 @@ index fa7fa0d..b79bcff 100644
                          .hetuPressScale(interaction, pressedScale = .92f, motion = motion && !active)
                          .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
                              onClick = { if (!active) haptics.perform(HetuHaptic.Tick); onSelect(index) })
-@@ -325,7 +354,7 @@ private fun DockItems(
+@@ -325,9 +355,9 @@ private fun DockItems(
                          scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                      }, tint = color)
                      Spacer(Modifier.height(1.dp))
 -                    Text(item.label, if (active) Modifier.testTag("dock-active-label") else Modifier,
 +                    Text(item.label, (if (active) Modifier.testTag("dock-active-label") else Modifier).padding(horizontal = 2.dp),
                          color = color, fontSize = 12.sp, lineHeight = 14.sp,
-                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
++                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  }
+             }
+         }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuInteractions.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuInteractions.kt
+index 9841062..4f452b7 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuInteractions.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuInteractions.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu.ui
+
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.animation.animateColorAsState
+ import androidx.compose.animation.core.animateFloatAsState
+ import androidx.compose.animation.core.snap
+@@ -69,7 +70,7 @@ internal fun HetuFilterTabs(labels: List<String>, selected: Int, onSelect: (Int)
+                 Text(ht(label), fontFamily = HetuSystemFontFamily, fontSize = 14.sp, lineHeight = 20.sp,
+                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                     color = if (active) MaterialTheme.colorScheme.primary else LocalHetuTokens.current.textSecondary,
+-                    maxLines = 1)
++                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+         }
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..ed57eb8 100644
+index 578ce9d..6568d16 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -77883,7 +78666,7 @@ index 578ce9d..ed57eb8 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,389 @@ private val vocabularyConnection = """
+@@ -969,16 +990,411 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -78179,6 +78962,28 @@ index 578ce9d..ed57eb8 100644
 +已复制|Copied|已複製|Скопировано
 +""".trimIndent()
 +
++private val vocabularyFunc400 = """
++导出诊断包|Export diagnostics|匯出診斷包|Экспорт диагностики
++诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件|Diagnostics, watchdog and core logs, routing and iptables state in one text file|診斷資訊、看門狗與核心日誌、路由與 iptables 狀態，儲存為一個文字檔|Диагностика, журналы сторожа и ядра, маршруты и iptables в одном текстовом файле
++诊断包导出失败|Could not export diagnostics|診斷包匯出失敗|Не удалось экспортировать диагностику
++诊断包已导出|Diagnostics exported|診斷包已匯出|Диагностика экспортирована
++没有可用的文件保存应用|No app available to save files|沒有可用的檔案儲存應用|Нет приложения для сохранения файлов
++下载到的是网页而不是配置，请检查链接是否正确或需要登录|The link returned a web page, not a config. Check the link or whether it needs a sign-in|下載到的是網頁而不是設定，請檢查連結是否正確或需要登入|По ссылке получена веб-страница, а не конфигурация. Проверьте ссылку или необходимость входа
++隐藏|Hide|隱藏|Скрыть
++已停止|Stopped|已停止|Остановлен
++正在重载…|Reloading…|正在重新載入…|Перезагрузка…
++正在读取代理状态…|Reading proxy status…|正在讀取代理狀態…|Чтение состояния прокси…
++暂时无法读取代理状态|Proxy status is unavailable for now|暫時無法讀取代理狀態|Состояние прокси пока недоступно
++河图 · 代理状态|Hetu · Proxy status|河圖 · 代理狀態|Hetu · Состояние прокси
++上次操作失败|Last action failed|上次操作失敗|Последнее действие не удалось
++通知栏操作失败|Notification action failed|通知列操作失敗|Действие из уведомления не удалось
++代理切换失败|Could not switch the proxy|代理切換失敗|Не удалось переключить прокси
++河图代理|Hetu proxy|河圖代理|Прокси Hetu
++切换失败|Switch failed|切換失敗|Сбой переключения
++切换中…|Switching…|切換中…|Переключение…
++未获得 Root 权限，河图无法接管网络。请在 Magisk / KernelSU / APatch 中允许河图后重试。|Root access is not granted, so Hetu cannot take over the network. Allow Hetu in Magisk / KernelSU / APatch and try again.|未取得 Root 權限，河圖無法接管網路。請在 Magisk / KernelSU / APatch 中允許河圖後重試。|Нет прав Root, Hetu не может управлять сетью. Разрешите Hetu в Magisk / KernelSU / APatch и повторите.
++""".trimIndent()
++
 +private val vocabularyAudit4Func = """
 +直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
 +上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
@@ -78253,7 +79058,7 @@ index 578ce9d..ed57eb8 100644
 +无法移除旧版河图停止后留下的 fake-IP 拦截规则（HXFAKE_REJECT），请重试启动或重启手机|Could not remove the fake-IP block left by an older Hetu stop (HXFAKE_REJECT). Try starting again or restart the phone|無法移除舊版河圖停止後留下的 fake-IP 攔截規則（HXFAKE_REJECT），請重試啟動或重新啟動手機|Не удалось снять блокировку fake-IP, оставленную остановкой старой версии Hetu (HXFAKE_REJECT). Запустите снова или перезагрузите телефон
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyTiktokStop).joinToString("\n")
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -78275,6 +79080,19 @@ index 578ce9d..ed57eb8 100644
  @Composable fun ht(source: String): String {
      val setting = LocalHetuLanguage.current
      val language = if (setting.isBlank() || setting == "system") {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLiquidGlassSystem.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLiquidGlassSystem.kt
+index d0eca76..0dd8549 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLiquidGlassSystem.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLiquidGlassSystem.kt
+@@ -325,7 +325,7 @@ fun LiquidChoicePill(
+             fontSize = 12.sp,
+             lineHeight = 16.sp,
+             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+-            maxLines = 1,
++            maxLines = 1, overflow = TextOverflow.Ellipsis,
+         )
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
 index af5647d..18e1fce 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
@@ -78297,6 +79115,26 @@ index af5647d..18e1fce 100644
      }
      return graphicsLayer {
          val p = progress.value.coerceIn(0f, 1f)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt
+index 70eefb0..ed88dc3 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu.ui
+
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.animation.animateColorAsState
+ import androidx.compose.animation.core.Animatable
+ import androidx.compose.animation.core.spring
+@@ -154,7 +155,7 @@ internal fun HetuScrollTabs(
+                         contentAlignment = Alignment.Center,
+                     ) {
+                         Text(
+-                            label, color = text, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 1,
++                            label, color = text, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                         )
+                     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt
 index c5d6deb..8ea577d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt
@@ -85274,6 +86112,198 @@ index 0000000..549e953
 +        assertNull(LatencyProbeBudget.CURRENT.get())
 +    }
 +
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Func400Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Func400Test.kt
+new file mode 100644
+index 0000000..09445fe
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Func400Test.kt
+@@ -0,0 +1,186 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onNodeWithText
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.tools.ToolsDestination
++import io.github.xgl34222220.hetu.tools.ToolsFeatureActions
++import io.github.xgl34222220.hetu.tools.ToolsFeaturePage
++import io.github.xgl34222220.hetu.tools.ToolsPreflight
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Assert.fail
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.File
++import java.io.IOException
++import java.net.ConnectException
++import java.net.SocketTimeoutException
++import java.net.UnknownHostException
++import javax.net.ssl.SSLHandshakeException
++
++/**
++ * 2026-10-16 4.0.0 function pass: retry of transient download / subscription failures (S1/S2),
++ * web-page instead of config (S3), 导出诊断包 (D1), status notification start action and error line
++ * (N1–N3), tile language / refresh (T1/T2) and the no-Root start message (E1).
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++class Func400Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    @Test fun transientFailuresAreRetriedAndFinalAnswersAreNot() {
++        assertTrue(HxNetRetry.transient(SocketTimeoutException("read timed out")))
++        assertTrue(HxNetRetry.transient(ConnectException("refused")))
++        assertTrue(HxNetRetry.transient(UnknownHostException("sub.example")))
++        assertTrue(HxNetRetry.transient(IOException("下载失败：HTTP 503")))
++        assertTrue(HxNetRetry.transient(IOException("下载失败：HTTP 429")))
++        assertTrue(HxNetRetry.transient(IOException("wrapped", SocketTimeoutException())))
++        assertTrue(HxNetRetry.transient(MihomoControllerClient.ControllerHttpException(503, "{\"message\":\"timeout\"}", false)))
++        assertFalse(HxNetRetry.transient(MihomoControllerClient.ControllerHttpException(401, "", false)))
++        assertFalse(HxNetRetry.transient(MihomoControllerClient.ControllerHttpException(404, "", false)))
++        assertFalse(HxNetRetry.transient(IOException("下载失败：HTTP 404")))
++        assertFalse(HxNetRetry.transient(IOException("下载失败：HTTP 403")))
++        assertFalse(HxNetRetry.transient(SSLHandshakeException("bad cert")))
++        assertFalse(HxNetRetry.transient(IOException("配置超过 4 MiB")))
++        assertTrue(source("app/HetuViewModel.kt").contains("if (!HxNetRetry.transient(first)) throw first"))
++    }
++
++    @Test fun configDownloadRetriesA503AndStopsAtA404() = runBlocking {
++        MockWebServer().use { server ->
++            server.enqueue(MockResponse().setResponseCode(503))
++            server.enqueue(MockResponse().setResponseCode(200).setBody("proxies:\n  - {name: a, type: direct}\n"))
++            server.start()
++            val (body, _) = HxConfigTransaction.download(server.url("/sub").toString())
++            assertTrue(String(body).startsWith("proxies:"))
++            assertEquals(2, server.requestCount)
++        }
++        MockWebServer().use { server ->
++            server.enqueue(MockResponse().setResponseCode(404))
++            server.enqueue(MockResponse().setResponseCode(200).setBody("proxies:\n"))
++            server.start()
++            try {
++                HxConfigTransaction.download(server.url("/gone").toString())
++                fail("404 must fail")
++            } catch (error: IOException) {
++                assertTrue(error.message.orEmpty().contains("HTTP 404"))
++            }
++            assertEquals("A 404 is final", 1, server.requestCount)
++        }
++    }
++
++    @Test fun aWebPageIsReportedAsAWebPage() {
++        val page = "<!DOCTYPE html>\n<html><head><title>Login</title></head><body>sign in</body></html>"
++        try {
++            HxConfigTransaction.decode(page.toByteArray())
++            fail("HTML must be rejected")
++        } catch (error: IOException) {
++            assertEquals("下载到的是网页而不是配置，请检查链接是否正确或需要登录", error.message)
++        }
++        assertTrue(HxConfigTransaction.looksLikeHtml("  <html lang=\"en\">"))
++        assertFalse(HxConfigTransaction.looksLikeHtml("proxies:\n  - name: <html>"))
++        // A real config is still accepted, and a Base64 list keeps its own hint.
++        assertTrue(HxConfigTransaction.decode("proxies:\nrules:\n".toByteArray()).startsWith("proxies:"))
++        try {
++            HxConfigTransaction.decode("dm1lc3M6Ly9hYmM=".toByteArray()); fail()
++        } catch (error: IOException) { assertTrue(error.message.orEmpty().contains("Base64")) }
++    }
++
++    @Test fun diagnosticsBundleCollectsSelfHealStateAndRedactsSecrets() = runBlocking {
++        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putString("proxyControllerSecret", "s3cr3t-token").commit()
++        var command = ""
++        val text = HxDiagnosticsBundle.build(
++            app,
++            report = { "controller secret=s3cr3t-token\nsub=https://example.com/api/sub?token=abc" },
++            rootRead = { command = it; "--- selfheal-state ---\nlevel=1 secret s3cr3t-token\n--- watchdog.log (last 300 lines) ---\nliveness ok" },
++        )
++        assertTrue(text.startsWith("河图诊断包"))
++        assertTrue(text.contains("app=" + BuildConfig.VERSION_NAME))
++        assertTrue(text.contains("liveness ok"))
++        assertFalse("secret redacted", text.contains("s3cr3t-token"))
++        assertFalse("full URL redacted", text.contains("token=abc"))
++        // The Root read is read-only and covers the watchdog / self-heal / routing state.
++        listOf("watchdog.log", "selfheal-state", "egress-state", "cgroup-escape", "wifi-reconnects",
++            "ip rule show", "iptables-save -t mangle", "ip6tables-save").forEach { assertTrue(it, command.contains(it)) }
++        listOf("hetu-root.sh", "iptables -D", "iptables -F", "iptables -X", "rm ", "kill ", "setprop").forEach { assertFalse(it, command.contains(it)) }
++        assertTrue(HxDiagnosticsBundle.fileName(0L).matches(Regex("hetu-diagnostics-\\d{8}-\\d{6}\\.txt")))
++        // A failing part is written as text instead of aborting the export.
++        val partial = HxDiagnosticsBundle.build(app, report = { throw IOException("controller down") }, rootRead = { throw IOException("su missing") })
++        assertTrue(partial.contains("controller down"))
++        assertTrue(partial.contains("su missing"))
++    }
++
++    @Test fun diagnosticsPageOffersTheExportRow() {
++        rule.setContent {
++            HetuAppTheme(appearance = "light", dynamic = false) {
++                CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides false) {
++                    Box(Modifier.fillMaxSize()) {
++                        ToolsFeaturePage(
++                            ToolsDestination.Diag,
++                            ToolsFeatureActions(runPreflight = { ToolsPreflight.Passed() }, exportDiagnostics = { "x" }),
++                            onBack = {},
++                        )
++                    }
++                }
++            }
++        }
++        rule.mainClock.advanceTimeBy(1000); rule.waitForIdle()
++        rule.onNodeWithText("导出诊断包").assertExists()
++        assertTrue(source("tools/ToolsFeatureAdapter.kt").contains("HxDiagnosticsBundle.build(app"))
++    }
++
++    @Test fun notificationOffersStartWhileStoppedAndShowsTheFailure() {
++        val service = source("ProxyStatusNotificationService.kt")
++        assertTrue(service.contains("\"stop\" -> if (running) \"停止\" to ACTION_STOP_PROXY else \"启动\" to ACTION_START_PROXY"))
++        assertTrue(service.contains("ACTION_START_PROXY -> runControl(\"正在启动…\") { controller.start() }"))
++        assertTrue(service.contains("recentError()"))
++        assertTrue(service.contains("hxPlainText(this, source)"))
++        assertEquals(10 * 60_000L, ProxyStatusNotificationService.ERROR_VISIBLE_MS)
++    }
++
++    @Test fun tileFollowsTheLanguageAndIsRefreshedAfterAnInAppToggle() {
++        val tile = source("HetuProxyTileService.kt")
++        assertTrue(tile.contains("tile.label = text(\"河图代理\")"))
++        assertTrue(tile.contains("TileService.requestListeningState"))
++        assertTrue(source("app/HetuViewModel.kt").contains("HetuProxyTileService.requestRefresh(app)"))
++        HetuProxyTileService.requestRefresh(app) // never throws, even without System UI
++        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putString("appLanguage", "en").commit()
++        assertEquals("Hetu proxy", hxPlainText(app, "河图代理"))
++        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().remove("appLanguage").commit()
++    }
++
++    @Test fun startWithoutRootSaysWhatToFix() = runBlocking {
++        assertFalse("No su in the test JVM", HxRootCheck.granted(app))
++        assertEquals(HxRootCheck.NO_ROOT + "\n\n启动失败", HxRootCheck.message("启动失败"))
++        assertEquals(HxRootCheck.NO_ROOT, HxRootCheck.message(""))
++        assertTrue(source("app/HetuViewModel.kt").contains("} else if (!HxRootCheck.granted(app)) {"))
++    }
++
++    @Test fun newWordsAreTranslated() {
++        listOf("导出诊断包", "诊断包已导出", "诊断包导出失败", "没有可用的文件保存应用", "下载到的是网页而不是配置，请检查链接是否正确或需要登录",
++            "诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件", "隐藏", "已停止", "正在重载…", "正在读取代理状态…",
++            "暂时无法读取代理状态", "河图 · 代理状态", "上次操作失败", "通知栏操作失败", "代理切换失败", "河图代理", "切换失败", "切换中…",
++            HxRootCheck.NO_ROOT).forEach { key ->
++            listOf("en", "zh-TW", "ru").forEach { lang ->
++                if (!(lang == "zh-TW" && key == "已停止")) assertTrue("$key/$lang", translateHetuText(key, lang) != key)
++            }
++        }
++    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt
 new file mode 100644
@@ -92425,6 +93455,84 @@ index 0000000..eaa1fdc
 +        assertEquals(HomeGlyphMode.Attention, degraded.homeHeroGlyphMode())
 +        // Running keeps its stricter reading.
 +        assertEquals(HomeGlyphMode.Unconfirmed, HomeUiState(status = HomeStatus.Running(600)).homeHeroGlyphMode())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish400Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish400Test.kt
+new file mode 100644
+index 0000000..86ec97f
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish400Test.kt
+@@ -0,0 +1,72 @@
++package io.github.xgl34222220.hetu
++
++import java.io.File
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * 4.0.0 UI pass (source shape): scrolling chip rows fade at the clipped edge, single-line labels
++ * end in an ellipsis instead of a hard cut, and 配置与订阅 keeps a failed read on the page.
++ */
++class UiPolish400Test {
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    private fun textCalls(src: String): List<String> {
++        val calls = mutableListOf<String>()
++        Regex("""\bText\(""").findAll(src).forEach { match ->
++            var i = match.range.last + 1
++            var depth = 1
++            while (depth > 0 && i < src.length) {
++                when (src[i]) {
++                    '(' -> depth++
++                    ')' -> depth--
++                    '"' -> { i++; while (i < src.length && src[i] != '"') { if (src[i] == '\\') i++; i++ } }
++                }
++                i++
++            }
++            calls += src.substring(match.range.first, i)
++        }
++        return calls
++    }
++
++    @Test fun scrollingChipRowsFadeAtTheClippedEdge() {
++        val rows = mapOf(
++            "panel/PanelListTabs.kt" to 2,
++            "panel/PanelOverlays.kt" to 1,
++            "app/ToolScreens.kt" to 2,
++            "app/OverrideScriptsSection.kt" to 2,
++            "app/ConfigScreens.kt" to 1,
++        )
++        rows.forEach { (path, count) ->
++            val src = source(path)
++            assertEquals(path, count, Regex("""\.panelHorizontalEdgeFade\(\w+\)\.horizontalScroll\(\w+\)""").findAll(src).count())
++            assertFalse("$path: no unfaded chip row left", src.contains(".horizontalScroll(rememberScrollState())"))
++        }
++    }
++
++    @Test fun liveSingleLineLabelsEndInAnEllipsis() {
++        val files = listOf(
++            "home/HomeScreen.kt", "panel/PanelScreen.kt", "panel/PanelOverviewTab.kt", "tools/ToolsEditorScreen.kt",
++            "ui/HetuGlassDock.kt", "ui/HetuTabs.kt", "ui/HetuInteractions.kt", "ui/HetuLiquidGlassSystem.kt", "app/ToolScreens.kt",
++            "app/MiscScreens.kt", "app/CoreConceptComponents.kt",
++        )
++        files.forEach { path ->
++            val clipped = textCalls(source(path)).filter { Regex("""maxLines\s*=\s*1\b""").containsMatchIn(it) && "overflow" !in it }
++            assertTrue("$path: ${clipped.joinToString("\n")}", clipped.isEmpty())
++        }
++        val log = source("ProxyLogViewerActivity.kt")
++        assertTrue(log.contains("style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)"))
++    }
++
++    @Test fun configLibraryKeepsAFailedReadOnThePageWithRetry() {
++        val configs = source("app/ConfigScreens.kt")
++        assertTrue(configs.contains("loadError = hxErrorMessage(error, \"配置读取失败\")"))
++        assertTrue(configs.contains("tone = HomeTone.Bad, actionLabel = \"重试\", onAction = { revision++ },"))
++        assertTrue("no misleading empty-subscription row after a failed read",
++            configs.contains("if (subscriptions.isEmpty() && !loading && loadError == null) {"))
++        assertTrue("subscriptions show placeholders on the first read",
++            configs.contains("if (subscriptions.isEmpty() && loading) {"))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt
