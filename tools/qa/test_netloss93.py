@@ -669,70 +669,137 @@ class NetRecover(unittest.TestCase):
         self.assertEqual(r.stdout.split(), ['7'], 'unique, only NetworkAgentInfo lines')
 
 
-class FakeReject(ShellCase):
-    def arm(self, gate=True, v4=FAKE4 + ',28.0.0.0/8', v6='fc00::/18'):
-        calls = self.dir / 'xt.calls'
-        hooked = self.dir / 'hooked'
-        spawned = self.dir / 'spawned'
-        self0 = self.dir / 'hetu-root.sh'
-        self0.write_text('#!/bin/sh\necho "$*" >> %s\n' % shq(spawned))
-        self0.chmod(0o755)
-        g = self.dir / 'android'
-        g.mkdir(exist_ok=True)
-        stub = ('xt4q(){ echo "$*" >> %s; case "$*" in *"-C OUTPUT"*) [ -f %s ]; return;; *"-I OUTPUT"*) : > %s;; *"-D OUTPUT"*) rm -f %s;; esac; return 0; }\n'
-                'has(){ [ "$1" != ip6tables ] && command -v "$1" >/dev/null 2>&1; }\nv6supported(){ return 0; }\n'
-                % (shq(calls), shq(hooked), shq(hooked), shq(hooked)))
-        stub += ''.join(function(n) for n in ('fake_reject_arm', 'fake_reject_drop', 'fake_reject_remove'))
-        stub += top_assignment('FAKE_REJECT_CHAIN') + top_assignment('FAKE_REJECT_SECONDS')
-        body = 'CG_ESCAPE_V1=""; '
-        if gate:
-            body += 'CG_ESCAPE_GATE=%s; ' % shq(g)
-        body += 'fake_reject_arm %s %s; echo "rc=$?"' % (shq(v4), shq(v6))
-        r = subprocess.run(['/bin/sh', '-c', self.prelude(stub) + body, str(self0)], capture_output=True, text=True, timeout=30)
-        self.assertIn('rc=0', r.stdout, r.stderr)
-        return calls, hooked, spawned, stub, self0
+def foreign_awk_reach():
+    match = re.search(r"^FOREIGN_AWK_REACH='.*?^  function own\(c\)[^\n]*'\n", TEXT, re.S | re.M)
+    if not match:
+        raise AssertionError('FOREIGN_AWK_REACH missing from hetu-root.sh')
+    return match.group(0)
 
-    def test_arm_installs_reset_rules_and_spawns_the_expiry_then_remove_clears_them(self):
-        calls, hooked, spawned, stub, self0 = self.arm()
-        text = calls.read_text()
-        for want in ('-t filter -N HXFAKE_REJECT',
-                     '-t filter -A HXFAKE_REJECT -d %s -p tcp -j REJECT --reject-with tcp-reset' % FAKE4,
-                     '-t filter -A HXFAKE_REJECT -d %s -p udp -j REJECT --reject-with icmp-port-unreachable' % FAKE4,
-                     '-t filter -I OUTPUT 1 -j HXFAKE_REJECT'):
-            self.assertIn(want, text)
-        self.assertNotIn('28.0.0.0', text, 'only the first CIDR of a list')
-        self.assertTrue(hooked.exists())
-        token = (self.run_dir / 'fake-reject').read_text().strip()
-        self.assertTrue(token)
-        for _ in range(50):
-            if spawned.exists():
-                break
-            time.sleep(0.1)
-        self.assertEqual(spawned.read_text().strip(), 'fake-reject-expire ' + token)
-        self.assertIn('are reset for 120s', self.log_text())
-        calls.unlink()
-        r = subprocess.run(['/bin/sh', '-c', self.prelude(stub) + 'fake_reject_remove; echo "rc=$?"', str(self0)],
-                           capture_output=True, text=True, timeout=30)
+
+class FakeReject(ShellCase):
+    """2026-10 (TikTok/stop report): the post-stop fake-IP REJECT is gone; any leftover chain is removed."""
+
+    def remove(self, present=True, hooked=True, sticky=False, marker=False):
+        calls = self.dir / 'xt.calls'
+        pres = self.dir / 'present'
+        hook = self.dir / 'hooked'
+        if present:
+            pres.write_text('')
+        if hooked:
+            hook.write_text('')
+        if marker:
+            (self.run_dir / 'fake-reject').write_text('tok\n')
+        stub = ('xt4q(){ echo "$*" >> %s; case "$*" in *"-S HXFAKE_REJECT"*) [ -f %s ]; return;; *"-C OUTPUT"*) [ -f %s ]; return;;'
+                ' *"-D OUTPUT"*) rm -f %s;; *"-X HXFAKE_REJECT"*) %s;; esac; return 0; }\n'
+                'has(){ [ "$1" != ip6tables ] && command -v "$1" >/dev/null 2>&1; }\niptables(){ :; }\nsleep(){ :; }\n'
+                % (shq(calls), shq(pres), shq(hook), shq(hook), 'return 1' if sticky else 'rm -f ' + shq(pres)))
+        stub += ''.join(function(n) for n in ('fake_reject_drop', 'fake_reject_present', 'fake_reject_remove'))
+        stub += top_assignment('FAKE_REJECT_CHAIN')
+        r = self.sh('fake_reject_remove; echo "rc=$?"', extra=stub)
+        return r, calls, pres, hook
+
+    def test_leftover_chain_is_removed_without_the_old_marker(self):
+        r, calls, pres, hook = self.remove()
         self.assertIn('rc=0', r.stdout, r.stderr)
         text = calls.read_text()
         for want in ('-t filter -D OUTPUT -j HXFAKE_REJECT', '-t filter -F HXFAKE_REJECT', '-t filter -X HXFAKE_REJECT'):
             self.assertIn(want, text)
-        self.assertFalse(hooked.exists())
-        self.assertFalse((self.run_dir / 'fake-reject').exists())
-        calls.unlink()
-        subprocess.run(['/bin/sh', '-c', self.prelude(stub) + 'fake_reject_remove', str(self0)], timeout=30)
-        self.assertFalse(calls.exists(), 'no window opened: remove touches nothing')
+        self.assertFalse(pres.exists())
+        self.assertFalse(hook.exists())
+        self.assertIn('removed the legacy fake-IP reject chain', self.log_text())
 
-    def test_arm_does_nothing_off_android_or_without_a_range(self):
-        for kw in ({'gate': False}, {'v4': '', 'v6': ''}, {'v4': 'bogus', 'v6': ''}, {'v4': '198.18.0.0/16;x', 'v6': ''}):
-            with self.subTest(**kw):
-                calls, hooked, spawned, _, _ = self.arm(**kw)
-                self.assertFalse(hooked.exists())
-                self.assertFalse((self.run_dir / 'fake-reject').exists())
-                self.assertFalse(spawned.exists())
-                if calls.exists():
-                    self.assertNotIn('-N HXFAKE_REJECT', calls.read_text())
-                    calls.unlink()
+    def test_marker_alone_is_cleared_and_absent_chain_is_only_looked_up(self):
+        r, calls, _, _ = self.remove(present=False, hooked=False, marker=True)
+        self.assertIn('rc=0', r.stdout, r.stderr)
+        self.assertFalse((self.run_dir / 'fake-reject').exists())
+        self.assertEqual([l for l in calls.read_text().splitlines() if '-S HXFAKE_REJECT' not in l], [])
+
+    def test_a_chain_that_cannot_be_deleted_is_reported(self):
+        r, _, pres, _ = self.remove(sticky=True)
+        self.assertIn('rc=1', r.stdout, r.stderr)
+        self.assertTrue(pres.exists())
+        self.assertIn('still present', self.log_text())
+
+    def test_no_code_path_installs_the_reject_any_more(self):
+        self.assertNotIn('fake_reject_arm', TEXT)
+        self.assertNotIn('-j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 &&', TEXT)
+        self.assertNotRegex(TEXT, r'-[AI] OUTPUT[^\n]*FAKE_REJECT_CHAIN')
+        self.assertNotIn('FAKE_REJECT_SECONDS', TEXT)
+        self.assertIn('fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_remove || true;;', TEXT)
+        self.assertIn('foreign_safe_cleanup', function('cleanup'))
+        self.assertIn('fake_reject_remove', function('foreign_safe_cleanup'))
+        self.assertIn('tun_rule_sweep', function('foreign_safe_cleanup'))
+        self.assertIn('[ -d "$CG_ESCAPE_GATE" ] || return 0', function('foreign_safe_cleanup'))
+        self.assertIn('fake-reject', function('stop_leftovers'))
+
+
+class ForeignRules(ShellCase):
+    """Rules of other proxy apps: blocking ones fail the start with a message, the rest are reported."""
+
+    def run_awk(self, func, stdin, *args):
+        body = top_assignment('FAKE_REJECT_CHAIN') + top_assignment('TUN_ROUTE_TABLE') + top_assignment('TUN_RULE_PREF_MIN')
+        body += top_assignment('TUN_RULE_PREF_MAX') + foreign_awk_reach()
+        body += ''.join(function(n) for n in ('foreign_fake_blocks', 'foreign_target_chains', 'foreign_tproxy_chains',
+                                                 'foreign_redirect_chains', 'tun_rule_lines'))
+        body += func + ' ' + ' '.join(shq(a) for a in args)
+        r = subprocess.run(['/bin/sh', '-c', body], input=stdin, capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.split('\n')[:-1]
+
+    def test_fake_range_blocks_are_found_only_when_reachable_and_overlapping(self):
+        rules = '\n'.join(('-P OUTPUT ACCEPT', '-N other', '-N dead', '-N HXFAKE_REJECT', '-A OUTPUT -j other',
+                           '-A other -d 198.18.0.0/16 -p tcp -j REJECT --reject-with tcp-reset',
+                           '-A other -d 198.16.0.0/12 -j DROP', '-A dead -d 198.18.0.0/16 -j DROP',
+                           '-A HXFAKE_REJECT -d 198.18.0.0/16 -j REJECT', '-A OUTPUT -j HXFAKE_REJECT',
+                           '-A OUTPUT -d 10.0.0.0/8 -j DROP', '-A HETU_KOUT -d 198.18.0.0/16 -j REJECT', '')) 
+        self.assertEqual(self.run_awk('foreign_fake_blocks', rules, '198.18.0.1/16'),
+                         ['other 198.18.0.0/16', 'other 198.16.0.0/12'])
+        self.assertEqual(self.run_awk('foreign_fake_blocks', rules, '28.0.0.1/8'), [])
+
+    def test_tproxy_and_redirect_of_other_apps_are_named_and_hetu_or_netd_chains_never(self):
+        mangle = '\n'.join(('-N box_pre', '-N stale', '-A PREROUTING -j box_pre', '-A box_pre -p tcp -j TPROXY --on-port 7893',
+                            '-A stale -p udp -j TPROXY --on-port 1', '-A PREROUTING -j HETU_MPRE',
+                            '-A HETU_MPRE -p tcp -j TPROXY --on-port 7895', ''))
+        self.assertEqual(self.run_awk('foreign_tproxy_chains', mangle), ['box_pre'])
+        nat = '\n'.join(('-A OUTPUT -j oem_nat_pre', '-A oem_nat_pre -p tcp -j REDIRECT --to-ports 1',
+                         '-A OUTPUT -j adguard_out', '-A adguard_out -p tcp --dport 443 -j REDIRECT --to-ports 8443',
+                         '-A OUTPUT -j HETU_DNSOUT', '-A HETU_DNSOUT -p udp --dport 53 -j REDIRECT --to-ports 1053', ''))
+        self.assertEqual(self.run_awk('foreign_redirect_chains', nat), ['adguard_out'])
+
+    def test_dead_tun_rules_are_selected_and_netd_rules_kept(self):
+        rules = ('9000:\tfrom all to 172.19.0.0/30 lookup 2022\n9001:\tfrom all goto 9010\n'
+                 '9002:\tnot from all dport 53 lookup main suppress_prefixlength 0\n'
+                 '9003:\tfrom all iif lo uidrange 0-9999 unreachable\n'
+                 '10000:\tfrom all fwmark 0xc0000/0xd0000 lookup legacy_system\n8999:\tfrom all lookup 2022\n')
+        self.assertEqual(self.run_awk('tun_rule_lines', rules),
+                         ['9000\tfrom all to 172.19.0.0/30 lookup 2022', '9001\tfrom all goto 9010',
+                          '9003\tfrom all iif lo uidrange 0-9999 unreachable'])
+
+    def tun_sweep(self, table_routes):
+        calls = self.dir / 'ip.calls'
+        if calls.exists():
+            calls.unlink()
+        stub = ('ip(){ echo "$*" >> %s; case "$*" in "-4 route show table 2022") printf %s;; "-4 rule show")'
+                ' printf "9000:\\tfrom all lookup 2022\\n9010:\\tfrom all nop\\n";; esac; return 0; }\n'
+                'v6supported(){ return 1; }\n' % (shq(calls), shq(table_routes)))
+        stub += top_assignment('TUN_ROUTE_TABLE') + top_assignment('TUN_RULE_PREF_MIN') + top_assignment('TUN_RULE_PREF_MAX')
+        stub += ''.join(function(n) for n in ('tun_rule_lines', 'tun_rule_sweep'))
+        r = self.sh('tun_rule_sweep; echo "rc=$?"', extra=stub)
+        self.assertIn('rc=0', r.stdout, r.stderr)
+        return calls.read_text()
+
+    def test_tun_sweep_deletes_only_while_the_table_is_empty(self):
+        self.assertIn('-4 rule del pref 9000 from all lookup 2022', self.tun_sweep(''))
+        self.assertNotIn('rule del', self.tun_sweep('default dev tun0 scope link\n'))
+
+    def test_start_checks_other_apps_after_its_own_cleanup_and_before_ports(self):
+        start = function('start')
+        self.assertLess(start.index('stopwatchdog; cleanup;'), start.index('foreign_capture_check'))
+        self.assertLess(start.index('foreign_capture_check'), start.index('check_start_ports'))
+        check = function('foreign_capture_check')
+        self.assertIn('[ -d "$CG_ESCAPE_GATE" ] || return 0', check)
+        self.assertEqual(check.count('fail "'), 3)
+        self.assertIn('FOREIGN_WARN', start)
 
 
 class Phase300SourceGuards(unittest.TestCase):
@@ -741,13 +808,12 @@ class Phase300SourceGuards(unittest.TestCase):
         self.assertIn('stop_verify', stop)
         self.assertLess(stop.index('[ "$SC_FAILED" = 0 ] || return 1'), stop.index('stop_verify'))
         self.assertLess(stop.index('stop_verify'), stop.index('rm -f "$SESSION"'))
-        self.assertLess(stop.index('rm -f "$SESSION"'), stop.index('fake_reject_arm "$ST_FAKE4" "$ST_FAKE6"'))
-        self.assertIn('net_recover_async stop', stop)
-        self.assertIn('fake_reject_remove; stopwatchdog; cleanup', function('start'))
+        self.assertLess(stop.index('rm -f "$SESSION"'), stop.index('net_recover_async stop'))
+        self.assertNotIn('fake_reject_arm', stop)
+        self.assertIn('stopwatchdog; cleanup; restorev6', function('start'))
 
     def test_detached_helpers_escape_the_app_cgroup_with_their_own_pid(self):
-        for name, cmd in (('fake_reject_arm', '$SETSID "$0" fake-reject-expire "$FRA_TOKEN"'),
-                          ('net_recover_async', '$SETSID "$0" net-recover "$1"')):
+        for name, cmd in (('net_recover_async', '$SETSID "$0" net-recover "$1"'),):
             body = function(name)
             self.assertIn(cmd, body)
             self.assertIn('cg_escape "$!"', body)

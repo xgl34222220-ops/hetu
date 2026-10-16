@@ -1370,7 +1370,14 @@ private val vocabularyHomeProbe333 = """
 """.trimIndent()
 
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400).joinToString("\n")
+// 2026-10 TikTok / stop fix: start refuses rules of other proxy apps that would leave the phone offline.
+private val vocabularyTiktokStop = """
+检测到其他应用的防火墙规则拦截了 fake-IP 网段，河图启动后将无法上网；请先停止或卸载该代理/防火墙应用，或重启手机后再启动|Another app's firewall rule blocks the fake-IP range, so nothing would connect once Hetu starts. Stop or uninstall that proxy/firewall app, or restart the phone, then start again|偵測到其他應用程式的防火牆規則攔截了 fake-IP 網段，河圖啟動後將無法上網；請先停止或解除安裝該代理／防火牆應用程式，或重新啟動手機後再啟動|Правило брандмауэра другого приложения блокирует диапазон fake-IP, после запуска Hetu сеть работать не будет. Остановите или удалите это прокси/брандмауэр либо перезагрузите телефон и запустите снова
+检测到其他代理应用的透明代理（TPROXY）规则仍在生效，河图与其同时运行会断网；请先在该应用中停止代理，或重启手机后再启动河图|Transparent proxy (TPROXY) rules of another proxy app are still active; running Hetu alongside them leaves the phone offline. Stop the proxy in that app, or restart the phone, then start Hetu|偵測到其他代理應用程式的透明代理（TPROXY）規則仍在生效，河圖與其同時執行會斷網；請先在該應用程式中停止代理，或重新啟動手機後再啟動河圖|Правила прозрачного прокси (TPROXY) другого приложения всё ещё действуют; вместе с ними Hetu оставит телефон без сети. Остановите прокси в том приложении или перезагрузите телефон, затем запустите Hetu
+无法移除旧版河图停止后留下的 fake-IP 拦截规则（HXFAKE_REJECT），请重试启动或重启手机|Could not remove the fake-IP block left by an older Hetu stop (HXFAKE_REJECT). Try starting again or restart the phone|無法移除舊版河圖停止後留下的 fake-IP 攔截規則（HXFAKE_REJECT），請重試啟動或重新啟動手機|Не удалось снять блокировку fake-IP, оставленную остановкой старой версии Hetu (HXFAKE_REJECT). Запустите снова или перезагрузите телефон
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

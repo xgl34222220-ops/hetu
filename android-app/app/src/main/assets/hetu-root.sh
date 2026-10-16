@@ -181,11 +181,17 @@ WD_DP_PATH=/generate_204
 WD_DP_CN_HOSTS="www.baidu.com www.qq.com www.taobao.com"
 WD_DP_GROUP_MAX=12
 WD_DP_BUDGET=30
-# After a stop, apps may still hold fake IPs from the core's DNS: for a short window they get a TCP reset /
-# ICMP unreachable instead of a hang, so they resolve again at once. Not a HETU_ chain: no sweep, status
-# check or stop verification treats it as capture.
+# 3.0.0-3.3.3 armed a 120 s post-stop REJECT of the whole fake-IP range (filter OUTPUT, every UID) in this
+# chain. It also cut off any other proxy app using the same 198.18/15 fake-IP range, and when ColorOS
+# killed the detached expiry timer the REJECT stayed until the next Hetu start. It is no longer armed:
+# every stop, start, cleanup and status removes it (fake_reject_remove), and the stop verification
+# reports it. The resolver flush after a stop (net_recover) is what makes apps resolve again.
 FAKE_REJECT_CHAIN=HXFAKE_REJECT
-FAKE_REJECT_SECONDS=120
+# sing-tun / Mihomo TUN auto-route defaults (Hetu's TUN mode never overrides them): ip rules from
+# TUN_RULE_PREF_MIN.., routes in table TUN_ROUTE_TABLE. A SIGKILLed core leaves the rules behind.
+TUN_ROUTE_TABLE=2022
+TUN_RULE_PREF_MIN=9000
+TUN_RULE_PREF_MAX=9099
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
@@ -638,7 +644,51 @@ sweep_policy_routes(){
     for SR_T in $SR_TABLES; do ip -"$SR_F" route flush table "$SR_T" >/dev/null 2>&1 || true; done
   done
 }
-cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; cnip_sweep_sets keep; ebpf_unload || true; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; cnip_sweep_sets keep; ebpf_unload || true; ip link del hetu0 >/dev/null 2>&1 || true; foreign_safe_cleanup; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+# Android only (host fixtures keep their exact command lists): the legacy post-stop fake-IP REJECT and
+# the dead TUN auto-route rules of a killed Hetu TUN core. Both cut every app's network, other proxy
+# apps included, so they never outlive a cleanup.
+foreign_safe_cleanup(){
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  fake_reject_remove
+  tun_rule_sweep
+  return 0
+}
+# Dead TUN auto-route rules: priorities TUN_RULE_PREF_MIN..MAX that look up TUN_ROUTE_TABLE, jump inside
+# that block (goto 90xx) or are unreachable/blackhole/prohibit, removed only while TUN_ROUTE_TABLE has no
+# route left in that family (its TUN device is gone). A running TUN of another app keeps its routes, so
+# its rules are never touched.
+tun_rule_lines(){
+  awk -v lo="$TUN_RULE_PREF_MIN" -v hi="$TUN_RULE_PREF_MAX" -v t="$TUN_ROUTE_TABLE" '
+    { p = $1; sub(/:$/, "", p); if (p !~ /^[0-9]+$/ || p + 0 < lo || p + 0 > hi) next
+      dead = 0
+      for (i = 2; i <= NF; i++) {
+        if (($i == "lookup" || $i == "table") && $(i+1) == t) dead = 1
+        if ($i == "goto" && $(i+1) ~ /^[0-9]+$/ && $(i+1) + 0 >= lo && $(i+1) + 0 <= hi) dead = 1
+        if ($i == "unreachable" || $i == "blackhole" || $i == "prohibit") dead = 1
+      }
+      if (dead) { line = $0; sub(/^[0-9]+:[[:space:]]*/, "", line); print p "\t" line } }'
+}
+tun_rule_sweep(){
+  TRS_TAB=$(printf '\t')
+  for TRS_F in 4 6; do
+    if [ "$TRS_F" = 6 ] && ! v6supported; then continue; fi
+    ip -"$TRS_F" route show table "$TUN_ROUTE_TABLE" 2>/dev/null | grep -q . && continue
+    TRS_LIST=$(ip -"$TRS_F" rule show 2>/dev/null | tun_rule_lines) || continue
+    [ -n "$TRS_LIST" ] || continue
+    TRS_N=0
+    while IFS="$TRS_TAB" read -r TRS_P TRS_RULE; do
+      [ -n "$TRS_P" ] || continue
+      # shellcheck disable=SC2086
+      ip -"$TRS_F" rule del pref "$TRS_P" $TRS_RULE >/dev/null 2>&1 || true
+      TRS_N=$((TRS_N+1))
+    done <<EOF_TRS
+$TRS_LIST
+EOF_TRS
+    wd_log "cleanup: removed $TRS_N dead TUN auto-route rule(s) (IPv$TRS_F, table $TUN_ROUTE_TABLE empty)"
+  done
+  return 0
+}
 
 cleanup_verify(){
   for CC_BIN in xt4 xt6; do
@@ -701,7 +751,9 @@ stop_transaction(){
   [ "$SC_FAILED" = 0 ] || return 1
   stop_verify
   rm -f "$SESSION"
-  fake_reject_arm "$ST_FAKE4" "$ST_FAKE6"
+  # No post-stop fake-IP REJECT any more (it broke other proxy apps on 198.18/15). Apps that still hold a
+  # fake IP re-resolve after the resolver flush below; ST_FAKE4/ST_FAKE6 only go to the log.
+  wd_log "stop: fake-IP range ${ST_FAKE4%%,*}${ST_FAKE6:+ ${ST_FAKE6%%,*}} released without a reject window; flushing resolver caches"
   net_recover_async stop
 }
 # 3.0.0 post-stop audit, independent of net.state: no fwmark rule or route of a Hetu table
@@ -721,60 +773,52 @@ stop_leftovers(){
     done
   done
   [ ! -d "$EBPF_PIN" ] || SL_OUT="$SL_OUT ebpf-pin"
+  for SL_BIN in xt4q xt6q; do
+    if [ "$SL_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    if "$SL_BIN" -t filter -S 2>/dev/null | grep -Eq "(^-N | -j )$FAKE_REJECT_CHAIN( |\$)"; then SL_OUT="$SL_OUT $SL_BIN-fake-reject"; fi
+  done
+  for SL_F in 4 6; do
+    if [ "$SL_F" = 6 ] && ! v6supported; then continue; fi
+    ip -"$SL_F" route show table "$TUN_ROUTE_TABLE" 2>/dev/null | grep -q . && continue
+    [ -z "$(ip -"$SL_F" rule show 2>/dev/null | tun_rule_lines)" ] || SL_OUT="$SL_OUT ip$SL_F-tun-rule"
+  done
   printf '%s' "${SL_OUT# }"
 }
 stop_verify(){
   [ -d "$CG_ESCAPE_GATE" ] || return 0
   SV_LEFT=$(stop_leftovers)
-  if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean (no Hetu ip rule, table 20260-20299 route, HETU_ chain or eBPF pin)"; return 0; fi
+  if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean (no Hetu ip rule, table 20260-20299 route, HETU_ chain, eBPF pin, fake-IP reject or dead TUN rule)"; return 0; fi
   wd_log "stop-verify: left after stop: $SV_LEFT; sweeping once more"
   cleanup_confirmed || true; ebpf_unload || true
   SV_LEFT=$(stop_leftovers)
   if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean after the second sweep"; else wd_log "stop-verify: still left after the second sweep: $SV_LEFT"; fi
   return 0
 }
-# Fake-IP reset window after a stop ($1 v4 range, $2 v6 range of the stopped session; first CIDR of a list).
-fake_reject_arm(){
-  [ -d "$CG_ESCAPE_GATE" ] || return 0
-  FRA_ON=0
-  for FRA_F in 4 6; do
-    if [ "$FRA_F" = 4 ]; then FRA_BIN=xt4q; FRA_R="${1%%,*}"; FRA_U=icmp-port-unreachable
-    else has ip6tables && v6supported || continue; FRA_BIN=xt6q; FRA_R="${2%%,*}"; FRA_U=icmp6-port-unreachable; fi
-    case "$FRA_R" in */*) ;; *) continue;; esac
-    case "$FRA_R" in *[!0-9A-Fa-f.:/]*) continue;; esac
-    fake_reject_drop "$FRA_BIN"
-    if "$FRA_BIN" -t filter -N "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 &&
-      "$FRA_BIN" -t filter -A "$FAKE_REJECT_CHAIN" -d "$FRA_R" -p tcp -j REJECT --reject-with tcp-reset >/dev/null 2>&1 &&
-      "$FRA_BIN" -t filter -A "$FAKE_REJECT_CHAIN" -d "$FRA_R" -p udp -j REJECT --reject-with "$FRA_U" >/dev/null 2>&1 &&
-      "$FRA_BIN" -t filter -I OUTPUT 1 -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; then FRA_ON=1
-    else fake_reject_drop "$FRA_BIN"; fi
-  done
-  [ "$FRA_ON" = 1 ] || return 0
-  FRA_TOKEN="$$-$(cat /proc/sys/kernel/random/uuid 2>/dev/null | cut -c1-8)"
-  { printf '%s\n' "$FRA_TOKEN" > "$RUN/fake-reject"; } 2>/dev/null || true
-  wd_log "stop: connections to the fake-IP range (${1%%,*}${2:+ ${2%%,*}}) are reset for ${FAKE_REJECT_SECONDS}s so apps resolve again"
-  detach_probe
-  $SETSID "$0" fake-reject-expire "$FRA_TOKEN" </dev/null >/dev/null 2>&1 &
-  cg_escape "$!"
-  return 0
-}
+# Removes the legacy post-stop fake-IP REJECT chain (3.0.0-3.3.3) in both families, whether or not the
+# old marker file is still there, and checks that it is gone: a lost marker or a lock timeout used to
+# leave it (and every fake-IP connection of every app) blocked. Returns 1 if it could not be removed.
 fake_reject_drop(){
   while "$1" -t filter -C OUTPUT -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; do "$1" -t filter -D OUTPUT -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || break; done
   "$1" -t filter -F "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || true; "$1" -t filter -X "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || true
 }
-# Ends the window early (every start) or on time (fake-reject-expire); only after a window was opened.
+fake_reject_present(){ "$1" -t filter -S "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; }
 fake_reject_remove(){
-  [ -f "$RUN/fake-reject" ] || return 0
-  rm -f "$RUN/fake-reject"
-  fake_reject_drop xt4q
-  if has ip6tables; then fake_reject_drop xt6q; fi
-  return 0
-}
-fake_reject_expire(){
-  sleep "$FAKE_REJECT_SECONDS"
-  [ "$(cat "$RUN/fake-reject" 2>/dev/null)" = "$1" ] || return 0
-  fake_reject_remove
-  wd_log "fake-IP reset window ended"
+  rm -f "$RUN/fake-reject" 2>/dev/null
+  FRR_RC=0
+  for FRR_BIN in xt4q xt6q; do
+    if [ "$FRR_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    if [ "$FRR_BIN" = xt4q ] && ! has iptables; then continue; fi
+    fake_reject_present "$FRR_BIN" || continue
+    FRR_N=0
+    while fake_reject_present "$FRR_BIN"; do
+      fake_reject_drop "$FRR_BIN"
+      FRR_N=$((FRR_N+1)); [ "$FRR_N" -lt 3 ] || break
+      fake_reject_present "$FRR_BIN" && sleep 1
+    done
+    if fake_reject_present "$FRR_BIN"; then FRR_RC=1; wd_log "fake-IP reject chain $FAKE_REJECT_CHAIN still present ($FRR_BIN)"
+    else wd_log "removed the legacy fake-IP reject chain $FAKE_REJECT_CHAIN ($FRR_BIN)"; fi
+  done
+  return "$FRR_RC"
 }
 # 3.0.0: after a stop or start the system resolver may still hold the core's answers (fake IPs) and
 # NetworkMonitor may keep a network "无法连接到网络" in its back-off. Flush every network's DNS cache and
@@ -2337,6 +2381,82 @@ ready(){
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
+# ---- Rules of other proxy apps (Android only) ----------------------------------------------------
+# Run by start after Hetu's own cleanup, before anything is installed. Blocking (start fails with a clear
+# message instead of a silent no-network): a REJECT/DROP in the filter table whose destination overlaps
+# Hetu's fake-IP range (every fake-IP connection would die), and TPROXY rules of another app in the mangle
+# table (its marks route Hetu's packets to its own dead or competing listener). Only reported: NAT
+# REDIRECT/DNAT of another app (AdGuard and similar root filters use it) and another app's TUN/VPN
+# interface. FOREIGN_WARN collects the report for the start message and watchdog.log.
+foreign_rule_owner(){ case "$1" in HETU_*|BICHEN_*|"$FAKE_REJECT_CHAIN") return 0;; esac; return 1; }
+# iptables -S output on stdin; awk prelude marking the chains reachable from the built-in chains in
+# ROOTS (jumps/gotos followed), so an unhooked leftover chain is never reported.
+FOREIGN_AWK_REACH='
+  { L[NR] = $0 }
+  $1 == "-A" { for (i = 3; i < NF; i++) if ($i == "-j" || $i == "-g") { e[$2] = e[$2] " " $(i+1) } }
+  function reach(   n, r, k, c, t, q, x) {
+    n = split(ROOTS, r, " "); for (k = 1; k <= n; k++) { R[r[k]] = 1; q[++t] = r[k] }
+    for (x = 1; x <= t; x++) { c = split(e[q[x]], nx, " "); for (k = 1; k <= c; k++) if (!(nx[k] in R)) { R[nx[k]] = 1; q[++t] = nx[k] } } }
+  function own(c) { return c ~ /^(HETU_|BICHEN_)/ || c == OWN }'
+# Filter-table rules on stdin: "<chain> <dst>" of REJECT/DROP rules reachable from OUTPUT, outside Hetu
+# chains, whose IPv4 destination overlaps $1 (a.b.c.d/n).
+foreign_fake_blocks(){
+  awk -v fake="$1" -v OWN="$FAKE_REJECT_CHAIN" -v ROOTS="OUTPUT" "$FOREIGN_AWK_REACH"'
+    function ip2n(a,   p) { split(a, p, "."); return ((p[1] * 256 + p[2]) * 256 + p[3]) * 256 + p[4] }
+    function lo(c,   a, n, b) { split(c, a, "/"); n = (a[2] == "") ? 32 : a[2] + 0; b = 2 ^ (32 - n); return int(ip2n(a[1]) / b) * b }
+    function hi(c,   a, n) { split(c, a, "/"); n = (a[2] == "") ? 32 : a[2] + 0; return lo(c) + 2 ^ (32 - n) - 1 }
+    END {
+      if (fake !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/) exit
+      flo = lo(fake); fhi = hi(fake); reach()
+      for (l = 1; l <= NR; l++) {
+        nf = split(L[l], f, " "); if (f[1] != "-A" || own(f[2]) || !(f[2] in R)) continue
+        d = ""; j = ""
+        for (i = 3; i < nf; i++) { if (f[i] == "-d") d = f[i+1]; if (f[i] == "-j") j = f[i+1] }
+        if ((j != "REJECT" && j != "DROP") || d !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/) continue
+        if (lo(d) <= fhi && hi(d) >= flo) print f[2] " " d } }'
+}
+# Rules on stdin: reachable chains outside Hetu (and outside netd's own prefixes for NAT) whose rules jump to
+# one of the targets in $1 (TPROXY, or REDIRECT DNAT).
+foreign_target_chains(){
+  awk -v want=" $1 " -v OWN="$FAKE_REJECT_CHAIN" -v ROOTS="PREROUTING OUTPUT" "$FOREIGN_AWK_REACH"'
+    END { reach()
+      for (l = 1; l <= NR; l++) {
+        nf = split(L[l], f, " "); if (f[1] != "-A" || own(f[2]) || !(f[2] in R)) continue
+        if (f[2] ~ /^(oem_|tetherctrl_|natctrl_|idletimer_|bw_|fw_|st_)/) continue
+        for (i = 3; i < nf; i++) if (f[i] == "-j" && index(want, " " f[i+1] " ")) { print f[2]; break } } }' | sort -u
+}
+foreign_tproxy_chains(){ foreign_target_chains TPROXY; }
+foreign_redirect_chains(){ foreign_target_chains "REDIRECT DNAT"; }
+foreign_tun_links(){ ip -o link show up 2>/dev/null | awk -F': ' '{ n = $2; sub(/@.*/, "", n); if (n ~ /^(tun|utun|ppp|tap|wg|clash|mihomo|meta|sing|box|nekoray|v2ray|xray)/ && n != "hetu0") print n }' | sort -u; }
+foreign_capture_check(){
+  FOREIGN_WARN=""
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  # The legacy chain is Hetu's own: it must be gone before anything else.
+  if ! fake_reject_remove; then fail "无法移除旧版河图停止后留下的 fake-IP 拦截规则（$FAKE_REJECT_CHAIN），请重试启动或重启手机"; fi
+  FC_FAKE="${FAKE_IP_V4%%,*}"; [ -n "$FC_FAKE" ] || FC_FAKE=198.18.0.0/15
+  FC_FILTER=$(xt4q -t filter -S 2>/dev/null || true)
+  FC_BLOCK=$(printf '%s\n' "$FC_FILTER" | foreign_fake_blocks "$FC_FAKE" | head -n 4 | tr '\n' ' ')
+  if [ -n "$FC_BLOCK" ]; then
+    wd_log "start: refused: another app's firewall rule blocks the fake-IP range $FC_FAKE: ${FC_BLOCK% }"
+    fail "检测到其他应用的防火墙规则拦截了 fake-IP 网段，河图启动后将无法上网；请先停止或卸载该代理/防火墙应用，或重启手机后再启动"
+  fi
+  FC_TP=""
+  for FC_BIN in xt4q xt6q; do
+    if [ "$FC_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    FC_TP="$FC_TP $("$FC_BIN" -t mangle -S 2>/dev/null | foreign_tproxy_chains | tr '\n' ' ')"
+  done
+  FC_TP=$(printf '%s\n' $FC_TP | sort -u | tr '\n' ' '); FC_TP=${FC_TP% }
+  if [ -n "$FC_TP" ]; then
+    wd_log "start: refused: TPROXY rules of another proxy app are active (mangle chains: $FC_TP)"
+    fail "检测到其他代理应用的透明代理（TPROXY）规则仍在生效，河图与其同时运行会断网；请先在该应用中停止代理，或重启手机后再启动河图"
+  fi
+  FC_NAT=$(xt4q -t nat -S 2>/dev/null | foreign_redirect_chains | tr '\n' ' '); FC_NAT=${FC_NAT% }
+  FC_TUN=$(foreign_tun_links | tr '\n' ' '); FC_TUN=${FC_TUN% }
+  [ -z "$FC_NAT" ] || FOREIGN_WARN="${FOREIGN_WARN:+$FOREIGN_WARN；}其他应用的 NAT 重定向规则仍在生效（$FC_NAT）"
+  [ -z "$FC_TUN" ] || FOREIGN_WARN="${FOREIGN_WARN:+$FOREIGN_WARN；}其他 VPN/TUN 接口在线（$FC_TUN），其流量可能不经过河图"
+  [ -z "$FOREIGN_WARN" ] || wd_log "start: other proxy/VPN state found: nat=${FC_NAT:-none} tun=${FC_TUN:-none}"
+  return 0
+}
 check_start_ports(){
   listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
   M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
@@ -3441,11 +3561,13 @@ start(){
     atomic_kill_guard 6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv6 启动保护安装失败"
   fi
   start_stage "cleanup-network"
-  fake_reject_remove; stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
+  stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   net_sysctl_restore
   start_stage "stop-old-core"
   stopcore || fail "旧核心未确认退出"; rm -f "$CRASH_STATE" "$SESSION"
   cgroup_release
+  start_stage "foreign-rules"
+  foreign_capture_check
   start_stage "check-ports"
   check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
@@ -3543,6 +3665,7 @@ start(){
   START_ACTIVE=0
   net_recover_async start
   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE,ebpf=$EBPF_STATE${EBPF_REASON:+,ebpfReason=$EBPF_REASON}"
+  [ -z "$FOREIGN_WARN" ] || DESC="$DESC；注意：$FOREIGN_WARN"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
 
@@ -3609,6 +3732,8 @@ status(){
     case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
   fi
 
+  # A 3.3.3 post-stop fake-IP reject whose timer was killed (marker left): remove it as soon as the App looks.
+  if [ "$STATUS_RUNNING" = false ] && [ -f "$RUN/fake-reject" ] && [ -d "$CG_ESCAPE_GATE" ] && try_lock_once; then fake_reject_remove || true; release_lock; fi
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
   SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
   DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -4542,7 +4667,8 @@ case "${1:-status}" in
   net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2"; wifi_heal "$2" flushed;;
   wifi-heal) [ "$#" = 2 ] || exit 0; root; wifi_heal "$2";;
   probe-urls) [ "$#" = 1 ] || fail "参数错误"; root; probe_urls;;
-  fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_expire "$2";;
+  # Kept for timers spawned by 3.0.0-3.3.3: no sleep, the legacy chain is removed at once.
+  fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_remove || true;;
   monitor-status) root; monitor_status_json;;
   monitor-ensure) [ "$#" = 1 ] || fail "参数错误"; root; monitor_ensure;;
   traffic-take) [ "$#" = 1 ] || fail "参数错误"; root; traffic_take;;
