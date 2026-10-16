@@ -376,6 +376,24 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
     var state by remember { mutableStateOf(ToolsDiagState()) }
     var overlay by remember { mutableStateOf<ToolsDiagOverlay?>(null) }
 
+    // func-400 D1: pick the file first, then collect (Root reads take a few seconds) and write it.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var exporting by remember { mutableStateOf(false) }
+    // Hosts without an activity-result registry (previews) simply do not offer the row.
+    val canExport = actions.exportDiagnostics != null &&
+        androidx.activity.compose.LocalActivityResultRegistryOwner.current != null
+    val exportLauncher = if (!canExport) null else androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(io.github.xgl34222220.hetu.HxDiagnosticsBundle.MIME),
+    ) { uri ->
+        val build = actions.exportDiagnostics
+        if (uri == null || build == null) { exporting = false; return@rememberLauncherForActivityResult }
+        scope.attempt({ error -> exporting = false; actions.onMessage(error.reason("诊断包导出失败")) }) {
+            io.github.xgl34222220.hetu.HxDiagnosticsBundle.write(context, uri, build())
+            exporting = false
+            actions.onMessage("诊断包已导出")
+        }
+    }
+
     fun preflight() {
         val runner = actions.runPreflight ?: return
         if (state.preflight is ToolsPreflight.Running) return
@@ -407,6 +425,14 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
+        onExport = if (exportLauncher == null) null else { {
+            if (!exporting) {
+                exporting = true
+                try { exportLauncher.launch(io.github.xgl34222220.hetu.HxDiagnosticsBundle.fileName()) }
+                catch (_: android.content.ActivityNotFoundException) { exporting = false; actions.onMessage("没有可用的文件保存应用") }
+            }
+        } },
+        exporting = exporting,
         onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
             { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
         } ?: actions.onOpenDiagnosticsDetails,

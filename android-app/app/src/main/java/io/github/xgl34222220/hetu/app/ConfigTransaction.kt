@@ -39,6 +39,11 @@ internal object HxConfigTransaction {
 
     private val configKeys = Regex("^(proxies|proxy-providers|proxy-groups|rules)\\s*:", RegexOption.MULTILINE)
 
+    private val htmlStart = Regex("^\\s*<(?:!doctype\\s+html|html|head|body)[\\s>]", RegexOption.IGNORE_CASE)
+
+    /** True when [text] opens like an HTML document (a portal, login or error page). */
+    fun looksLikeHtml(text: String): Boolean = htmlStart.containsMatchIn(text.take(512))
+
     /** True when [text] has at least one top-level Clash/Mihomo section a usable config needs. */
     fun looksLikeConfig(text: String): Boolean = configKeys.containsMatchIn(text)
 
@@ -58,6 +63,8 @@ internal object HxConfigTransaction {
         val body = text.removePrefix("\uFEFF")
         if (body.isBlank()) throw IOException("配置为空")
         if (body.indexOf('\u0000') >= 0) throw IOException("配置不是文本文件")
+        // func-400 S3: a login / captcha / error page is not a config; say so instead of hinting Base64.
+        if (looksLikeHtml(body) && !looksLikeConfig(body)) throw IOException("下载到的是网页而不是配置，请检查链接是否正确或需要登录")
         if (!looksLikeConfig(body)) throw IOException("内容不是 Clash/Mihomo YAML 配置（可能是 Base64 节点列表，请改用「添加订阅」）")
         return body
     }
@@ -121,8 +128,30 @@ internal object HxConfigTransaction {
         readBounded(context.contentResolver.openInputStream(uri) ?: throw IOException("无法读取配置文件"))
     }
 
-    /** Downloads a full YAML config. Returns the body and the file name the server suggested (may be blank). */
+    /**
+     * Downloads a full YAML config. Returns the body and the file name the server suggested (may be blank).
+     * func-400 S1: a transient failure (timeout, reset, HTTP 408/429/5xx) is tried up to three times
+     * with a short backoff; a final answer (4xx, TLS, oversize) is reported at once.
+     */
     suspend fun download(url: String): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+        var attempt = 0
+        var result: Pair<ByteArray, String>? = null
+        while (result == null) {
+            result = try {
+                downloadOnce(url)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: IOException) {
+                if (attempt >= HxNetRetry.DOWNLOAD_BACKOFF_MS.size || !HxNetRetry.transient(error)) throw error
+                kotlinx.coroutines.delay(HxNetRetry.DOWNLOAD_BACKOFF_MS[attempt])
+                attempt++
+                null
+            }
+        }
+        checkNotNull(result)
+    }
+
+    private fun downloadOnce(url: String): Pair<ByteArray, String> {
         val connection = (URL(url).openConnection() as? HttpURLConnection) ?: throw IOException("请输入有效的 http/https 链接")
         try {
             connection.connectTimeout = 15_000
@@ -135,7 +164,7 @@ internal object HxConfigTransaction {
             val disposition = connection.getHeaderField("Content-Disposition").orEmpty()
             val suggested = Regex("filename\\*?=(?:UTF-8'')?\"?([^\";]+)\"?", RegexOption.IGNORE_CASE)
                 .find(disposition)?.groupValues?.getOrNull(1)?.let { Uri.decode(it) }.orEmpty()
-            readBounded(connection.inputStream) to suggested
+            return readBounded(connection.inputStream) to suggested
         } finally {
             connection.disconnect()
         }

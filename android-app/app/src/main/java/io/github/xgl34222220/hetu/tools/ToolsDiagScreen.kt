@@ -52,6 +52,8 @@ internal fun ToolsDiagScreen(
     modifier: Modifier = Modifier,
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
     onRepairRecord: (() -> Unit)? = null,
+    onExport: (() -> Unit)? = null,
+    exporting: Boolean = false,
 ) {
     val c = LocalHomeColors.current
     val checking = state.preflight is ToolsPreflight.Running
@@ -90,6 +92,15 @@ internal fun ToolsDiagScreen(
                 AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
             )
+            if (onExport != null) {
+                HomeRowDivider(start = HomeRowDims.textStart)
+                ToolsRow(
+                    AnnotatedString(ht("导出诊断包")), icon = ToolsIcons.Share,
+                    subtitle = ht("诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件"),
+                    enabled = !exporting, onClick = onExport,
+                    trailing = { if (exporting) HomeSpinner(size = 20.dp, color = c.accent) else ToolsChevron() },
+                )
+            }
         }
         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
             ToolsCardTitle("运行记录")

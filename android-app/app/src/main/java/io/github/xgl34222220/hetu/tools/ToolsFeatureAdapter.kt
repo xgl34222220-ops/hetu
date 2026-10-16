@@ -270,6 +270,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             },
             startupConfig = { proxy.startupConfig() },
             diagnostics = { proxy.diagnostics() },
+            exportDiagnostics = { io.github.xgl34222220.hetu.HxDiagnosticsBundle.build(app, report = { proxy.diagnostics() }) },
             restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
             onCopy = { label, text ->
                 val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager

@@ -1281,6 +1281,28 @@ private val vocabularyAudit5 = """
 已复制|Copied|已複製|Скопировано
 """.trimIndent()
 
+private val vocabularyFunc400 = """
+导出诊断包|Export diagnostics|匯出診斷包|Экспорт диагностики
+诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件|Diagnostics, watchdog and core logs, routing and iptables state in one text file|診斷資訊、看門狗與核心日誌、路由與 iptables 狀態，儲存為一個文字檔|Диагностика, журналы сторожа и ядра, маршруты и iptables в одном текстовом файле
+诊断包导出失败|Could not export diagnostics|診斷包匯出失敗|Не удалось экспортировать диагностику
+诊断包已导出|Diagnostics exported|診斷包已匯出|Диагностика экспортирована
+没有可用的文件保存应用|No app available to save files|沒有可用的檔案儲存應用|Нет приложения для сохранения файлов
+下载到的是网页而不是配置，请检查链接是否正确或需要登录|The link returned a web page, not a config. Check the link or whether it needs a sign-in|下載到的是網頁而不是設定，請檢查連結是否正確或需要登入|По ссылке получена веб-страница, а не конфигурация. Проверьте ссылку или необходимость входа
+隐藏|Hide|隱藏|Скрыть
+已停止|Stopped|已停止|Остановлен
+正在重载…|Reloading…|正在重新載入…|Перезагрузка…
+正在读取代理状态…|Reading proxy status…|正在讀取代理狀態…|Чтение состояния прокси…
+暂时无法读取代理状态|Proxy status is unavailable for now|暫時無法讀取代理狀態|Состояние прокси пока недоступно
+河图 · 代理状态|Hetu · Proxy status|河圖 · 代理狀態|Hetu · Состояние прокси
+上次操作失败|Last action failed|上次操作失敗|Последнее действие не удалось
+通知栏操作失败|Notification action failed|通知列操作失敗|Действие из уведомления не удалось
+代理切换失败|Could not switch the proxy|代理切換失敗|Не удалось переключить прокси
+河图代理|Hetu proxy|河圖代理|Прокси Hetu
+切换失败|Switch failed|切換失敗|Сбой переключения
+切换中…|Switching…|切換中…|Переключение…
+未获得 Root 权限，河图无法接管网络。请在 Magisk / KernelSU / APatch 中允许河图后重试。|Root access is not granted, so Hetu cannot take over the network. Allow Hetu in Magisk / KernelSU / APatch and try again.|未取得 Root 權限，河圖無法接管網路。請在 Magisk / KernelSU / APatch 中允許河圖後重試。|Нет прав Root, Hetu не может управлять сетью. Разрешите Hetu в Magisk / KernelSU / APatch и повторите.
+""".trimIndent()
+
 private val vocabularyAudit4Func = """
 直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
 上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
@@ -1348,7 +1370,7 @@ private val vocabularyHomeProbe333 = """
 """.trimIndent()
 
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333).joinToString("\n")
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

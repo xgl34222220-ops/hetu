@@ -154,6 +154,10 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-15 3.3.3 polish (audit5 G7): the opt-in subscription expiry/traffic alert also runs as a
     # second periodic job of the already-declared UpdateJobService (no manifest/permission change).
     PACKAGE + 'UpdateJobService.java',
+    # 2026-10-16 4.0.0 function pass (func-400 N1-N3/T1-T2): the status notification offers 启动 while
+    # stopped, shows a failed control's reason and follows the App language; the Quick Settings tile
+    # follows the App language, toasts the failure reason and is re-read after an in-App start/stop.
+    PACKAGE + 'ProxyStatusNotificationService.kt', PACKAGE + 'HetuProxyTileService.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
