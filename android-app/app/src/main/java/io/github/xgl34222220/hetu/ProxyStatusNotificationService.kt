@@ -40,6 +40,7 @@ class ProxyStatusNotificationService : Service() {
     private var lastProcessTicks = 0L
     private var lastSystemTicks = 0L
     private var cpuPercent = 0f
+    @Volatile private var controlBusy = false
 
     override fun onCreate() {
         super.onCreate()
@@ -67,12 +68,14 @@ class ProxyStatusNotificationService : Service() {
             ACTION_RELOAD -> runControl("正在重载…") { controller.reload() }
             ACTION_RESTART -> runControl("正在重启…") { controller.restart() }
             ACTION_STOP_PROXY -> runControl("正在停止…") { controller.stop() }
+            // func-400 N1: the 「停止」 slot becomes 「启动」 while the proxy is stopped.
+            ACTION_START_PROXY -> runControl("正在启动…") { controller.start() }
         }
         if (!prefs.getBoolean(PREF_ENABLED, false)) {
             stopSelf()
             return START_NOT_STICKY
         }
-        ensureForeground("正在读取代理状态…")
+        ensureForeground(text("正在读取代理状态…"))
         if (loopJob?.isActive != true) {
             loopJob = scope.launch {
                 while (isActive && prefs.getBoolean(PREF_ENABLED, false)) {
@@ -86,23 +89,42 @@ class ProxyStatusNotificationService : Service() {
     }
 
     private fun runControl(stage: String, action: suspend () -> Any?) {
-        ensureForeground(stage)
+        // One control at a time: a second tap while starting/stopping is ignored, not queued.
+        if (controlBusy) return
+        controlBusy = true
+        ensureForeground(text(stage))
         scope.launch {
             try {
                 action()
+                prefs.edit().remove(PREF_ERROR).remove(PREF_ERROR_AT).apply()
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                prefs.edit().putString("proxyStatusNotificationError", error.message ?: "通知栏操作失败").apply()
+                // func-400 N2: the failure is shown in the notification itself (for ten minutes).
+                prefs.edit().putString(PREF_ERROR, hxErrorMessage(error, "通知栏操作失败"))
+                    .putLong(PREF_ERROR_AT, System.currentTimeMillis()).apply()
+            } finally {
+                controlBusy = false
             }
+            runCatching { HetuProxyTileService.requestRefresh(this@ProxyStatusNotificationService) }
             updateNotification()
         }
     }
 
+    /** func-400 N3: notification texts follow the App language (hxPlainText, as toasts do). */
+    private fun text(source: String): String = runCatching { hxPlainText(this, source) }.getOrDefault(source)
+
+    /** The last control failure while it is recent, else blank. */
+    private fun recentError(): String {
+        val at = prefs.getLong(PREF_ERROR_AT, 0L)
+        if (at <= 0L || System.currentTimeMillis() - at > ERROR_VISIBLE_MS) return ""
+        return prefs.getString(PREF_ERROR, "").orEmpty()
+    }
+
     private suspend fun updateNotification() {
         val state = runCatching { controller.state() }.getOrElse {
-            val body = prefs.getString("proxyStatusNotificationError", "").orEmpty().ifBlank { "暂时无法读取代理状态" }
-            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification("河图 · 代理状态", body, false))
+            val body = prefs.getString(PREF_ERROR, "").orEmpty().ifBlank { text("暂时无法读取代理状态") }
+            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text("河图 · 代理状态"), body, false))
             return
         }
         val runtime = runCatching { inspector.sample() }.getOrDefault(ProxyRuntimeSnapshot(running = state.running))
@@ -132,7 +154,7 @@ class ProxyStatusNotificationService : Service() {
         lastSystemTicks = runtime.systemTicks
 
         val values = mapOf(
-            "status" to if (state.running) "运行中" else "已停止",
+            "status" to text(if (state.running) "运行中" else "已停止"),
             "uptime" to HxFormat.duration(runtime.elapsedSeconds),
             "upload" to HxFormat.speed(uploadRate),
             "download" to HxFormat.speed(downloadRate),
@@ -153,6 +175,7 @@ class ProxyStatusNotificationService : Service() {
             body = body.replace("{$key}", value)
             title = title.replace("{$key}", value)
         }
+        recentError().takeIf { it.isNotBlank() }?.let { body = text("上次操作失败") + "：" + it + "\n" + body }
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, buildNotification(title, body, state.running))
     }
@@ -184,7 +207,8 @@ class ProxyStatusNotificationService : Service() {
             prefs.getString(PREF_ACTION_3, "stop").orEmpty() to prefs.getString(PREF_ACTION_LABEL_3, "").orEmpty(),
         )
         actions.filter { it.first != "none" }.forEachIndexed { index, (action, customLabel) ->
-            actionSpec(action, running)?.let { (defaultLabel, intentAction) ->
+            actionSpec(action, running)?.let { (rawLabel, intentAction) ->
+                val defaultLabel = text(rawLabel)
                 val pending = PendingIntent.getService(
                     this,
                     40 + index,
@@ -201,15 +225,15 @@ class ProxyStatusNotificationService : Service() {
     private fun actionSpec(value: String, running: Boolean): Pair<String, String>? = when (value) {
         "reload" -> if (running) "重载" to ACTION_RELOAD else null
         "restart" -> if (running) "重启" to ACTION_RESTART else null
-        "stop" -> if (running) "停止" to ACTION_STOP_PROXY else null
+        "stop" -> if (running) "停止" to ACTION_STOP_PROXY else "启动" to ACTION_START_PROXY
         "hide" -> "隐藏" to ACTION_DISABLE
         else -> null
     }
 
-    private fun ensureForeground(text: String) {
+    private fun ensureForeground(stageText: String) {
         val notification = buildNotification(
-            "河图 · 代理状态",
-            text,
+            text("河图 · 代理状态"),
+            stageText,
             prefs.getBoolean("proxyRootRuntimeRunning", false) && prefs.getBoolean("proxyRootWanted", false),
         )
         if (Build.VERSION.SDK_INT >= 34) {
@@ -247,6 +271,10 @@ class ProxyStatusNotificationService : Service() {
         private const val ACTION_RELOAD = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_RELOAD"
         private const val ACTION_RESTART = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_RESTART"
         private const val ACTION_STOP_PROXY = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_STOP_PROXY"
+        private const val ACTION_START_PROXY = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_START_PROXY"
+        const val PREF_ERROR = "proxyStatusNotificationError"
+        const val PREF_ERROR_AT = "proxyStatusNotificationErrorAt"
+        const val ERROR_VISIBLE_MS = 10 * 60_000L
 
         fun setEnabled(context: Context, enabled: Boolean) {
             context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putBoolean(PREF_ENABLED, enabled).apply()

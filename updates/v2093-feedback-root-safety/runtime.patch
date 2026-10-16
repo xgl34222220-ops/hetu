@@ -51968,6 +51968,82 @@ index 0000000..e476de3
 +        return "'" + value.replace("'", "'\\''") + "'";
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt
+index 21dd3d3..398eaf5 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt
+@@ -1,6 +1,9 @@
+ package io.github.xgl34222220.hetu
+
++import android.content.ComponentName
++import android.content.Context
+ import android.os.Build
++import android.widget.Toast
+ import android.service.quicksettings.Tile
+ import android.service.quicksettings.TileService
+ import kotlinx.coroutines.CancellationException
+@@ -44,7 +47,7 @@ class HetuProxyTileService : TileService() {
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (failure: Exception) {
+-                error = failure.message ?: "代理切换失败"
++                error = hxErrorMessage(failure, "代理切换失败")
+                 getSharedPreferences("hetu", MODE_PRIVATE)
+                     .edit()
+                     .putString("proxyTileLastError", error)
+@@ -53,6 +56,10 @@ class HetuProxyTileService : TileService() {
+                 switching = false
+                 withContext(Dispatchers.Main) {
+                     renderTile(error = error)
++                    // func-400 T1: the reason is shown, not only 「切换失败」 in the tile subtitle.
++                    if (error.isNotBlank()) runCatching {
++                        Toast.makeText(applicationContext, text("代理切换失败") + "：" + error, Toast.LENGTH_LONG).show()
++                    }
+                 }
+             }
+         }
+@@ -61,25 +68,38 @@ class HetuProxyTileService : TileService() {
+     private fun renderTile(stage: String = "", error: String = "") {
+         val tile = qsTile ?: return
+         val running = ProxyStatusBridge.rootProxyRunning(this)
+-        tile.label = "河图代理"
++        tile.label = text("河图代理")
+         tile.state = when {
+             switching -> Tile.STATE_UNAVAILABLE
+             running -> Tile.STATE_ACTIVE
+             else -> Tile.STATE_INACTIVE
+         }
+         if (Build.VERSION.SDK_INT >= 29) {
+-            tile.subtitle = when {
++            tile.subtitle = text(when {
+                 error.isNotBlank() -> "切换失败"
+                 stage.isNotBlank() -> stage
+                 running -> "运行中"
+                 else -> "已停止"
+-            }
++            })
+         }
+         tile.updateTile()
+     }
+
++    /** func-400 T1: tile texts follow the App language, as toasts do. */
++    private fun text(source: String): String = runCatching { hxPlainText(this, source) }.getOrDefault(source)
++
+     override fun onDestroy() {
+         scope.cancel()
+         super.onDestroy()
+     }
++
++    companion object {
++        /**
++         * func-400 T2: asks System UI to re-read the tile after the proxy was started or stopped
++         * elsewhere (App, notification, shortcut), so an open Quick Settings panel is not stale.
++         */
++        fun requestRefresh(context: Context) {
++            runCatching { TileService.requestListeningState(context, ComponentName(context, HetuProxyTileService::class.java)) }
++        }
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
 index 0000000..3d9f572
@@ -58294,6 +58370,139 @@ index 190ce6c..4f03ba6 100644
          )
      }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
+index bb3e75d..6a2d41a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
+@@ -40,6 +40,7 @@ class ProxyStatusNotificationService : Service() {
+     private var lastProcessTicks = 0L
+     private var lastSystemTicks = 0L
+     private var cpuPercent = 0f
++    @Volatile private var controlBusy = false
+
+     override fun onCreate() {
+         super.onCreate()
+@@ -67,12 +68,14 @@ class ProxyStatusNotificationService : Service() {
+             ACTION_RELOAD -> runControl("正在重载…") { controller.reload() }
+             ACTION_RESTART -> runControl("正在重启…") { controller.restart() }
+             ACTION_STOP_PROXY -> runControl("正在停止…") { controller.stop() }
++            // func-400 N1: the 「停止」 slot becomes 「启动」 while the proxy is stopped.
++            ACTION_START_PROXY -> runControl("正在启动…") { controller.start() }
+         }
+         if (!prefs.getBoolean(PREF_ENABLED, false)) {
+             stopSelf()
+             return START_NOT_STICKY
+         }
+-        ensureForeground("正在读取代理状态…")
++        ensureForeground(text("正在读取代理状态…"))
+         if (loopJob?.isActive != true) {
+             loopJob = scope.launch {
+                 while (isActive && prefs.getBoolean(PREF_ENABLED, false)) {
+@@ -86,23 +89,42 @@ class ProxyStatusNotificationService : Service() {
+     }
+
+     private fun runControl(stage: String, action: suspend () -> Any?) {
+-        ensureForeground(stage)
++        // One control at a time: a second tap while starting/stopping is ignored, not queued.
++        if (controlBusy) return
++        controlBusy = true
++        ensureForeground(text(stage))
+         scope.launch {
+             try {
+                 action()
++                prefs.edit().remove(PREF_ERROR).remove(PREF_ERROR_AT).apply()
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                prefs.edit().putString("proxyStatusNotificationError", error.message ?: "通知栏操作失败").apply()
++                // func-400 N2: the failure is shown in the notification itself (for ten minutes).
++                prefs.edit().putString(PREF_ERROR, hxErrorMessage(error, "通知栏操作失败"))
++                    .putLong(PREF_ERROR_AT, System.currentTimeMillis()).apply()
++            } finally {
++                controlBusy = false
+             }
++            runCatching { HetuProxyTileService.requestRefresh(this@ProxyStatusNotificationService) }
+             updateNotification()
+         }
+     }
+
++    /** func-400 N3: notification texts follow the App language (hxPlainText, as toasts do). */
++    private fun text(source: String): String = runCatching { hxPlainText(this, source) }.getOrDefault(source)
++
++    /** The last control failure while it is recent, else blank. */
++    private fun recentError(): String {
++        val at = prefs.getLong(PREF_ERROR_AT, 0L)
++        if (at <= 0L || System.currentTimeMillis() - at > ERROR_VISIBLE_MS) return ""
++        return prefs.getString(PREF_ERROR, "").orEmpty()
++    }
++
+     private suspend fun updateNotification() {
+         val state = runCatching { controller.state() }.getOrElse {
+-            val body = prefs.getString("proxyStatusNotificationError", "").orEmpty().ifBlank { "暂时无法读取代理状态" }
+-            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification("河图 · 代理状态", body, false))
++            val body = prefs.getString(PREF_ERROR, "").orEmpty().ifBlank { text("暂时无法读取代理状态") }
++            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text("河图 · 代理状态"), body, false))
+             return
+         }
+         val runtime = runCatching { inspector.sample() }.getOrDefault(ProxyRuntimeSnapshot(running = state.running))
+@@ -132,7 +154,7 @@ class ProxyStatusNotificationService : Service() {
+         lastSystemTicks = runtime.systemTicks
+
+         val values = mapOf(
+-            "status" to if (state.running) "运行中" else "已停止",
++            "status" to text(if (state.running) "运行中" else "已停止"),
+             "uptime" to HxFormat.duration(runtime.elapsedSeconds),
+             "upload" to HxFormat.speed(uploadRate),
+             "download" to HxFormat.speed(downloadRate),
+@@ -153,6 +175,7 @@ class ProxyStatusNotificationService : Service() {
+             body = body.replace("{$key}", value)
+             title = title.replace("{$key}", value)
+         }
++        recentError().takeIf { it.isNotBlank() }?.let { body = text("上次操作失败") + "：" + it + "\n" + body }
+         getSystemService(NotificationManager::class.java)
+             .notify(NOTIFICATION_ID, buildNotification(title, body, state.running))
+     }
+@@ -184,7 +207,8 @@ class ProxyStatusNotificationService : Service() {
+             prefs.getString(PREF_ACTION_3, "stop").orEmpty() to prefs.getString(PREF_ACTION_LABEL_3, "").orEmpty(),
+         )
+         actions.filter { it.first != "none" }.forEachIndexed { index, (action, customLabel) ->
+-            actionSpec(action, running)?.let { (defaultLabel, intentAction) ->
++            actionSpec(action, running)?.let { (rawLabel, intentAction) ->
++                val defaultLabel = text(rawLabel)
+                 val pending = PendingIntent.getService(
+                     this,
+                     40 + index,
+@@ -201,15 +225,15 @@ class ProxyStatusNotificationService : Service() {
+     private fun actionSpec(value: String, running: Boolean): Pair<String, String>? = when (value) {
+         "reload" -> if (running) "重载" to ACTION_RELOAD else null
+         "restart" -> if (running) "重启" to ACTION_RESTART else null
+-        "stop" -> if (running) "停止" to ACTION_STOP_PROXY else null
++        "stop" -> if (running) "停止" to ACTION_STOP_PROXY else "启动" to ACTION_START_PROXY
+         "hide" -> "隐藏" to ACTION_DISABLE
+         else -> null
+     }
+
+-    private fun ensureForeground(text: String) {
++    private fun ensureForeground(stageText: String) {
+         val notification = buildNotification(
+-            "河图 · 代理状态",
+-            text,
++            text("河图 · 代理状态"),
++            stageText,
+             prefs.getBoolean("proxyRootRuntimeRunning", false) && prefs.getBoolean("proxyRootWanted", false),
+         )
+         if (Build.VERSION.SDK_INT >= 34) {
+@@ -247,6 +271,10 @@ class ProxyStatusNotificationService : Service() {
+         private const val ACTION_RELOAD = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_RELOAD"
+         private const val ACTION_RESTART = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_RESTART"
+         private const val ACTION_STOP_PROXY = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_STOP_PROXY"
++        private const val ACTION_START_PROXY = "io.github.xgl34222220.hetu.STATUS_NOTIFICATION_START_PROXY"
++        const val PREF_ERROR = "proxyStatusNotificationError"
++        const val PREF_ERROR_AT = "proxyStatusNotificationErrorAt"
++        const val ERROR_VISIBLE_MS = 10 * 60_000L
+
+         fun setEnabled(context: Context, enabled: Boolean) {
+             context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putBoolean(PREF_ENABLED, enabled).apply()
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
 index 93a3d3d..3462cef 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
@@ -62692,10 +62901,10 @@ index 63c8e03..47e4143 100644
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
 new file mode 100644
-index 0000000..6c1130f
+index 0000000..1aa1d9b
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,172 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -62737,6 +62946,11 @@ index 0000000..6c1130f
 +
 +    private val configKeys = Regex("^(proxies|proxy-providers|proxy-groups|rules)\\s*:", RegexOption.MULTILINE)
 +
++    private val htmlStart = Regex("^\\s*<(?:!doctype\\s+html|html|head|body)[\\s>]", RegexOption.IGNORE_CASE)
++
++    /** True when [text] opens like an HTML document (a portal, login or error page). */
++    fun looksLikeHtml(text: String): Boolean = htmlStart.containsMatchIn(text.take(512))
++
 +    /** True when [text] has at least one top-level Clash/Mihomo section a usable config needs. */
 +    fun looksLikeConfig(text: String): Boolean = configKeys.containsMatchIn(text)
 +
@@ -62756,6 +62970,8 @@ index 0000000..6c1130f
 +        val body = text.removePrefix("\uFEFF")
 +        if (body.isBlank()) throw IOException("配置为空")
 +        if (body.indexOf('\u0000') >= 0) throw IOException("配置不是文本文件")
++        // func-400 S3: a login / captcha / error page is not a config; say so instead of hinting Base64.
++        if (looksLikeHtml(body) && !looksLikeConfig(body)) throw IOException("下载到的是网页而不是配置，请检查链接是否正确或需要登录")
 +        if (!looksLikeConfig(body)) throw IOException("内容不是 Clash/Mihomo YAML 配置（可能是 Base64 节点列表，请改用「添加订阅」）")
 +        return body
 +    }
@@ -62819,8 +63035,30 @@ index 0000000..6c1130f
 +        readBounded(context.contentResolver.openInputStream(uri) ?: throw IOException("无法读取配置文件"))
 +    }
 +
-+    /** Downloads a full YAML config. Returns the body and the file name the server suggested (may be blank). */
++    /**
++     * Downloads a full YAML config. Returns the body and the file name the server suggested (may be blank).
++     * func-400 S1: a transient failure (timeout, reset, HTTP 408/429/5xx) is tried up to three times
++     * with a short backoff; a final answer (4xx, TLS, oversize) is reported at once.
++     */
 +    suspend fun download(url: String): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
++        var attempt = 0
++        var result: Pair<ByteArray, String>? = null
++        while (result == null) {
++            result = try {
++                downloadOnce(url)
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: IOException) {
++                if (attempt >= HxNetRetry.DOWNLOAD_BACKOFF_MS.size || !HxNetRetry.transient(error)) throw error
++                kotlinx.coroutines.delay(HxNetRetry.DOWNLOAD_BACKOFF_MS[attempt])
++                attempt++
++                null
++            }
++        }
++        checkNotNull(result)
++    }
++
++    private fun downloadOnce(url: String): Pair<ByteArray, String> {
 +        val connection = (URL(url).openConnection() as? HttpURLConnection) ?: throw IOException("请输入有效的 http/https 链接")
 +        try {
 +            connection.connectTimeout = 15_000
@@ -62833,7 +63071,7 @@ index 0000000..6c1130f
 +            val disposition = connection.getHeaderField("Content-Disposition").orEmpty()
 +            val suggested = Regex("filename\\*?=(?:UTF-8'')?\"?([^\";]+)\"?", RegexOption.IGNORE_CASE)
 +                .find(disposition)?.groupValues?.getOrNull(1)?.let { Uri.decode(it) }.orEmpty()
-+            readBounded(connection.inputStream) to suggested
++            return readBounded(connection.inputStream) to suggested
 +        } finally {
 +            connection.disconnect()
 +        }
@@ -63733,7 +63971,7 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..11edaad 100644
+index 250b8a8..60c7718 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -16,11 +16,14 @@ import androidx.lifecycle.AndroidViewModel
@@ -63823,13 +64061,13 @@ index 250b8a8..11edaad 100644
 +        if (text.isBlank()) return
 +        explicitToastTones.remove(text)
 +        _messages.tryEmit(text)
-     }
++    }
 +    /** Posts [text] with a fixed colour instead of reading it from the wording. */
 +    fun toastAs(tone: HxTone, text: String) {
 +        if (text.isBlank()) return
 +        explicitToastTones[text] = tone
 +        _messages.tryEmit(text)
-+    }
+     }
 +    /** The tone of a posted toast: the caller's explicit tone, else the keyword fallback. */
 +    internal fun toastTone(text: String): HxTone = explicitToastTones[text] ?: hxToastTone(text)
 
@@ -64129,7 +64367,7 @@ index 250b8a8..11edaad 100644
              finally { autoStartBusy = false; bumpSettings() }
          }
      }
-@@ -674,24 +849,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -674,33 +849,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          val stopping = state.running
          invalidateRuntimeRequests()
          operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
@@ -64172,7 +64410,11 @@ index 250b8a8..11edaad 100644
                          "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                      } else if (configProblem) {
                          reason
-@@ -700,7 +888,47 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
++                    } else if (!HxRootCheck.granted(app)) {
++                        // func-400 E1: without Root every diagnostic read fails too; say what to fix.
++                        HxRootCheck.message(reason)
+                     } else {
+                         val diagnostics = try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
                          if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                      }
                  } else {
@@ -64182,6 +64424,8 @@ index 250b8a8..11edaad 100644
 +            } finally {
 +                operation = null
 +                operationText = ""
++                // func-400 T2: an open Quick Settings panel re-reads the tile after an in-App start/stop.
++                HetuProxyTileService.requestRefresh(app)
 +                refreshNow()
 +            }
 +        }
@@ -64221,7 +64465,7 @@ index 250b8a8..11edaad 100644
                  }
              } finally {
                  operation = null
-@@ -727,14 +955,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -727,14 +960,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              operationText = "正在重启…"
              ProxyRuntimeSettings.beginApply(prefs)
              try {
@@ -64239,7 +64483,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -746,6 +974,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +979,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -64253,7 +64497,7 @@ index 250b8a8..11edaad 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -755,7 +990,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -755,7 +995,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64262,7 +64506,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -764,8 +999,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +1004,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -64297,7 +64541,7 @@ index 250b8a8..11edaad 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,19 +1034,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,19 +1039,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64333,7 +64577,7 @@ index 250b8a8..11edaad 100644
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
          if (current.now == node || current.nodes.none { it.name == node }) return
-@@ -827,13 +1101,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,13 +1106,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -64355,7 +64599,7 @@ index 250b8a8..11edaad 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1122,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1127,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -64394,7 +64638,7 @@ index 250b8a8..11edaad 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1157,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1162,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -64415,7 +64659,7 @@ index 250b8a8..11edaad 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1179,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1184,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -64471,7 +64715,7 @@ index 250b8a8..11edaad 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,22 +1255,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,22 +1260,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -64587,7 +64831,7 @@ index 250b8a8..11edaad 100644
      fun measureSites() {
          val request = activeRuntimeRequest() ?: return
          if (siteTesting) return
-@@ -964,7 +1379,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1384,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64596,7 +64840,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1396,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1401,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64605,7 +64849,7 @@ index 250b8a8..11edaad 100644
              }
          }
      }
-@@ -995,7 +1410,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1415,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64614,7 +64858,7 @@ index 250b8a8..11edaad 100644
              }
          }
      }
-@@ -1014,7 +1429,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1434,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64623,7 +64867,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1448,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1453,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64632,7 +64876,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1456,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1461,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -64641,7 +64885,7 @@ index 250b8a8..11edaad 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1488,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1493,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -64650,7 +64894,7 @@ index 250b8a8..11edaad 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1549,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1554,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64659,7 +64903,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1153,18 +1568,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1153,18 +1573,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val fresh = repo.providers()
                  if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                      providers = fresh
@@ -64681,7 +64925,7 @@ index 250b8a8..11edaad 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1175,6 +1591,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1175,6 +1596,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                  beginProviderRead()
                  if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
@@ -64689,7 +64933,7 @@ index 250b8a8..11edaad 100644
                  providerTasks[name] = HxTask(ok = true, message = "已更新")
                  refreshNow()
              } catch (cancel: CancellationException) {
-@@ -1193,7 +1610,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1615,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -64698,7 +64942,27 @@ index 250b8a8..11edaad 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1239,6 +1656,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1216,7 +1638,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                             async {
+                                 if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
+                                 try {
+-                                    repo.refreshProvider(item.name)
++                                    // func-400 S2: one quiet retry for a transient failure (timeout, 5xx,
++                                    // a provider busy with its own interval update) before reporting it.
++                                    try {
++                                        repo.refreshProvider(item.name)
++                                    } catch (cancel: CancellationException) {
++                                        throw cancel
++                                    } catch (first: Exception) {
++                                        if (!HxNetRetry.transient(first)) throw first
++                                        delay(HxNetRetry.PROVIDER_RETRY_DELAY_MS)
++                                        if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
++                                        repo.refreshProvider(item.name)
++                                    }
+                                     if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
+                                         providerTasks[item.name] = HxTask(ok = true, message = "已更新")
+                                         ok++
+@@ -1239,6 +1672,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                  if (readOwner == latestProviderRead) {
                      providers = fresh
@@ -64706,7 +64970,7 @@ index 250b8a8..11edaad 100644
                      lastProviderRefreshAt = SystemClock.elapsedRealtime()
                  }
                  toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
-@@ -1246,7 +1664,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1246,7 +1680,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -64715,7 +64979,7 @@ index 250b8a8..11edaad 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1263,6 +1681,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1697,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -65405,6 +65669,117 @@ index e337597..5b0c7a4 100644
 +    }
 +    return progressive
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDiagnosticsBundle.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDiagnosticsBundle.kt
+new file mode 100644
+index 0000000..b4ef1da
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDiagnosticsBundle.kt
+@@ -0,0 +1,105 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.net.Uri
++import android.os.Build
++import java.io.IOException
++import java.text.SimpleDateFormat
++import java.util.Date
++import java.util.Locale
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/**
++ * func-400 D1: 工具 › 诊断与维护 › 导出诊断包.
++ *
++ * One text file with everything a network-loss / start-failure report needs: the existing
++ * 消息与网络诊断 report (already redacted), plus the self-heal state the watchdog keeps under
++ * /data/adb/hetu/run (watchdog.log, selfheal/egress/cgroup-escape state, Wi-Fi heal count), the
++ * policy-routing / iptables state and the core processes. Read-only: the Root command only reads
++ * files and lists rules; nothing is started, stopped or rewritten. Controller secret and full URLs
++ * are redacted with the same [DiagnosticReport.redact] as the on-screen report.
++ */
++internal object HxDiagnosticsBundle {
++    const val MIME = "text/plain"
++    private const val RUN = "/data/adb/hetu/run"
++    private const val ROOT_TIMEOUT_MS = 15_000L
++    private const val SECTION_LIMIT = 400_000
++
++    fun fileName(now: Long = System.currentTimeMillis()): String =
++        "hetu-diagnostics-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(now)) + ".txt"
++
++    /** The read-only Root script; every step tolerates a missing file or tool. */
++    val ROOT_COMMAND: String = listOf(
++        "R=$RUN",
++        "for f in start-state last-start-error last-crash selfheal-state egress-state cgroup-escape rollback-state " +
++            "network-repair-at sysctl-tune.state state/selfheal-budget state/wifi-reconnects state/core.kind; do " +
++            "echo \"--- \$f ---\"; cat \"\$R/\$f\" 2>/dev/null; echo; done",
++        "echo '--- watchdog.log (last 300 lines) ---'; tail -n 300 \"\$R/watchdog.log\" 2>/dev/null",
++        "echo '--- network-repair.log ---'; tail -n 60 \"\$R/network-repair.log\" 2>/dev/null",
++        "echo '--- ebpf.log ---'; tail -n 40 \"\$R/ebpf.log\" 2>/dev/null",
++        "echo '--- share.log ---'; tail -n 30 \"\$R/share.log\" 2>/dev/null",
++        "echo '--- core.log (last 200 lines) ---'; tail -n 200 \"\$R/core.log\" 2>/dev/null",
++        "echo '--- processes ---'; ps -A -o PID,PPID,STAT,NAME 2>/dev/null | grep -iE 'mihomo|clash|sing-box|xray|v2ray|hysteria|hetu' | grep -v grep",
++        "echo '--- ip rule ---'; ip rule show 2>/dev/null; echo '--- ip -6 rule ---'; ip -6 rule show 2>/dev/null",
++        "echo '--- ip route (policy tables) ---'; ip route show table all 2>/dev/null | grep -vE '^(local|broadcast) ' | head -n 120",
++        "echo '--- iptables mangle ---'; iptables-save -t mangle 2>/dev/null | head -n 260",
++        "echo '--- iptables nat ---'; iptables-save -t nat 2>/dev/null | head -n 200",
++        "echo '--- iptables filter (Hetu) ---'; iptables-save -t filter 2>/dev/null | grep -E 'HETU|BICHEN|^\\*|^:' | head -n 160",
++        "echo '--- ip6tables mangle ---'; ip6tables-save -t mangle 2>/dev/null | head -n 200",
++        "echo '--- ip6tables nat ---'; ip6tables-save -t nat 2>/dev/null | head -n 120",
++        "echo '--- connectivity ---'; dumpsys connectivity 2>/dev/null | grep -E 'NetworkAgentInfo|VALIDATED|PARTIAL_CONNECTIVITY|CAPTIVE|Active default network' | head -n 40",
++        "true",
++    ).joinToString("\n")
++
++    /** Device / App header; no identifiers beyond model and versions. */
++    fun header(context: Context, now: Long = System.currentTimeMillis()): String {
++        val version = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
++        return buildString {
++            append("河图诊断包 / Hetu diagnostics\n")
++            append("time=").append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(Date(now))).append('\n')
++            append("app=").append(version).append('\n')
++            append("device=").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n')
++            append("android=").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n")
++            append("abis=").append(Build.SUPPORTED_ABIS.joinToString(",")).append('\n')
++            append("note=密钥与完整 URL 已脱敏；包含本机 IP 与路由信息，分享前请确认\n")
++        }
++    }
++
++    /**
++     * Builds the bundle. [report] is the existing on-screen diagnostics; [rootRead] runs [ROOT_COMMAND]
++     * (replaceable in tests). A failing part is written as its error text, never aborting the bundle.
++     */
++    suspend fun build(
++        context: Context,
++        report: suspend () -> String,
++        rootRead: (String) -> String = { command -> readRoot(context, command) },
++    ): String = withContext(Dispatchers.IO) {
++        val secret = context.getSharedPreferences("hetu", Context.MODE_PRIVATE).getString("proxyControllerSecret", "").orEmpty()
++        val diagnostics = try { report() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) {
++            "读取失败：" + hxErrorMessage(error, "读取失败")
++        }
++        val selfHeal = try { rootRead(ROOT_COMMAND) } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) {
++            "读取失败：" + hxErrorMessage(error, "读取失败")
++        }
++        buildString {
++            append(header(context)).append('\n')
++            append("===== 消息与网络诊断 =====\n")
++            append(DiagnosticReport.redact(diagnostics, secret).take(SECTION_LIMIT)).append("\n\n")
++            append("===== 看门狗 / 自愈 / 路由与防火墙状态 =====\n")
++            append(DiagnosticReport.redact(selfHeal, secret).take(SECTION_LIMIT)).append('\n')
++        }
++    }
++
++    private fun readRoot(context: Context, command: String): String {
++        val result = RootBridge.rootShell(context, command, ROOT_TIMEOUT_MS)
++        return if (result.ok()) result.output else "exit=${result.code}\n${result.output}"
++    }
++
++    /** Writes [text] to the document the user picked. */
++    suspend fun write(context: Context, uri: Uri, text: String) = withContext(Dispatchers.IO) {
++        val output = context.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("无法写入导出文件")
++        output.use { it.write(text.toByteArray(Charsets.UTF_8)) }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxDirectProbe.kt
 new file mode 100644
 index 0000000..96449d6
@@ -65992,6 +66367,57 @@ index 241408e..3bf669d 100644
 +internal fun androidx.compose.foundation.lazy.LazyItemScope.hxAnimateItem(motion: Boolean = hxMotion()): Modifier =
 +    if (motion) Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
 +    else Modifier
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxNetRetry.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxNetRetry.kt
+new file mode 100644
+index 0000000..0664abe
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxNetRetry.kt
+@@ -0,0 +1,45 @@
++package io.github.xgl34222220.hetu
++
++import java.io.EOFException
++import java.io.InterruptedIOException
++import java.net.ConnectException
++import java.net.NoRouteToHostException
++import java.net.SocketException
++import java.net.UnknownHostException
++import javax.net.ssl.SSLException
++
++/**
++ * func-400 S1/S2: which download / subscription failures are worth one more attempt.
++ *
++ * Transient = the network or the server hiccupped (timeout, reset, refused, DNS during a network
++ * switch, HTTP 408 / 425 / 429 / 5xx). A 4xx answer (bad link, expired token), a TLS / certificate
++ * failure, an oversize or non-config body are final: retrying them only delays the real message.
++ */
++internal object HxNetRetry {
++    const val PROVIDER_RETRY_DELAY_MS = 1_500L
++    /** Waits before the 2nd and 3rd download attempt. */
++    val DOWNLOAD_BACKOFF_MS = longArrayOf(1_000L, 3_000L)
++
++    private val httpStatus = Regex("""HTTP(?:/\d(?:\.\d)?)?\s*[:：]?\s*([1-5]\d{2})(?!\d)""")
++
++    fun transientStatus(code: Int): Boolean = code == 408 || code == 425 || code == 429 || code in 500..599
++
++    fun transient(error: Throwable): Boolean {
++        var cause: Throwable? = error
++        var depth = 0
++        while (cause != null && depth < 6) {
++            when (cause) {
++                is SSLException -> return false
++                // Mihomo answers a failed provider fetch with 503 (body = the fetch error).
++                is MihomoControllerClient.ControllerHttpException -> return transientStatus(cause.statusCode)
++                is InterruptedIOException, is ConnectException, is NoRouteToHostException,
++                is UnknownHostException, is EOFException, is SocketException -> return true
++            }
++            val status = httpStatus.find(cause.message.orEmpty())?.groupValues?.get(1)?.toIntOrNull()
++            if (status != null) return transientStatus(status)
++            cause = cause.cause?.takeIf { it !== cause }
++            depth++
++        }
++        return false
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt
 new file mode 100644
 index 0000000..3798192
@@ -66699,6 +67125,41 @@ index 0000000..5594bbe
 +
 +    private fun sha256(text: String): String =
 +        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxRootCheck.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxRootCheck.kt
+new file mode 100644
+index 0000000..221eb1e
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxRootCheck.kt
+@@ -0,0 +1,29 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/**
++ * func-400 E1: a failed start on a phone where Root is not granted (denied in the Root manager,
++ * no su, a pending grant prompt that timed out) gets one clear instruction instead of a page of
++ * diagnostics that all failed for the same reason.
++ */
++internal object HxRootCheck {
++    const val NO_ROOT = "未获得 Root 权限，河图无法接管网络。请在 Magisk / KernelSU / APatch 中允许河图后重试。"
++
++    /** Runs `id -u` through su (≤5 s); any failure counts as not granted. */
++    suspend fun granted(context: Context): Boolean = withContext(Dispatchers.IO) {
++        try {
++            RootBridge.hasRoot(context)
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (_: Exception) {
++            false
++        }
++    }
++
++    /** The start-failure text: the instruction first, the original reason as detail. */
++    fun message(reason: String): String = if (reason.isBlank()) NO_ROOT else "$NO_ROOT\n\n$reason"
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt
 new file mode 100644
@@ -76647,7 +77108,7 @@ index 67585f1..2702aa2 100644
                              core.latest.isNotBlank() -> HomePill(ht("已是最新"), tone = HomeTone.Good)
                          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-index ee40a76..8c39531 100644
+index ee40a76..d227f15 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 @@ -1,17 +1,25 @@
@@ -76684,15 +77145,31 @@ index ee40a76..8c39531 100644
 
  /**
   * 诊断与维护 (工具 › 诊断工具). Stateless.
-@@ -42,6 +51,7 @@ internal fun ToolsDiagScreen(
+@@ -42,6 +51,9 @@ internal fun ToolsDiagScreen(
      onRestore: () -> Unit,
      modifier: Modifier = Modifier,
      onOpenDiagnosticsDetails: (() -> Unit)? = null,
 +    onRepairRecord: (() -> Unit)? = null,
++    onExport: (() -> Unit)? = null,
++    exporting: Boolean = false,
  ) {
      val c = LocalHomeColors.current
      val checking = state.preflight is ToolsPreflight.Running
-@@ -85,9 +95,16 @@ internal fun ToolsDiagScreen(
+@@ -80,14 +92,30 @@ internal fun ToolsDiagScreen(
+                 AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
+                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
+             )
++            if (onExport != null) {
++                HomeRowDivider(start = HomeRowDims.textStart)
++                ToolsRow(
++                    AnnotatedString(ht("导出诊断包")), icon = ToolsIcons.Share,
++                    subtitle = ht("诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件"),
++                    enabled = !exporting, onClick = onExport,
++                    trailing = { if (exporting) HomeSpinner(size = 20.dp, color = c.accent) else ToolsChevron() },
++                )
++            }
+         }
+         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
              ToolsCardTitle("运行记录")
              ToolsRow(
                  AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,
@@ -76710,7 +77187,7 @@ index ee40a76..8c39531 100644
          }
          HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
              ToolsCardTitle("紧急")
-@@ -108,9 +125,19 @@ internal fun ToolsDiagScreen(
+@@ -108,9 +136,19 @@ internal fun ToolsDiagScreen(
  internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      val palette = remember(c) { ToolsYamlPalette(key = c.t1, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
@@ -76733,7 +77210,7 @@ index ee40a76..8c39531 100644
  }
 
  /** The plain-text report, with 复制. */
-@@ -126,19 +153,29 @@ private fun DiagTextSheet(
+@@ -126,19 +164,29 @@ private fun DiagTextSheet(
      content: ToolsDiagText,
      onCopy: (String) -> Unit,
      modifier: Modifier,
@@ -76797,7 +77274,7 @@ index 9ec8a80..babe6f1 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..e818d42 100644
+index f575100..2d5cdfb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -76830,7 +77307,7 @@ index f575100..e818d42 100644
                      }
                      request.second(message)
                  }
-@@ -183,39 +189,81 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -183,49 +189,93 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              /* ------------------------------ 共享网络 ------------------------------ */
              loadShare = {
                  val live = ProxySharedNetworkInspector.inspect(app)
@@ -76925,7 +77402,10 @@ index f575100..e818d42 100644
              runPreflight = {
                  val (passed, message) = ToolsRuntimeBridge.preflight(app)
                  if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
-@@ -225,7 +273,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+             },
+             startupConfig = { proxy.startupConfig() },
+             diagnostics = { proxy.diagnostics() },
++            exportDiagnostics = { io.github.xgl34222220.hetu.HxDiagnosticsBundle.build(app, report = { proxy.diagnostics() }) },
              restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
              onCopy = { label, text ->
                  val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -76935,7 +77415,7 @@ index f575100..e818d42 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +282,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +283,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
@@ -76948,7 +77428,7 @@ index f575100..e818d42 100644
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -243,6 +298,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -243,6 +299,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          modeLabel = when (chain.mode.lowercase()) { "global" -> "全局"; "direct" -> "直连"; else -> "" },
                          ruleCount = snapshot.count,
                          hits = chain.hits,
@@ -76962,7 +77442,7 @@ index f575100..e818d42 100644
                          allow = snapshot.allow,
                          block = snapshot.block,
                          sources = snapshot.sources.map { source ->
-@@ -262,12 +324,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -262,12 +325,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -76993,7 +77473,7 @@ index f575100..e818d42 100644
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
-@@ -339,10 +418,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+@@ -339,10 +419,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
  /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
  @Composable
  private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
@@ -77026,7 +77506,7 @@ index 378e395..d49eb16 100644
  }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..cb17fc4 100644
+index 40111ed..fd9a0fa 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 @@ -144,17 +144,28 @@ internal data class ToolsBypassState(
@@ -77161,7 +77641,7 @@ index 40111ed..cb17fc4 100644
          return null
      }
 
-@@ -363,10 +428,18 @@ internal class ToolsFeatureActions(
+@@ -363,12 +428,22 @@ internal class ToolsFeatureActions(
      /* CNIP */
      val loadCnIp: (suspend () -> Boolean)? = null,
      val setCnIp: suspend (Boolean) -> Unit = {},
@@ -77179,8 +77659,12 @@ index 40111ed..cb17fc4 100644
 +    val repairSessionRecord: (suspend () -> String)? = null,
      val startupConfig: suspend () -> String = { "" },
      val diagnostics: suspend () -> String = { "" },
++    /** func-400 D1: builds the 导出诊断包 text; null hides the row. */
++    val exportDiagnostics: (suspend () -> String)? = null,
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
-@@ -385,6 +458,12 @@ internal class ToolsFeatureActions(
+     val restoreNetwork: suspend () -> String = { "已停止代理并回滚网络规则" },
+     val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
+@@ -385,6 +460,12 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
@@ -77194,7 +77678,7 @@ index 40111ed..cb17fc4 100644
      val onMessage: (String) -> Unit = {},
  ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-index 6e1e067..08e9255 100644
+index 6e1e067..7a12c24 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 @@ -328,7 +328,10 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
@@ -77232,11 +77716,44 @@ index 6e1e067..08e9255 100644
      )
  }
 
-@@ -388,7 +407,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -357,6 +376,24 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+     var state by remember { mutableStateOf(ToolsDiagState()) }
+     var overlay by remember { mutableStateOf<ToolsDiagOverlay?>(null) }
+
++    // func-400 D1: pick the file first, then collect (Root reads take a few seconds) and write it.
++    val context = androidx.compose.ui.platform.LocalContext.current
++    var exporting by remember { mutableStateOf(false) }
++    // Hosts without an activity-result registry (previews) simply do not offer the row.
++    val canExport = actions.exportDiagnostics != null &&
++        androidx.activity.compose.LocalActivityResultRegistryOwner.current != null
++    val exportLauncher = if (!canExport) null else androidx.activity.compose.rememberLauncherForActivityResult(
++        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(io.github.xgl34222220.hetu.HxDiagnosticsBundle.MIME),
++    ) { uri ->
++        val build = actions.exportDiagnostics
++        if (uri == null || build == null) { exporting = false; return@rememberLauncherForActivityResult }
++        scope.attempt({ error -> exporting = false; actions.onMessage(error.reason("诊断包导出失败")) }) {
++            io.github.xgl34222220.hetu.HxDiagnosticsBundle.write(context, uri, build())
++            exporting = false
++            actions.onMessage("诊断包已导出")
++        }
++    }
++
+     fun preflight() {
+         val runner = actions.runPreflight ?: return
+         if (state.preflight is ToolsPreflight.Running) return
+@@ -388,7 +425,20 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
          onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
          onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
 -        onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
++        onExport = if (exportLauncher == null) null else { {
++            if (!exporting) {
++                exporting = true
++                try { exportLauncher.launch(io.github.xgl34222220.hetu.HxDiagnosticsBundle.fileName()) }
++                catch (_: android.content.ActivityNotFoundException) { exporting = false; actions.onMessage("没有可用的文件保存应用") }
++            }
++        } },
++        exporting = exporting,
 +        onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
 +            { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
 +        } ?: actions.onOpenDiagnosticsDetails,
@@ -77246,7 +77763,7 @@ index 6e1e067..08e9255 100644
          modifier = modifier,
      )
 
-@@ -399,6 +423,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -399,6 +449,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
              ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
          }
@@ -77256,7 +77773,7 @@ index 6e1e067..08e9255 100644
          is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
              ToolsRestoreNetworkDialogCard(
                  loading = current.running,
-@@ -427,7 +454,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -427,7 +480,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
      suspend fun read() {
          val snapshot = (actions.loadAdblock ?: return)()
@@ -77266,7 +77783,7 @@ index 6e1e067..08e9255 100644
      }
 
      fun reload(announce: String? = null) {
-@@ -506,8 +534,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -506,8 +560,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
          },
          onStandaloneDnsChange = { on -> change(state.copy(standaloneDns = on), "独立 DNS 过滤切换失败") { actions.setStandaloneDns(on) } },
          onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
@@ -77915,7 +78432,7 @@ index 9841062..4f452b7 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..b9ced3f 100644
+index 578ce9d..14a14ca 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -77962,7 +78479,7 @@ index 578ce9d..b9ced3f 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,382 @@ private val vocabularyConnection = """
+@@ -969,16 +990,404 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -78258,6 +78775,28 @@ index 578ce9d..b9ced3f 100644
 +已复制|Copied|已複製|Скопировано
 +""".trimIndent()
 +
++private val vocabularyFunc400 = """
++导出诊断包|Export diagnostics|匯出診斷包|Экспорт диагностики
++诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件|Diagnostics, watchdog and core logs, routing and iptables state in one text file|診斷資訊、看門狗與核心日誌、路由與 iptables 狀態，儲存為一個文字檔|Диагностика, журналы сторожа и ядра, маршруты и iptables в одном текстовом файле
++诊断包导出失败|Could not export diagnostics|診斷包匯出失敗|Не удалось экспортировать диагностику
++诊断包已导出|Diagnostics exported|診斷包已匯出|Диагностика экспортирована
++没有可用的文件保存应用|No app available to save files|沒有可用的檔案儲存應用|Нет приложения для сохранения файлов
++下载到的是网页而不是配置，请检查链接是否正确或需要登录|The link returned a web page, not a config. Check the link or whether it needs a sign-in|下載到的是網頁而不是設定，請檢查連結是否正確或需要登入|По ссылке получена веб-страница, а не конфигурация. Проверьте ссылку или необходимость входа
++隐藏|Hide|隱藏|Скрыть
++已停止|Stopped|已停止|Остановлен
++正在重载…|Reloading…|正在重新載入…|Перезагрузка…
++正在读取代理状态…|Reading proxy status…|正在讀取代理狀態…|Чтение состояния прокси…
++暂时无法读取代理状态|Proxy status is unavailable for now|暫時無法讀取代理狀態|Состояние прокси пока недоступно
++河图 · 代理状态|Hetu · Proxy status|河圖 · 代理狀態|Hetu · Состояние прокси
++上次操作失败|Last action failed|上次操作失敗|Последнее действие не удалось
++通知栏操作失败|Notification action failed|通知列操作失敗|Действие из уведомления не удалось
++代理切换失败|Could not switch the proxy|代理切換失敗|Не удалось переключить прокси
++河图代理|Hetu proxy|河圖代理|Прокси Hetu
++切换失败|Switch failed|切換失敗|Сбой переключения
++切换中…|Switching…|切換中…|Переключение…
++未获得 Root 权限，河图无法接管网络。请在 Magisk / KernelSU / APatch 中允许河图后重试。|Root access is not granted, so Hetu cannot take over the network. Allow Hetu in Magisk / KernelSU / APatch and try again.|未取得 Root 權限，河圖無法接管網路。請在 Magisk / KernelSU / APatch 中允許河圖後重試。|Нет прав Root, Hetu не может управлять сетью. Разрешите Hetu в Magisk / KernelSU / APatch и повторите.
++""".trimIndent()
++
 +private val vocabularyAudit4Func = """
 +直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
 +上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
@@ -78325,7 +78864,7 @@ index 578ce9d..b9ced3f 100644
 +""".trimIndent()
 +
 +
-+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333).joinToString("\n")
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -85328,6 +85867,198 @@ index 0000000..549e953
 +        assertNull(LatencyProbeBudget.CURRENT.get())
 +    }
 +
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Func400Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Func400Test.kt
+new file mode 100644
+index 0000000..09445fe
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Func400Test.kt
+@@ -0,0 +1,186 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onNodeWithText
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.tools.ToolsDestination
++import io.github.xgl34222220.hetu.tools.ToolsFeatureActions
++import io.github.xgl34222220.hetu.tools.ToolsFeaturePage
++import io.github.xgl34222220.hetu.tools.ToolsPreflight
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Assert.fail
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.File
++import java.io.IOException
++import java.net.ConnectException
++import java.net.SocketTimeoutException
++import java.net.UnknownHostException
++import javax.net.ssl.SSLHandshakeException
++
++/**
++ * 2026-10-16 4.0.0 function pass: retry of transient download / subscription failures (S1/S2),
++ * web-page instead of config (S3), 导出诊断包 (D1), status notification start action and error line
++ * (N1–N3), tile language / refresh (T1/T2) and the no-Root start message (E1).
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++class Func400Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    @Test fun transientFailuresAreRetriedAndFinalAnswersAreNot() {
++        assertTrue(HxNetRetry.transient(SocketTimeoutException("read timed out")))
++        assertTrue(HxNetRetry.transient(ConnectException("refused")))
++        assertTrue(HxNetRetry.transient(UnknownHostException("sub.example")))
++        assertTrue(HxNetRetry.transient(IOException("下载失败：HTTP 503")))
++        assertTrue(HxNetRetry.transient(IOException("下载失败：HTTP 429")))
++        assertTrue(HxNetRetry.transient(IOException("wrapped", SocketTimeoutException())))
++        assertTrue(HxNetRetry.transient(MihomoControllerClient.ControllerHttpException(503, "{\"message\":\"timeout\"}", false)))
++        assertFalse(HxNetRetry.transient(MihomoControllerClient.ControllerHttpException(401, "", false)))
++        assertFalse(HxNetRetry.transient(MihomoControllerClient.ControllerHttpException(404, "", false)))
++        assertFalse(HxNetRetry.transient(IOException("下载失败：HTTP 404")))
++        assertFalse(HxNetRetry.transient(IOException("下载失败：HTTP 403")))
++        assertFalse(HxNetRetry.transient(SSLHandshakeException("bad cert")))
++        assertFalse(HxNetRetry.transient(IOException("配置超过 4 MiB")))
++        assertTrue(source("app/HetuViewModel.kt").contains("if (!HxNetRetry.transient(first)) throw first"))
++    }
++
++    @Test fun configDownloadRetriesA503AndStopsAtA404() = runBlocking {
++        MockWebServer().use { server ->
++            server.enqueue(MockResponse().setResponseCode(503))
++            server.enqueue(MockResponse().setResponseCode(200).setBody("proxies:\n  - {name: a, type: direct}\n"))
++            server.start()
++            val (body, _) = HxConfigTransaction.download(server.url("/sub").toString())
++            assertTrue(String(body).startsWith("proxies:"))
++            assertEquals(2, server.requestCount)
++        }
++        MockWebServer().use { server ->
++            server.enqueue(MockResponse().setResponseCode(404))
++            server.enqueue(MockResponse().setResponseCode(200).setBody("proxies:\n"))
++            server.start()
++            try {
++                HxConfigTransaction.download(server.url("/gone").toString())
++                fail("404 must fail")
++            } catch (error: IOException) {
++                assertTrue(error.message.orEmpty().contains("HTTP 404"))
++            }
++            assertEquals("A 404 is final", 1, server.requestCount)
++        }
++    }
++
++    @Test fun aWebPageIsReportedAsAWebPage() {
++        val page = "<!DOCTYPE html>\n<html><head><title>Login</title></head><body>sign in</body></html>"
++        try {
++            HxConfigTransaction.decode(page.toByteArray())
++            fail("HTML must be rejected")
++        } catch (error: IOException) {
++            assertEquals("下载到的是网页而不是配置，请检查链接是否正确或需要登录", error.message)
++        }
++        assertTrue(HxConfigTransaction.looksLikeHtml("  <html lang=\"en\">"))
++        assertFalse(HxConfigTransaction.looksLikeHtml("proxies:\n  - name: <html>"))
++        // A real config is still accepted, and a Base64 list keeps its own hint.
++        assertTrue(HxConfigTransaction.decode("proxies:\nrules:\n".toByteArray()).startsWith("proxies:"))
++        try {
++            HxConfigTransaction.decode("dm1lc3M6Ly9hYmM=".toByteArray()); fail()
++        } catch (error: IOException) { assertTrue(error.message.orEmpty().contains("Base64")) }
++    }
++
++    @Test fun diagnosticsBundleCollectsSelfHealStateAndRedactsSecrets() = runBlocking {
++        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putString("proxyControllerSecret", "s3cr3t-token").commit()
++        var command = ""
++        val text = HxDiagnosticsBundle.build(
++            app,
++            report = { "controller secret=s3cr3t-token\nsub=https://example.com/api/sub?token=abc" },
++            rootRead = { command = it; "--- selfheal-state ---\nlevel=1 secret s3cr3t-token\n--- watchdog.log (last 300 lines) ---\nliveness ok" },
++        )
++        assertTrue(text.startsWith("河图诊断包"))
++        assertTrue(text.contains("app=" + BuildConfig.VERSION_NAME))
++        assertTrue(text.contains("liveness ok"))
++        assertFalse("secret redacted", text.contains("s3cr3t-token"))
++        assertFalse("full URL redacted", text.contains("token=abc"))
++        // The Root read is read-only and covers the watchdog / self-heal / routing state.
++        listOf("watchdog.log", "selfheal-state", "egress-state", "cgroup-escape", "wifi-reconnects",
++            "ip rule show", "iptables-save -t mangle", "ip6tables-save").forEach { assertTrue(it, command.contains(it)) }
++        listOf("hetu-root.sh", "iptables -D", "iptables -F", "iptables -X", "rm ", "kill ", "setprop").forEach { assertFalse(it, command.contains(it)) }
++        assertTrue(HxDiagnosticsBundle.fileName(0L).matches(Regex("hetu-diagnostics-\\d{8}-\\d{6}\\.txt")))
++        // A failing part is written as text instead of aborting the export.
++        val partial = HxDiagnosticsBundle.build(app, report = { throw IOException("controller down") }, rootRead = { throw IOException("su missing") })
++        assertTrue(partial.contains("controller down"))
++        assertTrue(partial.contains("su missing"))
++    }
++
++    @Test fun diagnosticsPageOffersTheExportRow() {
++        rule.setContent {
++            HetuAppTheme(appearance = "light", dynamic = false) {
++                CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides false) {
++                    Box(Modifier.fillMaxSize()) {
++                        ToolsFeaturePage(
++                            ToolsDestination.Diag,
++                            ToolsFeatureActions(runPreflight = { ToolsPreflight.Passed() }, exportDiagnostics = { "x" }),
++                            onBack = {},
++                        )
++                    }
++                }
++            }
++        }
++        rule.mainClock.advanceTimeBy(1000); rule.waitForIdle()
++        rule.onNodeWithText("导出诊断包").assertExists()
++        assertTrue(source("tools/ToolsFeatureAdapter.kt").contains("HxDiagnosticsBundle.build(app"))
++    }
++
++    @Test fun notificationOffersStartWhileStoppedAndShowsTheFailure() {
++        val service = source("ProxyStatusNotificationService.kt")
++        assertTrue(service.contains("\"stop\" -> if (running) \"停止\" to ACTION_STOP_PROXY else \"启动\" to ACTION_START_PROXY"))
++        assertTrue(service.contains("ACTION_START_PROXY -> runControl(\"正在启动…\") { controller.start() }"))
++        assertTrue(service.contains("recentError()"))
++        assertTrue(service.contains("hxPlainText(this, source)"))
++        assertEquals(10 * 60_000L, ProxyStatusNotificationService.ERROR_VISIBLE_MS)
++    }
++
++    @Test fun tileFollowsTheLanguageAndIsRefreshedAfterAnInAppToggle() {
++        val tile = source("HetuProxyTileService.kt")
++        assertTrue(tile.contains("tile.label = text(\"河图代理\")"))
++        assertTrue(tile.contains("TileService.requestListeningState"))
++        assertTrue(source("app/HetuViewModel.kt").contains("HetuProxyTileService.requestRefresh(app)"))
++        HetuProxyTileService.requestRefresh(app) // never throws, even without System UI
++        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putString("appLanguage", "en").commit()
++        assertEquals("Hetu proxy", hxPlainText(app, "河图代理"))
++        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().remove("appLanguage").commit()
++    }
++
++    @Test fun startWithoutRootSaysWhatToFix() = runBlocking {
++        assertFalse("No su in the test JVM", HxRootCheck.granted(app))
++        assertEquals(HxRootCheck.NO_ROOT + "\n\n启动失败", HxRootCheck.message("启动失败"))
++        assertEquals(HxRootCheck.NO_ROOT, HxRootCheck.message(""))
++        assertTrue(source("app/HetuViewModel.kt").contains("} else if (!HxRootCheck.granted(app)) {"))
++    }
++
++    @Test fun newWordsAreTranslated() {
++        listOf("导出诊断包", "诊断包已导出", "诊断包导出失败", "没有可用的文件保存应用", "下载到的是网页而不是配置，请检查链接是否正确或需要登录",
++            "诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件", "隐藏", "已停止", "正在重载…", "正在读取代理状态…",
++            "暂时无法读取代理状态", "河图 · 代理状态", "上次操作失败", "通知栏操作失败", "代理切换失败", "河图代理", "切换失败", "切换中…",
++            HxRootCheck.NO_ROOT).forEach { key ->
++            listOf("en", "zh-TW", "ru").forEach { lang ->
++                if (!(lang == "zh-TW" && key == "已停止")) assertTrue("$key/$lang", translateHetuText(key, lang) != key)
++            }
++        }
++    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt
 new file mode 100644

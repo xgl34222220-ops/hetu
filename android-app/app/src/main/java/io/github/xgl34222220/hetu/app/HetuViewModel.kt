@@ -883,6 +883,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                     } else if (configProblem) {
                         reason
+                    } else if (!HxRootCheck.granted(app)) {
+                        // func-400 E1: without Root every diagnostic read fails too; say what to fix.
+                        HxRootCheck.message(reason)
                     } else {
                         val diagnostics = try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
                         if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
@@ -893,6 +896,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } finally {
                 operation = null
                 operationText = ""
+                // func-400 T2: an open Quick Settings panel re-reads the tile after an in-App start/stop.
+                HetuProxyTileService.requestRefresh(app)
                 refreshNow()
             }
         }
@@ -1633,7 +1638,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                             async {
                                 if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
                                 try {
-                                    repo.refreshProvider(item.name)
+                                    // func-400 S2: one quiet retry for a transient failure (timeout, 5xx,
+                                    // a provider busy with its own interval update) before reporting it.
+                                    try {
+                                        repo.refreshProvider(item.name)
+                                    } catch (cancel: CancellationException) {
+                                        throw cancel
+                                    } catch (first: Exception) {
+                                        if (!HxNetRetry.transient(first)) throw first
+                                        delay(HxNetRetry.PROVIDER_RETRY_DELAY_MS)
+                                        if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
+                                        repo.refreshProvider(item.name)
+                                    }
                                     if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
                                         providerTasks[item.name] = HxTask(ok = true, message = "已更新")
                                         ok++

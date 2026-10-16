@@ -442,6 +442,8 @@ internal class ToolsFeatureActions(
     val repairSessionRecord: (suspend () -> String)? = null,
     val startupConfig: suspend () -> String = { "" },
     val diagnostics: suspend () -> String = { "" },
+    /** func-400 D1: builds the 导出诊断包 text; null hides the row. */
+    val exportDiagnostics: (suspend () -> String)? = null,
     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
     val restoreNetwork: suspend () -> String = { "已停止代理并回滚网络规则" },
     val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
