@@ -246,7 +246,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
                     .padding(horizontal = 13.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(ht(tab.label), color = text, style = if (active) PanelType.tab.copy(fontWeight = FontWeight.Bold) else PanelType.tab, maxLines = 1)
+                Text(ht(tab.label), color = text, style = if (active) PanelType.tab.copy(fontWeight = FontWeight.Bold) else PanelType.tab, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -456,7 +456,7 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
                 PanelDelay.Failed -> ht("失败")
                 is PanelDelay.Ms -> "${shown.value} ms"
             }
-            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
     val capsule: @Composable () -> Unit = {

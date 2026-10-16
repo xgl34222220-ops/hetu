@@ -258,7 +258,7 @@ internal fun HomeBanner(
                 Modifier.clip(SharedBadgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
                     .heightIn(min = 32.dp).padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1) }
+            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }
@@ -690,7 +690,7 @@ internal fun HomeNotice(
             Box(
                 Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
+            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
         if (onClose != null) {
             Box(
@@ -938,7 +938,7 @@ internal fun HomeTextField(
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1)
+                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
             },

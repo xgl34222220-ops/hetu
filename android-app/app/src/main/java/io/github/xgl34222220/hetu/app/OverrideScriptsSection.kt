@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -289,7 +290,8 @@ private fun OverrideScriptEditorSheet(draft: OverrideDraft, busy: Boolean, onDis
                 decorationBox = { inner -> Box { if (name.isEmpty()) Text(nameLabel, color = c.t3, style = HomeType.body); inner() } },
             )
             if (draft.id == null) {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val exampleScroll = rememberScrollState()
+                Row(Modifier.fillMaxWidth().panelHorizontalEdgeFade(exampleScroll).horizontalScroll(exampleScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OverrideScriptExamples.ALL.forEach { example ->
                         HomePill(ht(example.title), tone = HomeTone.Neutral, height = 32.dp, onClick = {
                             editor?.setText(example.source)
@@ -325,7 +327,8 @@ private fun OverrideScriptEditorSheet(draft: OverrideDraft, busy: Boolean, onDis
                     onRelease = { native -> if (editor === native) editor = null; native.release() },
                 )
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val symbolScroll = rememberScrollState()
+            Row(Modifier.fillMaxWidth().panelHorizontalEdgeFade(symbolScroll).horizontalScroll(symbolScroll), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 overrideJsSymbols.forEach { symbol ->
                     val keySource = remember { MutableInteractionSource() }
                     Box(

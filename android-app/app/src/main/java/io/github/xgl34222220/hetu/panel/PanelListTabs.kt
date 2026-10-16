@@ -148,8 +148,10 @@ internal fun LazyListScope.panelConnectionsTab(
     val list = PanelLogic.connections(data, view)
     if (view.searching) item(key = "conn-tools") {
         val c = LocalHomeColors.current
+        val chipScroll = rememberScrollState()
         Row(
-            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).horizontalScroll(rememberScrollState()).panelGutter(),
+            // 4.0.0: the last chip slides under a fade instead of being cut at the screen edge.
+            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).panelHorizontalEdgeFade(chipScroll).horizontalScroll(chipScroll).panelGutter(),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HomeSegmented(
@@ -432,8 +434,10 @@ internal fun LazyListScope.panelLogsTab(
 ) {
     item(key = "log-filters") {
         val c = LocalHomeColors.current
+        val chipScroll = rememberScrollState()
         Row(
-            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).horizontalScroll(rememberScrollState()).panelGutter(),
+            // 4.0.0: the last chip slides under a fade instead of being cut at the screen edge.
+            Modifier.fillMaxWidth().padding(bottom = PanelDims.gap).panelHorizontalEdgeFade(chipScroll).horizontalScroll(chipScroll).panelGutter(),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PanelLogFilter.entries.forEach { filter ->

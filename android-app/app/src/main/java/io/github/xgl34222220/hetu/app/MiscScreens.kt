@@ -607,7 +607,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
                             coreVersion.ifBlank { ht("启动后显示版本") },
                             color = if (coreVersion.isBlank()) c.t3 else c.t2,
                             style = if (coreVersion.isBlank()) HomeType.caption else HomeType.value.copy(fontWeight = FontWeight.Medium),
-                            maxLines = 1,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                     SettingsDivider()

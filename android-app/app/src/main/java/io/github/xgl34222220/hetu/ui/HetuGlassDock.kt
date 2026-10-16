@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.ui
 
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -356,7 +357,7 @@ private fun DockItems(
                     Spacer(Modifier.height(1.dp))
                     Text(item.label, (if (active) Modifier.testTag("dock-active-label") else Modifier).padding(horizontal = 2.dp),
                         color = color, fontSize = 12.sp, lineHeight = 14.sp,
-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

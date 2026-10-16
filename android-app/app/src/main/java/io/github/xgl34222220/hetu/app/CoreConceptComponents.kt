@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -64,7 +65,7 @@ internal fun CoreConceptButton(text: String,onClick: () -> Unit,modifier: Modifi
     Row(modifier.heightIn(min=50.dp).clip(RoundedCornerShape(18.dp)).background(background)
         .clickable(enabled=actionable,onClick={ if (actionable) onClick() }).padding(horizontal=10.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
         if(busy){HxSpinner(21.dp,foreground);Spacer(Modifier.width(9.dp))}
-        Text(if (busy) "处理中" else text,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=foreground,maxLines=1)
+        Text(if (busy) "处理中" else text,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=foreground,maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

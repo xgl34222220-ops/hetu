@@ -384,7 +384,7 @@ private fun ProviderFigure(value: String, label: String, color: Color, modifier:
             lineHeight = 21.sp,
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             color = color,
-            maxLines = 1,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Text(label, style = MaterialTheme.typography.labelSmall, color = Hx.colors.textMuted)
     }

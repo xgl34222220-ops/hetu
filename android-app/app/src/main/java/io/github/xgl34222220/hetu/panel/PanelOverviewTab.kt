@@ -182,7 +182,7 @@ internal fun LazyListScope.panelOverviewTab(
                     }
                     Text(
                         if (view.rankMode == PanelRankMode.Connections) ht("%d 条连接").fill(rank.connections) else HomeFormat.bytes(rank.totalBytes),
-                        color = c.t2, style = HomeType.rowSub, maxLines = 1,
+                        color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

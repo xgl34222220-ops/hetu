@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
 import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
 import android.content.Context
 import android.graphics.Typeface
@@ -81,6 +82,7 @@ import io.github.xgl34222220.hetu.home.HomeFormField
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeNotice
 import io.github.xgl34222220.hetu.home.HomeMotion
 import io.github.xgl34222220.hetu.home.HomePill
 import io.github.xgl34222220.hetu.home.HomePop
@@ -121,6 +123,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     var subscriptions by remember { mutableStateOf<List<ProxySubscriptionUi>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    // 4.0.0: a failed read stays on the page (with 重试) instead of only a toast over empty groups.
+    var loadError by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var menuFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
     var confirmDelete by remember { mutableStateOf<ProxyConfigUi?>(null) }
@@ -136,9 +140,11 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         try {
             configs = vm.controller.configLibrary()
             subscriptions = vm.controller.subscriptions()
+            loadError = null
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
+            loadError = hxErrorMessage(error, "配置读取失败")
             vm.toastAs(HxTone.Bad, hxErrorMessage(error, "配置读取失败"))
         } finally {
             loading = false
@@ -209,6 +215,12 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         item(key = "configs") {
             HxSection {
                 HxGroup(title = ht("配置管理")) {
+                    loadError?.takeIf { !loading }?.let { failure ->
+                        HomeNotice(
+                            ht(failure), HomeIcons.CircleAlert, Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            tone = HomeTone.Bad, actionLabel = "重试", onAction = { revision++ },
+                        )
+                    }
                     if (loading && configs.isEmpty()) {
                         // First read: rows in the shape of config entries instead of a spinner.
                         HxSkeletonLines(count = 3)
@@ -243,7 +255,11 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                         HomeIconButton(ToolsIcons.Plus, "添加订阅", { editSub = null; form = "subscription" }, enabled = !busy)
                     }
                     Text(ht("当前配置的 proxy-providers。"), Modifier.padding(start = 18.dp, end = 18.dp, bottom = 6.dp), color = c.t2, style = HomeRowSubStyle)
-                    if (subscriptions.isEmpty() && !loading) {
+                    if (subscriptions.isEmpty() && loading) {
+                        // First read: the subscription rows take shape instead of an empty card.
+                        HxSkeletonLines(count = 2)
+                    }
+                    if (subscriptions.isEmpty() && !loading && loadError == null) {
                         HxRow(ht("当前配置没有订阅段"), subtitle = ht("完整的 YAML 配置无需订阅；如需添加，请在编辑器中加入 proxy-providers"), icon = PanelIcons.Unlink)
                     }
                     subscriptions.forEachIndexed { index, sub ->
@@ -953,7 +969,7 @@ internal fun ConfigEditorScreen(
         // The characters YAML needs and a phone keyboard hides, one tap each.
         if (!readOnly && !search) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
             .clip(HomeDims.cardShape).background(c.surface)
-            .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            .let { val keys = rememberScrollState(); it.panelHorizontalEdgeFade(keys).horizontalScroll(keys) }.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             HxYamlSymbols.forEach { symbol ->
                 val keySource = remember { MutableInteractionSource() }
                 Box(Modifier.heightIn(min = 44.dp).widthIn(min = 44.dp).clip(RoundedCornerShape(13.dp)).background(c.sunken)
