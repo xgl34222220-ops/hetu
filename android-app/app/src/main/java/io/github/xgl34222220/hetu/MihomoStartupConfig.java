@@ -207,9 +207,15 @@ final class MihomoStartupConfig {
             wechatNote+="# hetu-validation-bypass: "+probe.state+"\n";
         }
 
+        // Fake-IP mappings survive core restarts (watchdog self-heal, POST /restart, stop/start): see
+        // ensureStoreFakeIp. Absent profile: block = written below inside the isolation block.
+        boolean addProfile=!hasTopLevelKey(yaml,"profile");
+        if(!addProfile)yaml=ensureStoreFakeIp(yaml);
+
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
         override.append("\n# --- Hetu runtime isolation; source file is unchanged ---\n");
+        if(addProfile)override.append("profile:\n  store-fake-ip: true\n");
         override.append(wechatNote);
         switch(profile.mode){
             case TPROXY:
@@ -690,6 +696,45 @@ final class MihomoStartupConfig {
                 source,
                 cnRules,
                 "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+    }
+
+    /**
+     * 2026-10 (real-device report: TikTok cannot connect under Hetu, other apps fine, switching nodes does not
+     * help). Mihomo keeps fake-IP mappings only in memory unless profile.store-fake-ip is on, so every core
+     * restart (Hetu's watchdog closes connections, reloads with POST /restart or restarts the core; every
+     * stop/start) hands out a new pool while apps with their own DNS cache (TikTok's TTNet among them) keep
+     * connecting to the old fake IPs: the core then has no domain (or the wrong one) for them. With the
+     * mapping stored in the private run directory's cache.db the same domain keeps the same fake IP. An
+     * explicit store-fake-ip in the source is respected; an inline profile: {...} is left alone.
+     */
+    static String ensureStoreFakeIp(String source){
+        String[] lines=normalize(source).split("\n",-1);
+        int start=-1;
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0||lines[i].startsWith("#"))continue;
+            if("profile".equals(keyOfMappingLine(lines[i].trim()))){start=i;break;}
+        }
+        if(start<0)return source;
+        String head=lines[start].trim();
+        String rest=head.substring(head.indexOf(':')+1).trim();
+        if(!rest.isEmpty()&&!rest.startsWith("#"))return source;
+        int childIndent=-1;
+        for(int i=start+1;i<lines.length;i++){
+            String t=lines[i].trim();
+            if(t.isEmpty()||t.startsWith("#"))continue;
+            int ind=indent(lines[i]);
+            if(ind==0)break;
+            if(childIndent<0)childIndent=ind;
+            if(ind==childIndent&&"store-fake-ip".equals(keyOfMappingLine(t)))return source;
+        }
+        if(childIndent<0)childIndent=2;
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            out.append(lines[i]);
+            if(i<lines.length-1)out.append('\n');
+            if(i==start)out.append(spaces(childIndent)).append("store-fake-ip: true\n");
+        }
+        return out.toString();
     }
 
     /** Turn off AAAA answers without replacing the user's DNS policy or resolvers. */
