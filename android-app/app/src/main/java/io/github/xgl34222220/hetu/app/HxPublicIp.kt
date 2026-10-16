@@ -18,8 +18,8 @@ import java.util.concurrent.Executors
 /**
  * Public address as other apps see it, for the WAN card and 公网 IP 详情.
  *
- * - Proxy running (Root): through the core's local policy listener, which applies the same rules
- *   transparent interception applies to apps (Hetu's own UID is exempt from interception).
+ * - Proxy running (Root): through the core's local policy listener, asking overseas sources only,
+ *   so the answer is the proxy's exit rather than a mainland site matched DIRECT by the rules.
  * - Proxy stopped: the device's ordinary route, the address any app sees with Hetu off.
  *
  * Several independent sources are asked in parallel (mainland-reachable ones included); the first
@@ -47,18 +47,23 @@ internal class HxIpSource(
     val rich: Boolean,
     val userAgent: String = "Mozilla/5.0 (Linux; Android) Hetu-Android",
     val parse: (String) -> WanRuntimeInfo,
+    /**
+     * A mainland site. Rule configs send it DIRECT (GEOIP CN), so through the proxy listener it
+     * would report the device's own address: only asked while the proxy is stopped.
+     */
+    val mainland: Boolean = false,
 )
 
 internal object HxIpSources {
     private const val CURL = "curl/8.5.0"
     val all: List<HxIpSource> = listOf(
-        HxIpSource("myip.ipip.net", "https://myip.ipip.net/json", true, parse = ::hxParseIpipNet),
+        HxIpSource("myip.ipip.net", "https://myip.ipip.net/json", true, parse = ::hxParseIpipNet, mainland = true),
         HxIpSource("ip.sb", "https://api.ip.sb/geoip", true, parse = ::hxParseIpSbGeo),
         HxIpSource("ipwho.is", "https://ipwho.is/?fields=success,ip,type,country_code,country,region,city,connection,timezone,latitude,longitude", true, parse = ::parseWanRuntimeInfo),
-        HxIpSource("cip.cc", "https://cip.cc/", true, CURL, ::hxParseCipCc),
+        HxIpSource("cip.cc", "https://cip.cc/", true, CURL, ::hxParseCipCc, mainland = true),
         HxIpSource("ipinfo.io", "https://ipinfo.io/json", true, parse = ::hxParseIpInfo),
-        HxIpSource("ip.3322.net", "https://ip.3322.net/", false, CURL, ::hxParsePlainIp),
-        HxIpSource("ipw.cn", "https://4.ipw.cn/", false, CURL, ::hxParsePlainIp),
+        HxIpSource("ip.3322.net", "https://ip.3322.net/", false, CURL, ::hxParsePlainIp, mainland = true),
+        HxIpSource("ipw.cn", "https://4.ipw.cn/", false, CURL, ::hxParsePlainIp, mainland = true),
         HxIpSource("ipify", "https://api.ipify.org/", false, parse = ::hxParsePlainIp),
     )
 }
@@ -231,9 +236,11 @@ internal class HxPublicIpLookup(
         val executor = pool ?: Executors.newFixedThreadPool(4) { task ->
             Thread(task, "hetu-public-ip").apply { isDaemon = true }
         }.also { pool = it }
-        var pending = sources.size
+        // Proxy on: only overseas sources, so the answer is the proxy's exit, never a DIRECT rule's.
+        val chosen = if (path == HxIpPath.Proxy) sources.filterNot { it.mainland }.ifEmpty { sources } else sources
+        var pending = chosen.size
         var answered = false
-        sources.forEach { source ->
+        chosen.forEach { source ->
             val task = Runnable {
                 val info = runCatching { fetch(source, port) }.getOrNull()
                 main.post {

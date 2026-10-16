@@ -65985,10 +65985,10 @@ index 0000000..f3d1e7c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPublicIp.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPublicIp.kt
 new file mode 100644
-index 0000000..4a99e90
+index 0000000..85f8a8c
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPublicIp.kt
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,358 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -66009,8 +66009,8 @@ index 0000000..4a99e90
 +/**
 + * Public address as other apps see it, for the WAN card and 公网 IP 详情.
 + *
-+ * - Proxy running (Root): through the core's local policy listener, which applies the same rules
-+ *   transparent interception applies to apps (Hetu's own UID is exempt from interception).
++ * - Proxy running (Root): through the core's local policy listener, asking overseas sources only,
++ *   so the answer is the proxy's exit rather than a mainland site matched DIRECT by the rules.
 + * - Proxy stopped: the device's ordinary route, the address any app sees with Hetu off.
 + *
 + * Several independent sources are asked in parallel (mainland-reachable ones included); the first
@@ -66038,18 +66038,23 @@ index 0000000..4a99e90
 +    val rich: Boolean,
 +    val userAgent: String = "Mozilla/5.0 (Linux; Android) Hetu-Android",
 +    val parse: (String) -> WanRuntimeInfo,
++    /**
++     * A mainland site. Rule configs send it DIRECT (GEOIP CN), so through the proxy listener it
++     * would report the device's own address: only asked while the proxy is stopped.
++     */
++    val mainland: Boolean = false,
 +)
 +
 +internal object HxIpSources {
 +    private const val CURL = "curl/8.5.0"
 +    val all: List<HxIpSource> = listOf(
-+        HxIpSource("myip.ipip.net", "https://myip.ipip.net/json", true, parse = ::hxParseIpipNet),
++        HxIpSource("myip.ipip.net", "https://myip.ipip.net/json", true, parse = ::hxParseIpipNet, mainland = true),
 +        HxIpSource("ip.sb", "https://api.ip.sb/geoip", true, parse = ::hxParseIpSbGeo),
 +        HxIpSource("ipwho.is", "https://ipwho.is/?fields=success,ip,type,country_code,country,region,city,connection,timezone,latitude,longitude", true, parse = ::parseWanRuntimeInfo),
-+        HxIpSource("cip.cc", "https://cip.cc/", true, CURL, ::hxParseCipCc),
++        HxIpSource("cip.cc", "https://cip.cc/", true, CURL, ::hxParseCipCc, mainland = true),
 +        HxIpSource("ipinfo.io", "https://ipinfo.io/json", true, parse = ::hxParseIpInfo),
-+        HxIpSource("ip.3322.net", "https://ip.3322.net/", false, CURL, ::hxParsePlainIp),
-+        HxIpSource("ipw.cn", "https://4.ipw.cn/", false, CURL, ::hxParsePlainIp),
++        HxIpSource("ip.3322.net", "https://ip.3322.net/", false, CURL, ::hxParsePlainIp, mainland = true),
++        HxIpSource("ipw.cn", "https://4.ipw.cn/", false, CURL, ::hxParsePlainIp, mainland = true),
 +        HxIpSource("ipify", "https://api.ipify.org/", false, parse = ::hxParsePlainIp),
 +    )
 +}
@@ -66222,9 +66227,11 @@ index 0000000..4a99e90
 +        val executor = pool ?: Executors.newFixedThreadPool(4) { task ->
 +            Thread(task, "hetu-public-ip").apply { isDaemon = true }
 +        }.also { pool = it }
-+        var pending = sources.size
++        // Proxy on: only overseas sources, so the answer is the proxy's exit, never a DIRECT rule's.
++        val chosen = if (path == HxIpPath.Proxy) sources.filterNot { it.mainland }.ifEmpty { sources } else sources
++        var pending = chosen.size
 +        var answered = false
-+        sources.forEach { source ->
++        chosen.forEach { source ->
 +            val task = Runnable {
 +                val info = runCatching { fetch(source, port) }.getOrNull()
 +                main.post {
@@ -85546,10 +85553,10 @@ index 0000000..cf9889d
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeProbe333Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeProbe333Test.kt
 new file mode 100644
-index 0000000..7576476
+index 0000000..060f498
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeProbe333Test.kt
-@@ -0,0 +1,300 @@
+@@ -0,0 +1,306 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -85848,6 +85855,12 @@ index 0000000..7576476
 +        }
 +        assertEquals("Latency", translateHetuText("网络延迟", "en"))
 +        assertEquals("網路延遲", translateHetuText("网络延迟", "zh-TW"))
++    }
++
++    @Test fun proxyPathAsksOnlyOverseasSources() {
++        val mainland = HxIpSources.all.filter { it.mainland }.map { it.id }.toSet()
++        org.junit.Assert.assertEquals(setOf("myip.ipip.net", "cip.cc", "ip.3322.net", "ipw.cn"), mainland)
++        org.junit.Assert.assertTrue(HxIpSources.all.count { !it.mainland } >= 3)
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java

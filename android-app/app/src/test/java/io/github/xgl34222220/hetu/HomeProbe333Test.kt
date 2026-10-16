@@ -297,4 +297,10 @@ class HomeProbe333Test {
         assertEquals("Latency", translateHetuText("网络延迟", "en"))
         assertEquals("網路延遲", translateHetuText("网络延迟", "zh-TW"))
     }
+
+    @Test fun proxyPathAsksOnlyOverseasSources() {
+        val mainland = HxIpSources.all.filter { it.mainland }.map { it.id }.toSet()
+        org.junit.Assert.assertEquals(setOf("myip.ipip.net", "cip.cc", "ip.3322.net", "ipw.cn"), mainland)
+        org.junit.Assert.assertTrue(HxIpSources.all.count { !it.mainland } >= 3)
+    }
 }
