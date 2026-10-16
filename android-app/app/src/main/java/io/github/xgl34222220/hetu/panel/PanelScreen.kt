@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.panel
 
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
 import androidx.compose.foundation.background
@@ -322,7 +323,7 @@ private fun BoxScope.PanelHeader(
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1)
+            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // Restored cards are display-only until the first fresh read lands; say so quietly.
             HomePop(data.running && data.syncing) { PanelSyncChip() }
         }
@@ -351,7 +352,7 @@ private fun BoxScope.PanelHeader(
                 alpha = shown
                 translationY = (1f - shown) * 8.dp.toPx()
             },
-            color = c.t1, style = HomeType.barTitle, maxLines = 1,
+            color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         if (data.running && data.readError.isBlank() && data.core.supports(tab)) {
             val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
@@ -471,6 +472,6 @@ private fun PanelSyncChip() {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
-        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1)
+        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

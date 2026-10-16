@@ -178,7 +178,7 @@ private fun SymbolBar(enabled: Boolean, onInsert: (String) -> Unit) {
                         .background(if (c.dark) c.sunken else c.bg)
                         .semantics { contentDescription = spoken },
                     contentAlignment = Alignment.Center,
-                ) { Text(label, color = c.t1, style = ToolsTypography.mono.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1) }
+                ) { Text(label, color = c.t1, style = ToolsTypography.mono.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }

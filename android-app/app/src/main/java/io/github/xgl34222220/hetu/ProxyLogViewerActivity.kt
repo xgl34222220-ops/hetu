@@ -629,7 +629,7 @@ private fun HxLogControls(
         ) {
             Icon(HomeIcons.RefreshCw, null, Modifier.size(22.dp).graphicsLayer { rotationZ = angle }, tint = liveTint)
             Spacer(Modifier.width(8.dp))
-            Text(ht(if (autoRefresh) "自动刷新中" else "自动刷新"), color = liveTint, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1)
+            Text(ht(if (autoRefresh) "自动刷新中" else "自动刷新"), color = liveTint, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val orderSource = remember { MutableInteractionSource() }
         val flip by animateFloatAsState(if (newestFirst) 0f else 180f, HomeMotion.glide(motion), label = "log-order-flip")
@@ -642,7 +642,7 @@ private fun HxLogControls(
         ) {
             Icon(ToolsFeatureIcons.ArrowDownWideNarrow, null, Modifier.size(22.dp).graphicsLayer { rotationX = flip }, tint = c.t2)
             Spacer(Modifier.width(8.dp))
-            Text(ht(if (newestFirst) "最新在前" else "最早在前"), color = c.t2, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1)
+            Text(ht(if (newestFirst) "最新在前" else "最早在前"), color = c.t2, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

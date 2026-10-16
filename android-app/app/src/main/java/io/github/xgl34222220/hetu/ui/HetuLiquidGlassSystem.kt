@@ -325,7 +325,7 @@ fun LiquidChoicePill(
             fontSize = 12.sp,
             lineHeight = 16.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-            maxLines = 1,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
 }

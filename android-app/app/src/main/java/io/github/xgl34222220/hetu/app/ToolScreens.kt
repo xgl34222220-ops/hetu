@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -619,8 +620,9 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
         },
     ) {
         item(key = "breadcrumbs") {
+            val crumbScroll = rememberScrollState()
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                Modifier.fillMaxWidth().panelHorizontalEdgeFade(crumbScroll).horizontalScroll(crumbScroll)
                     .padding(horizontal = HomeDims.gutter + 4.dp).padding(bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -635,7 +637,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
                             .padding(horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(label, color = if (active) c.accent else c.t2, maxLines = 1,
+                        Text(label, color = if (active) c.accent else c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             style = HomeType.label.copy(fontWeight = if (active) FontWeight.Bold else FontWeight.Medium))
                     }
                     if (index < breadcrumb.lastIndex) {
@@ -1131,8 +1133,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     }
                     // Every variable the service understands, one tap away from the template. One
                     // line that slides under the card's edges, so the buttons below stay close.
+                    val variableScroll = rememberScrollState()
                     Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
+                        Modifier.fillMaxWidth().panelHorizontalEdgeFade(variableScroll).horizontalScroll(variableScroll).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         HomePill(

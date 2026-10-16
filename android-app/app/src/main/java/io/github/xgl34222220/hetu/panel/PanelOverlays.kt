@@ -338,8 +338,9 @@ private fun ConnectionSheet(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Audit4 G6: copy the host, narrow the list to this app, or jump to the matched rule.
+            val actionScroll = rememberScrollState()
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp),
+                Modifier.fillMaxWidth().panelHorizontalEdgeFade(actionScroll).horizontalScroll(actionScroll).padding(horizontal = 2.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 PanelChip("复制主机", onCopyHost, height = 34.dp, leading = { Icon(HomeIcons.Copy, null, Modifier.size(16.dp), tint = c.t1) })

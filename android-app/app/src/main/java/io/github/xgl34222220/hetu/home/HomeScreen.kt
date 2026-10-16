@@ -473,7 +473,7 @@ private fun RowScope.ControlAction(
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
     ) {
         if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
-        Text(text, color = tint, style = HomeType.control, maxLines = 1)
+        Text(text, color = tint, style = HomeType.control, maxLines = 1, overflow = TextOverflow.Ellipsis)
         // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
         if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
     }
@@ -503,7 +503,7 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
         HomeProbeLegacyAnchor()
         Row(Modifier.fillMaxWidth().padding(start = HomeDims.cardPadding, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
-                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1)
+                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     ht(path), Modifier.padding(top = 2.dp), color = if (live) c.accent else c.t2,
                     style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -565,7 +565,7 @@ private fun MetricCard(
 
 @Composable
 private fun MetricTitle(text: String) {
-    Text(ht(text), color = LocalHomeColors.current.t1, style = HomeType.cardLabel, maxLines = 1)
+    Text(ht(text), color = LocalHomeColors.current.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 /** Label on the left, live value on the right. A null [value] is an honest dash, never a zero. */
@@ -579,7 +579,7 @@ private fun MetricLine(
 ) {
     val c = LocalHomeColors.current
     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(ht(label), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+        Text(ht(label), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(8.dp))
         Spacer(Modifier.weight(1f))
         when {
@@ -618,7 +618,7 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
                         .padding(end = 10.dp, top = 4.dp, bottom = 4.dp),
                     color = tint,
                     style = if (active) HomeType.cardLabel else HomeType.cardLabel.copy(fontWeight = FontWeight.Medium),
-                    maxLines = 1,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(Modifier.weight(1f))
@@ -638,11 +638,11 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
                 state.wan.region != null ->
                     MetricLine("地区", state.wan.region, leading = { HomeFlag(state.wan.countryCode, height = 15.dp) })
                 ip == null && state.wan.state == HomeWanState.Failed ->
-                    MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1) })
+                    MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) })
                 ip == null || state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle -> MetricLine("地区", null, placeholder = {
                     Icon(HomeIcons.Hourglass, null, Modifier.size(15.dp), tint = c.t2)
                     Spacer(Modifier.width(5.dp))
-                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 })
                 else -> MetricLine("地区", null)
             }
@@ -662,7 +662,7 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () -> 
         header = {
             MetricTitle("网速")
             Spacer(Modifier.weight(1f))
-            Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1)
+            Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
     ) {
         if (!live) {
@@ -684,7 +684,7 @@ private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen:
         header = {
             MetricTitle("订阅")
             Spacer(Modifier.weight(1f))
-            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1)
+            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
     ) {
         if (sub == null) {

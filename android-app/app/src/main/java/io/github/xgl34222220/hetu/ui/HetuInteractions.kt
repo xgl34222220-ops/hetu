@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.ui
 
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -69,7 +70,7 @@ internal fun HetuFilterTabs(labels: List<String>, selected: Int, onSelect: (Int)
                 Text(ht(label), fontFamily = HetuSystemFontFamily, fontSize = 14.sp, lineHeight = 20.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (active) MaterialTheme.colorScheme.primary else LocalHetuTokens.current.textSecondary,
-                    maxLines = 1)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
