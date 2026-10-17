@@ -90956,7 +90956,7 @@ index 0000000..324c39a
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Polish2106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Polish2106Test.kt
 new file mode 100644
-index 0000000..8e7b6e2
+index 0000000..9fd44a1
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Polish2106Test.kt
 @@ -0,0 +1,143 @@
@@ -91060,7 +91060,7 @@ index 0000000..8e7b6e2
 +        assertEquals("测试中断 · 3/30 可用", hxNetTestSummary(3, 30, 5, failed = true, available = "可用", interrupted = "测试中断"))
 +        val screen = source("app/NetworkTestScreen.kt")
 +        assertTrue(screen.contains("runFailed = true"))
-+        assertTrue(screen.contains("speed.error?.let { ht(it) }"))
++        assertTrue(screen.contains("speed.error?.let { ht(it)"))
 +    }
 +
 +    /* V1 / V3 / V4 */

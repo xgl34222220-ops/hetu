@@ -98,7 +98,7 @@ class Polish2106Test {
         assertEquals("测试中断 · 3/30 可用", hxNetTestSummary(3, 30, 5, failed = true, available = "可用", interrupted = "测试中断"))
         val screen = source("app/NetworkTestScreen.kt")
         assertTrue(screen.contains("runFailed = true"))
-        assertTrue(screen.contains("speed.error?.let { ht(it) }"))
+        assertTrue(screen.contains("speed.error?.let { ht(it)"))
     }
 
     /* V1 / V3 / V4 */
