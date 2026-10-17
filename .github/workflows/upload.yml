@@ -1,7 +1,7 @@
-name: hetu-4.0.0-asset-upload
+name: hetu-4.4.4-asset-upload
 on:
   push:
-    branches: [hark/tmp-release-asset-4.0.0]
+    branches: [hark/tmp-release-asset-4.4.4]
 permissions:
   contents: write
   actions: read
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Hetu-APK-arm64
-          run-id: 38995788096
+          run-id: 39007940081
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: xgl34222220-ops/hetu
           path: apk
@@ -21,5 +21,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ls -la apk
-          echo "364526b4f6f62aee7b405ae2056837f5742069184cd1414e59dfc306ff6026ff  apk/Hetu-4.0.0-arm64-v8a.apk" | sha256sum -c -
-          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/vnd.android.package-archive" --data-binary @apk/Hetu-4.0.0-arm64-v8a.apk "https://uploads.github.com/repos/xgl34222220-ops/hetu/releases/415601002/assets?name=Hetu-4.0.0.apk"
+          echo "0bb7b64efe8b8b73568ef4752cb94e85ba5ca72e61d7fc6a507510462fbd7eed  apk/Hetu-4.4.4-arm64-v8a.apk" | sha256sum -c -
+          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/vnd.android.package-archive" --data-binary @apk/Hetu-4.4.4-arm64-v8a.apk "https://uploads.github.com/repos/xgl34222220-ops/hetu/releases/415653635/assets?name=Hetu-4.4.4.apk"
