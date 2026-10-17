@@ -258,7 +258,7 @@ internal fun ToolsCnIpScreen(
             HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
                 ToolsSwitchRow(
                     "内核绕过 IPv4", state.kernelV4, { onKernelChange(it, state.kernelV6) },
-                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）",
+                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset）",
                     enabled = state.load is ToolsLoad.Ready,
                 )
                 HomeRowDivider(start = HomeRowDims.textStart)
@@ -313,8 +313,8 @@ internal fun cnIpKernelStatusParts(state: ToolsCnIpState): List<CnIpStatusPart> 
             reason.contains("mode-tun") || reason.contains("mode-ebpf") -> CnIpStatusPart("当前代理模式不支持内核绕过，已降级为核心内规则")
             reason.contains("iptables-failed") || reason.contains("restore-missing") -> CnIpStatusPart("内核 iptables 规则安装失败，已降级为核心内规则（%s）", listOf(reason))
             reason.contains("data-invalid") || reason.contains("data-missing") -> CnIpStatusPart("中国 IP 数据缺失或无效，已降级为核心内规则（%s）", listOf(reason))
-            // A session started by an older version (ipset only): the next start uses the iptables rules.
-            reason == "ipset-unavailable" -> CnIpStatusPart("设备没有 ipset：重启代理后改用 iptables 内核规则")
+            // No ipset binary (e.g. stock ColorOS): the iptables tree is opt-in only since 4.4.4.
+            reason.contains("ipset-unavailable") -> CnIpStatusPart("设备不支持 ipset，已降级为核心内规则")
             reason.contains("v6-mode-") -> CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式")
             reason.isBlank() -> CnIpStatusPart("内核绕过未生效，已降级为核心内规则")
             else -> CnIpStatusPart("内核绕过未生效，已降级为核心内规则（%s）", listOf(reason))

@@ -112,7 +112,7 @@ def main():
     assert re.search(r'firstInstallTime=(.+)', after).group(1).strip() == first, 'Upgrade reinstalled instead of updating in place'
     flags = ' '.join(l for l in after.splitlines() if 'pkgFlags=' in l or 'flags=[' in l)
     assert 'DEBUGGABLE' not in flags, 'Installed release is debuggable: ' + flags
-    assert 'versionCode=' + os.environ.get('HETU_EXPECTED_VERSION', '2100') in after
+    assert 'versionCode=' + os.environ.get('HETU_EXPECTED_VERSION', '2101') in after
     adb('logcat', '-c', '-b', 'crash', check=False)
     adb('shell', 'am', 'force-stop', PKG)
     components = adb('shell', 'cmd', 'package', 'query-activities', '--brief', '--components', '-a', 'android.intent.action.MAIN',

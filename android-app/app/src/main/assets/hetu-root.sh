@@ -801,6 +801,7 @@ stop_verify(){
   if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean (no Hetu ip rule, table 20260-20299 route, HETU_ chain, eBPF pin, fake-IP reject or dead TUN rule)"; return 0; fi
   wd_log "stop-verify: left after stop: $SV_LEFT; sweeping once more"
   cleanup_confirmed || true; ebpf_unload || true
+  case " $SV_LEFT " in *-mangle*) cnip_xt_drop 4 || true; cnip_xt_drop 6 || true;; esac
   SV_LEFT=$(stop_leftovers)
   if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean after the second sweep"; else wd_log "stop-verify: still left after the second sweep: $SV_LEFT"; fi
   return 0
@@ -1582,8 +1583,11 @@ bypass6(){
 # ---------------------------------------------------------------- CNIP (ipset)
 cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
 cnip_load_policy(){
-  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0
+  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0
   [ -r "$BASE/policy/cnip" ] || return 1
+  # The iptables CIDR tree (no ipset binary) is opt-in only: on ColorOS it left ~1000 mangle
+  # chains behind and slowed every later iptables call until starts timed out (4.0.0).
+  [ "$(cnip_policy_value XT)" = 1 ] && CN_XT=1
   CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
   # Optional (default off): only TCP to CN addresses bypasses the core; UDP/QUIC still reaches it.
   [ "$(cnip_policy_value TCPONLY)" = 1 ] && CN_TCPONLY=1
@@ -1667,6 +1671,7 @@ cnip_prepare(){
   if ! cnip_capable; then
     # No ipset: the iptables CIDR tree (installed by cnip_xt_install after the start's cleanup).
     CNIP_REASON=ipset-unavailable
+    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; return 0; fi
     if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; return 0; fi
     if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN4_ON=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
     if [ "$CNP_V6" = 1 ]; then
@@ -1771,6 +1776,7 @@ cnip_xt_capable(){
   fi
   [ "$CX_OK" = 1 ]
 }
+cnip_xt_full_restore(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 20 "$1" -w 5 -T mangle; else "$1" -w 5 -T mangle; fi; }
 cnip_xt_restore(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 20 "$1" -w 5 --noflush; else "$1" -w 5 --noflush; fi; }
 # iptables-restore body (mangle) of one family's tree, read from the CN list on stdin; the number
 # of accepted networks goes to $5. Same validation and limits as the ipset import; exit 3 when the
@@ -1844,7 +1850,21 @@ cnip_xt_drop(){
     END { for (i = 1; i <= n; i++) print "-F " chain[i]; for (i = 1; i <= n; i++) print "-X " chain[i] }')
   [ -n "$CXD_PLAN" ] || return 0
   has "$CXD_RESTORE" || return 1
-  printf '*mangle\n%s\nCOMMIT\n' "$CXD_PLAN" | cnip_xt_restore "$CXD_RESTORE" >/dev/null 2>&1 || return 1
+  if ! printf '*mangle\n%s\nCOMMIT\n' "$CXD_PLAN" | cnip_xt_restore "$CXD_RESTORE" >/dev/null 2>&1; then
+    # One stale line aborts the whole restore: rewrite mangle without the tree in one commit,
+    # else remove piece by piece.
+    CXD_SAVE=iptables-save; [ "$1" != 6 ] || CXD_SAVE=ip6tables-save
+    if has "$CXD_SAVE" && CXD_DUMP=$("$CXD_SAVE" -t mangle 2>/dev/null) && printf '%s\n' "$CXD_DUMP" | grep -q '^\*mangle'; then
+      printf '%s\n' "$CXD_DUMP" | grep -Ev '(^:|^-A |-j |-g )HETU_CN(C|Y|L|_)' | cnip_xt_full_restore "$CXD_RESTORE" >/dev/null 2>&1 || true
+      CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
+      printf '%s\n' "$CXD_RULES" | grep -Eq '(^-N | -j | -g )HETU_CN(C|Y|L|_)' || return 0
+    fi
+    printf '%s\n' "$CXD_PLAN" | while IFS= read -r CXD_LINE; do
+      [ -n "$CXD_LINE" ] || continue
+      # shellcheck disable=SC2086
+      "$CXD_BIN" -t mangle $CXD_LINE >/dev/null 2>&1 || true
+    done
+  fi
   CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
   ! printf '%s\n' "$CXD_RULES" | grep -Eq '(^-N | -j | -g )HETU_CN(C|Y|L|_)'
 }

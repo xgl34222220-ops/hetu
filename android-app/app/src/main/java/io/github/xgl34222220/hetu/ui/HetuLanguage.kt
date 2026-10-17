@@ -1380,6 +1380,8 @@ private val vocabularyTiktokStop = """
 
 // 2026-10 CNIP without ipset (iptables tree) and the speed test failure reasons.
 private val vocabularyCnipSpeed = """
+国内 IPv4 直接放行，不经过核心（ipset）|Domestic IPv4 goes direct without the core (ipset)|國內 IPv4 直接放行，不經過核心（ipset）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset)
+设备不支持 ipset，已降级为核心内规则|This device has no ipset; the core rules handle it instead|裝置不支援 ipset，已降級為核心內規則|На устройстве нет ipset; вместо этого работают правила ядра прокси
 国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
 内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
 内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)

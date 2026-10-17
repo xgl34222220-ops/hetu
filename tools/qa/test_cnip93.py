@@ -336,7 +336,7 @@ class Cnip93(unittest.TestCase):
         Path(str(self.ipstate) + '.noconnmark').write_text('')
         self.start()
         self.assertIn('CNIP=degraded\n', self.read(self.base / 'run/session.state'))
-        self.assertIn('CNIP_REASON=ipset-unavailable,xt-connmark-unavailable\n', self.read(self.base / 'run/session.state'))
+        self.assertIn('CNIP_REASON=ipset-unavailable\n', self.read(self.base / 'run/session.state'))
         self.assertFalse([l for l in self.all_rules() if 'HETU_CN' in l or 'connmark --mark 0x20000000' in l])
         self.assertFalse([l for l in self.all_rules() if '--match-set' in l])
         self.assertTrue(any('HETU_MOUT' in l for l in self.all_rules()), 'the capture itself is installed')

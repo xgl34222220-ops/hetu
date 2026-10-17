@@ -21,7 +21,8 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-13: the user authorized shipping this layer as the official 1.0.0 release (versionCode 2094).
 # 2026-10-15: 3.3.3 release (versionCode 2099) = 3.0.0 + real-probe Wi-Fi heal, home latency/public IP, audit5 polish.
 # 2026-10-17: 4.0.0 release (versionCode 2100) = 3.3.3 + stop no longer blocks fake-IP, foreign-rule start check, store-fake-ip, UI/func 400.
-VERSION_CODE, VERSION_NAME = 2100, '4.0.0'
+# 2026-10-17: 4.4.4 (versionCode 2101) = 4.0.0 + iptables CNIP tree opt-in only, robust tree cleanup.
+VERSION_CODE, VERSION_NAME = 2101, '4.4.4'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -409,8 +410,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2100', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "4.0.0"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2101', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "4.4.4"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'

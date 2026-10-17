@@ -115,7 +115,7 @@ class CnipXt93(test_cnip93.Cnip93):
         Path(str(self.ipstate) + '.absent').write_text('')
 
     def policy(self, v4=1, v6=1, force='', tcp_only=None):
-        text = 'V4=%d\nV6=%d\nFORCE=%s\n' % (v4, v6, force)
+        text = 'V4=%d\nV6=%d\nFORCE=%s\nXT=1\n' % (v4, v6, force)
         if tcp_only is not None: text += 'TCPONLY=%d\n' % tcp_only
         (self.base / 'policy/cnip').write_text(text)
 
@@ -137,6 +137,15 @@ class CnipXt93(test_cnip93.Cnip93):
         self.assertEqual([], left)
 
     # ------------------------------------------------------------------ tests
+    def test_tree_is_opt_in_only(self):
+        # 4.4.4: without XT=1 in the policy (the app never writes it) no tree is built.
+        (self.base / 'policy/cnip').write_text('V4=1\nV6=1\nFORCE=\n')
+        self.start()
+        session = self.session()
+        self.assertIn('CNIP=degraded\n', session); self.assertIn('CNIP_REASON=ipset-unavailable\n', session)
+        self.assertFalse([l for l in self.all_rules() if 'HETU_CN' in l])
+        self.assertTrue(any('HETU_MOUT' in l for l in self.all_rules()), 'the capture itself is installed')
+
     def test_tree_installed_returns_cn_and_stop_removes_everything(self):
         self.policy()
         self.start()

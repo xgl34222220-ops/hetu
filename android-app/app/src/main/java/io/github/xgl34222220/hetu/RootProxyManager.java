@@ -2066,7 +2066,9 @@ final class RootProxyManager {
             return MihomoStartupConfig.CNIP_FAKE_IP_OFF;
         boolean geosite=false;
         try{
-            RootBridge.Result listing=boundedRootShell(context,"ls -ln "+RootBridge.quote(ROOT+"/run")+" 2>/dev/null; :",5_000L);
+            // No ipset binary (stock ColorOS): the kernel bypass degrades, so CN names keep fake IPs.
+            RootBridge.Result listing=boundedRootShell(context,"command -v ipset >/dev/null 2>&1 && echo HETU_IPSET_PRESENT; ls -ln "+RootBridge.quote(ROOT+"/run")+" 2>/dev/null; :",5_000L);
+            if(listing.ok()&&!listing.output.contains("HETU_IPSET_PRESENT")) return MihomoStartupConfig.CNIP_FAKE_IP_OFF;
             geosite=listing.ok()&&CnipFakeIp.geositeAvailable(listing.output);
         }catch(RuntimeException ignored){}
         return geosite?MihomoStartupConfig.CNIP_FAKE_IP_GEOSITE:MihomoStartupConfig.CNIP_FAKE_IP_OFFLINE;
