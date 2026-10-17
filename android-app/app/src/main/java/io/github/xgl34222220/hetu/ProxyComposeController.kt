@@ -252,7 +252,7 @@ internal class ProxyComposeController(context: Context) {
                     val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                         else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                     if (observedPid > 0) live.put("pid", observedPid)
-                    // CNIP kernel bypass as the running session reports it (ipset / degraded / off).
+                    // CNIP kernel bypass as the running session reports it (ipset / iptables / degraded / off).
                     if (live.has("cnip")) {
                         val cnip = if (live.optBoolean("running", false)) live.optString("cnip", "off") else "off"
                         val reason = live.optString("cnipReason", "")

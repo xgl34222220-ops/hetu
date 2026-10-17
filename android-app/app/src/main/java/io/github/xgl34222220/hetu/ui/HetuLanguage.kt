@@ -1377,7 +1377,36 @@ private val vocabularyTiktokStop = """
 无法移除旧版河图停止后留下的 fake-IP 拦截规则（HXFAKE_REJECT），请重试启动或重启手机|Could not remove the fake-IP block left by an older Hetu stop (HXFAKE_REJECT). Try starting again or restart the phone|無法移除舊版河圖停止後留下的 fake-IP 攔截規則（HXFAKE_REJECT），請重試啟動或重新啟動手機|Не удалось снять блокировку fake-IP, оставленную остановкой старой версии Hetu (HXFAKE_REJECT). Запустите снова или перезагрузите телефон
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop).joinToString("\n")
+
+// 2026-10 CNIP without ipset (iptables tree) and the speed test failure reasons.
+private val vocabularyCnipSpeed = """
+国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
+内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
+内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)
+IPv4 %s 段|IPv4 %s ranges|IPv4 %s 段|IPv4: %s диапазонов
+IPv6 %s 段|IPv6 %s ranges|IPv6 %s 段|IPv6: %s диапазонов
+IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs IPv6 mode "Enable / Strict"|IPv6 未生效：需要 IPv6「啟用／嚴格」模式|IPv6 не применён: нужен режим IPv6 «Включить / Строгий»
+内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复|The kernel bypass rules are gone; the core rules handle it now. Restart the proxy to restore them|核心繞過規則已遺失，已降級為核心內規則；重新啟動代理可恢復|Правила обхода в ядре пропали, теперь работают правила ядра прокси. Перезапустите прокси, чтобы вернуть их
+设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则|This device has no ipset and no iptables connection marks; the core rules handle it instead|裝置沒有 ipset，也不支援 iptables 連線標記，已降級為核心內規則|На устройстве нет ipset и меток соединений iptables; вместо этого работают правила ядра прокси
+当前代理模式不支持内核绕过，已降级为核心内规则|The current proxy mode has no kernel bypass; the core rules handle it instead|目前代理模式不支援核心繞過，已降級為核心內規則|Текущий режим прокси не поддерживает обход в ядре; вместо этого работают правила ядра прокси
+内核 iptables 规则安装失败，已降级为核心内规则（%s）|Installing the kernel iptables rules failed; the core rules handle it instead (%s)|核心 iptables 規則安裝失敗，已降級為核心內規則（%s）|Не удалось установить правила iptables; вместо этого работают правила ядра прокси (%s)
+中国 IP 数据缺失或无效，已降级为核心内规则（%s）|China IP data is missing or invalid; the core rules handle it instead (%s)|中國 IP 資料缺失或無效，已降級為核心內規則（%s）|Данные об IP Китая отсутствуют или неверны; вместо этого работают правила ядра прокси (%s)
+设备没有 ipset：重启代理后改用 iptables 内核规则|This device has no ipset: restart the proxy to switch to kernel iptables rules|裝置沒有 ipset：重新啟動代理後改用 iptables 核心規則|На устройстве нет ipset: перезапустите прокси, чтобы перейти на правила iptables
+内核绕过未生效，已降级为核心内规则|Kernel bypass not active; the core rules handle it instead|核心繞過未生效，已降級為核心內規則|Обход в ядре не активен; вместо этого работают правила ядра прокси
+内核绕过未生效，已降级为核心内规则（%s）|Kernel bypass not active; the core rules handle it instead (%s)|核心繞過未生效，已降級為核心內規則（%s）|Обход в ядре не активен; вместо этого работают правила ядра прокси (%s)
+重启代理后生效|Takes effect after a proxy restart|重新啟動代理後生效|Вступит в силу после перезапуска прокси
+出口正常，但测速站 speed.cloudflare.com 的连接被立即关闭：通常是当前节点（机场）禁止测速，或分流规则把它拒绝（REJECT）。可换个节点再试|The exit works, but connections to speed.cloudflare.com are closed at once: usually the current node (provider) forbids speed tests, or a routing rule rejects it (REJECT). Try another node|出口正常，但測速站 speed.cloudflare.com 的連線被立即關閉：通常是目前節點（機場）禁止測速，或分流規則將其拒絕（REJECT）。可換個節點再試|Выход работает, но соединения с speed.cloudflare.com сразу закрываются: обычно текущий узел (провайдер) запрещает тесты скорости или правило маршрутизации его отклоняет (REJECT). Попробуйте другой узел
+连接被立即关闭，出口也查询不到：当前节点可能不可用，或分流规则拒绝了这些连接。请换个节点再试|Connections are closed at once and the exit cannot be looked up either: the current node may be down, or a routing rule rejects these connections. Try another node|連線被立即關閉，出口也查詢不到：目前節點可能無法使用，或分流規則拒絕了這些連線。請換個節點再試|Соединения сразу закрываются, и выход тоже не определить: текущий узел может быть недоступен или правило маршрутизации отклоняет эти соединения. Попробуйте другой узел
+无法连接河图核心的本地测速入口（127.0.0.1:%s）：代理可能刚停止或正在重启，请稍后再试|Cannot reach the core's local speed-test entry (127.0.0.1:%s): the proxy may have just stopped or be restarting. Try again shortly|無法連線河圖核心的本機測速入口（127.0.0.1:%s）：代理可能剛停止或正在重新啟動，請稍後再試|Нет связи с локальным входом теста скорости ядра (127.0.0.1:%s): прокси мог только что остановиться или перезапускается. Повторите чуть позже
+测速服务器拒绝连接|The speed test server refused the connection|測速伺服器拒絕連線|Сервер теста скорости отклонил соединение
+测速请求超时：当前节点响应太慢或不可用|The speed test timed out: the current node is too slow or unavailable|測速請求逾時：目前節點回應太慢或無法使用|Тайм-аут теста скорости: текущий узел слишком медленный или недоступен
+无法解析测速服务器域名|Cannot resolve the speed test server's name|無法解析測速伺服器網域|Не удалось разрешить имя сервера теста скорости
+与测速服务器的 TLS 握手失败（%s）|TLS handshake with the speed test server failed (%s)|與測速伺服器的 TLS 交握失敗（%s）|Сбой TLS-рукопожатия с сервером теста скорости (%s)
+测速服务器返回 HTTP %s，当前出口可能被 Cloudflare 限制|The speed test server answered HTTP %s; Cloudflare may be limiting this exit|測速伺服器回傳 HTTP %s，目前出口可能被 Cloudflare 限制|Сервер теста скорости ответил HTTP %s; Cloudflare может ограничивать этот выход
+测速连接中断（%s）|The speed test connection broke off (%s)|測速連線中斷（%s）|Соединение теста скорости прервалось (%s)
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

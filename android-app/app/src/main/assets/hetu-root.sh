@@ -115,6 +115,15 @@ CN_TCPONLY=0
 CN_CHAIN=""
 CNIP_STATE=off
 CNIP_REASON=""
+# Without the ipset binary (stock ColorOS/OxygenOS and many other ROMs ship none) the same bypass
+# runs as an iptables CIDR tree in mangle: OUTPUT/PREROUTING -> HETU_CNC -> HETU_CNL (one rule per
+# /8 or /16 block, nested HETU_CN_<bits>_<key> chains of at most ~32 entries) -> HETU_CNY. Only a
+# connection's first packet (ctstate NEW, verdict not yet stored) walks the tree; the verdict is
+# kept in two conntrack-mark bits (CN_CT_CHK = classified, CN_CT_CN = CN destination), so every
+# later packet skips it and the capture/guard chains only test the CN bit. status: cnip=iptables.
+CN_CT_CN=0x20000000
+CN_CT_CHK=0x40000000
+CN_CT_BOTH=0x60000000
 
 # Opt-in eBPF rule matcher (default off). The App writes $BASE/policy/ebpf (ENABLED=1) and deploys
 # the loader and object from assets/hetu-bpf to $BASE/bin. When enabled and every probe passes, the
@@ -568,6 +577,7 @@ cleanup4(){
   unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
   if [ "$PRESERVE_KILL" != 1 ]; then unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; fi
   cn_drop_tails xt4; share_drop_tails xt4
+  if [ "$PRESERVE_KILL" != 1 ] && ! cleanup_chain_absent xt4 mangle HETU_CNC; then cnip_xt_drop 4 || true; fi
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -584,6 +594,7 @@ cleanup6(){
   unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
   if [ "$PRESERVE_KILL" != 1 ]; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
   cn_drop_tails xt6; share_drop_tails xt6
+  if [ "$PRESERVE_KILL" != 1 ] && ! cleanup_chain_absent xt6 mangle HETU_CNC; then cnip_xt_drop 6 || true; fi
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -598,7 +609,7 @@ cleanup6(){
 sweep_plan(){
   awk -v keep="$PRESERVE_KILL" -v want="$1" -v only="${SWEEP_ONLY:-}" '
     function own(c){ if (only != "") return index(" " only " ", " " c " ") > 0; return c ~ /^(HETU|BICHEN)_/ }
-    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T" || c == "HETU_KFWD_S") }
+    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T" || c == "HETU_KFWD_S" || c ~ /^HETU_CN(C|Y|L|_)/) }
     function hook(   i){ for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1)) && !kept($(i+1))) return 1; return 0 }
     $1 == "-N" && own($2) && !kept($2) { n++; chain[n] = $2; next }
     $1 == "-A" && own($2) && !kept($2) { next }
@@ -1584,7 +1595,7 @@ cnip_load_policy(){
 cnip_load_session(){
   CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
   CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
-  [ "$CNIP_STATE" = ipset ] || return 0
+  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || return 0
   [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
   [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
   [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
@@ -1653,7 +1664,19 @@ cnip_prepare(){
   CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""
   cnip_load_policy || { CN_FORCE=""; return 0; }
   case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; return 0;; esac
-  if ! cnip_capable; then CNIP_STATE=degraded; CNIP_REASON=ipset-unavailable; CN_FORCE=""; return 0; fi
+  if ! cnip_capable; then
+    # No ipset: the iptables CIDR tree (installed by cnip_xt_install after the start's cleanup).
+    CNIP_REASON=ipset-unavailable
+    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; return 0; fi
+    if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN4_ON=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
+    if [ "$CNP_V6" = 1 ]; then
+      if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables && has ip6tables-restore; then
+        if [ -s "$CN_FILE6" ]; then CN6_ON=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
+      else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
+    fi
+    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; fi
+    return 0
+  fi
   if [ "$CNP_V4" = 1 ]; then cnip_import 4 && CN4_ON=1; fi
   if [ "$CNP_V6" = 1 ]; then
     if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then cnip_import 6 && CN6_ON=1
@@ -1669,20 +1692,22 @@ cn_split(){
   CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
   case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
   CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
+  # ipset: the set match; iptables tree: the CN verdict bit HETU_CNC stored on the connection.
+  CS_M="-m set --match-set $CS_SET dst"; [ "$CNIP_STATE" != iptables ] || CS_M="-m connmark --mark $CN_CT_CN/$CN_CT_CN"
   if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
     CS_TAIL="${CS_C}_T"
     if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
     else "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" || return 1; fi
     CS_OLDIFS=$IFS; IFS=,; set -- $CN_FORCE; IFS=$CS_OLDIFS
     for CS_U in "$@"; do "$CS_BIN" -t "$CS_T" -A "$CS_C" -m owner --uid-owner "$CS_U" -g "$CS_TAIL" || return 1; done
-    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN || return 1
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P $CS_M -j RETURN || return 1
     "$CS_BIN" -t "$CS_T" -A "$CS_C" -g "$CS_TAIL" || return 1
     CN_CHAIN="$CS_TAIL"; return 0
   fi
   if [ "$CS_KIND" = mark ] && [ -n "$MARK" ]; then
-    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m mark ! --mark "$MARK/$MASK" $CS_M -j RETURN; return
   fi
-  "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN
+  "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P $CS_M -j RETURN
 }
 # Per-chain fallback: an unreferenced "<chain>_T" left by a failed batch sweep.
 cn_drop_tail(){ cleanup_chain_absent "$1" "$2" "$3" && return 0; "$1" -t "$2" -F "$3" >/dev/null 2>&1 || true; "$1" -t "$2" -X "$3" >/dev/null 2>&1 || true; }
@@ -1719,6 +1744,7 @@ cnip_set_size(){ cnip_ipset list "$1" -t 2>/dev/null | awk -F': *' '/^Number of 
 cnip_reload(){ (
   trap 'release_lock' EXIT
   cnip_load_session
+  [ "$CNIP_STATE" != iptables ] || cnip_xt_reload
   if [ "$CNIP_STATE" != ipset ]; then printf '{"ok":true,"reloaded":false,"cnip":"%s","message":"内核 CNIP 未生效，数据已保存，下次启动使用"}\n' "$CNIP_STATE"; exit 0; fi
   CR_DUE=0
   if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
@@ -1732,6 +1758,150 @@ cnip_reload(){ (
   if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ipset","message":"CNIP ipset 已热更新"}\n'
   else printf '{"ok":false,"reloaded":false,"cnip":"ipset","message":"CNIP 新数据无效或导入失败，继续使用原集合"}\n'; fi
 ); }
+
+# ---------------------------------------------------------------- CNIP (iptables tree, no ipset)
+# The kernel needs conntrack + connmark matches and the CONNMARK target in mangle (both are used
+# by Android netd itself); iptables-restore installs the whole tree in one commit per family.
+cnip_xt_capable(){
+  has iptables-restore || return 1
+  CX_OK=0
+  if xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1; then
+    xt4 -t mangle -A HETU_PROBE -m conntrack --ctstate NEW -m connmark ! --mark "$CN_CT_CHK/$CN_CT_CHK" -j CONNMARK --set-xmark "$CN_CT_CHK/$CN_CT_CHK" >/dev/null 2>&1 && CX_OK=1
+    xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true
+  fi
+  [ "$CX_OK" = 1 ]
+}
+cnip_xt_restore(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 20 "$1" -w 5 --noflush; else "$1" -w 5 --noflush; fi; }
+# iptables-restore body (mangle) of one family's tree, read from the CN list on stdin; the number
+# of accepted networks goes to $5. Same validation and limits as the ipset import; exit 3 when the
+# count is out of range. Entries stay in the deepest block chain (<= 32 per chain where the
+# prefix allows), direct entries before block jumps, so overlapping lists still match.
+cnip_xt_tree(){
+  awk -v f="$1" -v lo="$2" -v hi="$3" -v proto="$4" -v countfile="$5" -v top=HETU_CNL -v both="$CN_CT_BOTH" -v chk="$CN_CT_CHK" '
+    function hexval(s,   i, c, v) { v = 0; s = tolower(s); if (s == "" || length(s) > 4) return -1
+      for (i = 1; i <= length(s); i++) { c = index("0123456789abcdef", substr(s, i, 1)); if (c == 0) return -1; v = v * 16 + c - 1 }
+      return v }
+    function pow2(n,   r) { r = 1; while (n-- > 0) r *= 2; return r }
+    function block(v, b,   x, h1, h2, h3) {
+      if (f == 4) { x = v * pow2(32 - b); h1 = int(x / 16777216); x -= h1 * 16777216; h2 = int(x / 65536); x -= h2 * 65536; h3 = int(x / 256); x -= h3 * 256
+        return sprintf("%d.%d.%d.%d/%d", h1, h2, h3, x, b) }
+      x = v * pow2(48 - b); h1 = int(x / 4294967296); x -= h1 * 4294967296; h2 = int(x / 65536); x -= h2 * 65536
+      return sprintf("%x:%x:%x::/%d", h1, h2, x, b) }
+    { sub(/\r$/, ""); sub(/[ \t]*#.*/, ""); gsub(/^[ \t]+|[ \t]+$/, ""); if ($0 == "") next
+      n = split($0, a, "/")
+      if (f == 4) {
+        if ($0 !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/) next
+        split(a[1], o, "."); bad = 0; for (i = 1; i <= 4; i++) if (o[i] + 0 > 255) bad = 1; if (bad) next
+        p = (n == 2) ? a[2] + 0 : 32; if (p < 8 || p > 32) next
+        key = ((o[1] * 256 + o[2]) * 256 + o[3]) * 256 + o[4]; W = 32
+      } else {
+        if ($0 !~ /^[0-9A-Fa-f:]+(\/[0-9]+)?$/ || $0 !~ /:/) next
+        p = (n == 2) ? a[2] + 0 : 128; if (p < 16 || p > 128) next
+        if (substr(a[1], 1, 1) == ":") next
+        d = index(a[1], "::"); head = (d > 0) ? substr(a[1], 1, d - 1) : a[1]
+        m = split(head, h, ":"); if (d == 0 && m != 8) next; if (m > 8) next
+        for (i = m + 1; i <= 3; i++) h[i] = "0"
+        v1 = hexval(h[1]); v2 = hexval(h[2]); v3 = hexval(h[3]); if (v1 < 0 || v2 < 0 || v3 < 0) next
+        key = (v1 * 65536 + v2) * 65536 + v3; W = 48
+      }
+      N++; net[N] = $0; pl[N] = p; k[N] = key; ch[N] = top
+    }
+    END {
+      if (N < lo || N > hi) exit 3
+      nl = split(f == 4 ? "8 12 16 20 24" : "16 20 24 28 32 36 40 44 48", lv, " ")
+      for (l = 1; l <= nl; l++) {
+        b = lv[l] + 0; split("", cnt)
+        for (i = 1; i <= N; i++) cnt[ch[i]]++
+        for (i = 1; i <= N; i++) {
+          if (cnt[ch[i]] <= 32 || pl[i] <= b) continue
+          kb = int(k[i] / pow2(W - b)); c = sprintf("HETU_CN_%d_%.0f", b, kb)
+          if (!(c in par)) { par[c] = ch[i]; cidr[c] = block(kb, b); order[++nc] = c }
+          ch[i] = c
+        }
+      }
+      printf "-N HETU_CNC\n-N HETU_CNY\n-N %s\n", top
+      for (j = 1; j <= nc; j++) printf "-N %s\n", order[j]
+      printf "-A HETU_CNY -j CONNMARK --set-xmark %s/%s\n", both, both
+      for (i = 1; i <= N; i++) printf "-A %s -d %s -g HETU_CNY\n", ch[i], net[i]
+      for (j = 1; j <= nc; j++) printf "-A %s -d %s -g %s\n", par[order[j]], cidr[order[j]], order[j]
+      printf "-A HETU_CNC %s-m conntrack --ctstate NEW -m connmark ! --mark %s/%s -j %s\n", proto, chk, chk, top
+      printf "-A HETU_CNC -m conntrack --ctstate NEW -j CONNMARK --set-xmark %s/%s\n", chk, chk
+      printf "-I PREROUTING 1 -j HETU_CNC\n-I OUTPUT 1 -j HETU_CNC\n"
+      printf "%d\n", N > countfile
+    }
+  '
+}
+# Removes one family's tree and its hooks (one restore, verified). Kept with a preserved Kill
+# Switch only through sweep_plan; this function always removes.
+cnip_xt_drop(){
+  CXD_BIN=xt$1; CXD_RESTORE=iptables-restore
+  if [ "$1" = 6 ]; then has ip6tables || return 0; CXD_RESTORE=ip6tables-restore; fi
+  CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
+  CXD_PLAN=$(printf '%s\n' "$CXD_RULES" | awk '
+    function own(c){ return c ~ /^HETU_CN(C|Y|L|_)/ }
+    $1 == "-N" && own($2) { n++; chain[n] = $2; next }
+    $1 == "-A" && !own($2) { for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1))) { line = $0; sub(/^-A /, "-D ", line); print line; break } }
+    END { for (i = 1; i <= n; i++) print "-F " chain[i]; for (i = 1; i <= n; i++) print "-X " chain[i] }')
+  [ -n "$CXD_PLAN" ] || return 0
+  has "$CXD_RESTORE" || return 1
+  printf '*mangle\n%s\nCOMMIT\n' "$CXD_PLAN" | cnip_xt_restore "$CXD_RESTORE" >/dev/null 2>&1 || return 1
+  CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
+  ! printf '%s\n' "$CXD_RULES" | grep -Eq '(^-N | -j | -g )HETU_CN(C|Y|L|_)'
+}
+# (Re)builds one family: the new data is validated and rendered before the old tree goes, so a bad
+# list keeps the installed tree; the stamp/count record what is live.
+cnip_xt_build(){
+  CXB_F="$1"; CXB_FILE=$CN_FILE4; CXB_LO=1000; CXB_HI=20000; CXB_RESTORE=iptables-restore; CXB_BIN=xt4
+  if [ "$CXB_F" = 6 ]; then CXB_FILE=$CN_FILE6; CXB_LO=500; CXB_HI=30000; CXB_RESTORE=ip6tables-restore; CXB_BIN=xt6; fi
+  [ -s "$CXB_FILE" ] || { CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-data-missing"; return 1; }
+  has "$CXB_RESTORE" || { CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-restore-missing"; return 1; }
+  CXB_SIG=$(cnip_file_sig "$CXB_FILE"); [ -n "$CXB_SIG" ] || return 1
+  mkdir -p "$RUN/state" 2>/dev/null || true
+  CXB_BATCH="$RUN/.cnipxt$CXB_F.$$"; CXB_P=""; [ "$CN_TCPONLY" != 1 ] || CXB_P="-p tcp "
+  printf '*mangle\n' > "$CXB_BATCH" || return 1
+  cnip_xt_tree "$CXB_F" "$CXB_LO" "$CXB_HI" "$CXB_P" "$CXB_BATCH.count" < "$CXB_FILE" >> "$CXB_BATCH"; CXB_RC=$?
+  if [ "$CXB_RC" != 0 ]; then
+    rm -f "$CXB_BATCH" "$CXB_BATCH.count"
+    if [ "$CXB_RC" = 3 ]; then CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-data-invalid"; fi
+    return 1
+  fi
+  printf 'COMMIT\n' >> "$CXB_BATCH"
+  if ! cnip_xt_drop "$CXB_F"; then rm -f "$CXB_BATCH" "$CXB_BATCH.count"; CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-iptables-failed"; return 1; fi
+  if ! cnip_xt_restore "$CXB_RESTORE" < "$CXB_BATCH" >/dev/null 2>&1 || ! "$CXB_BIN" -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1; then
+    rm -f "$CXB_BATCH" "$CXB_BATCH.count"; cnip_xt_drop "$CXB_F" || true
+    CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-iptables-failed"; return 1
+  fi
+  mv -f "$CXB_BATCH.count" "$RUN/state/cnip-xt$CXB_F.count" 2>/dev/null || true
+  printf '%s\n' "$CXB_SIG" > "$RUN/state/cnip-xt$CXB_F.stamp" 2>/dev/null || true
+  rm -f "$CXB_BATCH"
+}
+# Start stage after the start's cleanup and before any capture rule: install what cnip_prepare
+# decided; a family that cannot be installed is switched off before a capture rule tests its bit.
+cnip_xt_install(){
+  if [ "$CNIP_STATE" != iptables ]; then
+    # A preserved bootstrap Kill Switch keeps an older tree through cleanup; drop it.
+    if [ "$PRESERVE_KILL" = 1 ]; then cnip_xt_drop 4 || true; cnip_xt_drop 6 || true; fi
+    return 0
+  fi
+  if [ "$CN4_ON" = 1 ]; then cnip_xt_build 4 || CN4_ON=0; else cnip_xt_drop 4 || true; fi
+  if [ "$CN6_ON" = 1 ]; then cnip_xt_build 6 || CN6_ON=0; else cnip_xt_drop 6 || true; fi
+  if [ "$CN4_ON" != 1 ] && [ "$CN6_ON" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; fi
+  return 0
+}
+cnip_xt_reload(){
+  CR_DUE=0
+  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-xt4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-xt6.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CR_DUE" = 0 ]; then printf '{"ok":true,"reloaded":false,"cnip":"iptables","message":"CNIP 数据未变化"}\n'; exit 0; fi
+  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
+  CR_FAILED=0; CNIP_REASON=""
+  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-xt4.stamp" 2>/dev/null)" ]; then cnip_xt_build 4 || CR_FAILED=1; fi
+  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-xt6.stamp" 2>/dev/null)" ]; then cnip_xt_build 6 || CR_FAILED=1; fi
+  printf '%s cnip-reload(iptables) failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
+  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"iptables","message":"CNIP iptables 规则已热更新"}\n'
+  else printf '{"ok":false,"reloaded":false,"cnip":"iptables","message":"CNIP 新数据无效或规则更新失败，内核绕过可能暂时经核心处理"}\n'; fi
+  exit 0
+}
 
 # ---------------------------------------------------------------- eBPF rule matcher (opt-in)
 ebpf_policy_enabled(){ [ "$(sed -n 's/^ENABLED=//p' "$BASE/policy/ebpf" 2>/dev/null | head -n 1)" = 1 ]; }
@@ -3110,7 +3280,7 @@ watchdog(){
     if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
       MISS=0; H_TICK=$((H_TICK+1))
       if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
-        [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; wd_net_watch; fi
+        case "$CNIP_STATE" in ipset|iptables) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
       wd_selfheal_tick
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
@@ -3607,6 +3777,9 @@ start(){
   # any capture rule references it. Every failure falls back to the owner/CIDR rules.
   start_stage "ebpf-matcher"
   ebpf_prepare
+  # CNIP without ipset: the iptables tree goes in before any capture rule tests its verdict bit.
+  start_stage "cnip-chain"
+  cnip_xt_install
   start_stage "install-capture-batch"
   xt_batch_begin || fail "无法准备防火墙批量规则"
   XT_BATCH=1; install_capture_rules; XT_BATCH=0
@@ -3635,7 +3808,7 @@ start(){
   # Finish the immutable session before its integrity snapshot. Updating it after
   # health_record would invalidate every status check and disable owned-rule repair.
   printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$([ "$CNIP_STATE" = ipset ] && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
   printf 'EBPF_MATCH=%s\nEBPF_REASON=%s\n' "$EBPF_STATE" "$EBPF_REASON" >> "$SESSION" || { fail "无法记录 eBPF 匹配状态，已停止本次启动"; }
   printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
@@ -3876,11 +4049,17 @@ status(){
     [ "$CN4_ON" != 1 ] || CNIP4N=$(cnip_set_size "$CN_SET4"); [ "$CN6_ON" != 1 ] || CNIP6N=$(cnip_set_size "$CN_SET6")
     case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
     if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
+  elif [ "$CNIP_STATE" = iptables ]; then
+    # The tree is not in the integrity manifest (too large to diff each poll): check its hooks here.
+    if [ "$CN4_ON" = 1 ]; then CNIP4N=$(cat "$RUN/state/cnip-xt4.count" 2>/dev/null); xt4q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v4-chain-missing"; fi
+    if [ "$CN6_ON" = 1 ]; then CNIP6N=$(cat "$RUN/state/cnip-xt6.count" 2>/dev/null); xt6q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v6-chain-missing"; fi
+    case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
+    case "$CNIPR" in *chain-missing*) CNIP_STATE=degraded;; esac
   fi
   ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
   # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | offline), else empty.
   EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.

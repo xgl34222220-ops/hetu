@@ -449,7 +449,7 @@ final class RootProxyManager {
         ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
         source=cleaned.text;
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
-                prefs.getBoolean("proxyRecommendedDns",false),true,validationHosts());
+                prefs.getBoolean("proxyRecommendedDns",false),true,validationHosts(),cnipFakeIpPolicy(profile));
         RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
         // Private comments carry an already validated routing projection into start/boot.
         // Keep the established startup argument protocol and the user's source untouched.
@@ -2054,6 +2054,23 @@ final class RootProxyManager {
      * captive_portal_*_url and the probe URLs NetworkRevalidation last read as Root (cached; read after a start,
      * never on the start path).
      */
+    /**
+     * CNIP kernel bypass x fake-IP: while the bypass is on (TPROXY/Redirect/Enhance), domestic names get
+     * real addresses in fake-ip mode. geosite:cn only when the core home already holds GeoSite.dat
+     * (Mihomo would download it during the start otherwise); else the offline list (CnipFakeIp).
+     */
+    private int cnipFakeIpPolicy(ProxyRuntimeProfile profile){
+        if(!CnipFakeIp.kernelBypassWanted(prefs.getBoolean(CnipFakeIp.PREF_V4,false),prefs.getBoolean(CnipFakeIp.PREF_V6,false)))
+            return MihomoStartupConfig.CNIP_FAKE_IP_OFF;
+        if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE)
+            return MihomoStartupConfig.CNIP_FAKE_IP_OFF;
+        boolean geosite=false;
+        try{
+            RootBridge.Result listing=boundedRootShell(context,"ls -ln "+RootBridge.quote(ROOT+"/run")+" 2>/dev/null; :",5_000L);
+            geosite=listing.ok()&&CnipFakeIp.geositeAvailable(listing.output);
+        }catch(RuntimeException ignored){}
+        return geosite?MihomoStartupConfig.CNIP_FAKE_IP_GEOSITE:MihomoStartupConfig.CNIP_FAKE_IP_OFFLINE;
+    }
     private List<String> validationHosts(){
         ArrayList<String> values=new ArrayList<>();
         for(String key:CaptivePortalBypass.SETTINGS_KEYS){

@@ -117,6 +117,25 @@ final class MihomoStartupConfig {
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
             boolean recommendedDns,boolean wechatTransport,List<String> validationHosts)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,
+                recommendedDns,wechatTransport,validationHosts,CNIP_FAKE_IP_OFF);
+    }
+
+    /** CNIP kernel bypass off (or a mode without it): fake-ip answers stay as the source says. */
+    static final int CNIP_FAKE_IP_OFF=0;
+    /** Bypass on, no GeoSite.dat in the core home: the offline domestic list gets real addresses. */
+    static final int CNIP_FAKE_IP_OFFLINE=1;
+    /** Bypass on and GeoSite.dat present: geosite:cn gets real addresses. */
+    static final int CNIP_FAKE_IP_GEOSITE=2;
+
+    /**
+     * [cnipFakeIp] (the Root start passes it while the CNIP kernel bypass is on in TPROXY/Redirect/
+     * Enhance): in fake-ip mode domestic names get real addresses so the kernel bypass can match
+     * them (see CnipFakeIp); user fake-ip-filter entries keep precedence.
+     */
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns,boolean wechatTransport,List<String> validationHosts,int cnipFakeIp)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -200,6 +219,12 @@ final class MihomoStartupConfig {
             WechatTransport.Result rules=WechatTransport.insertDirectRules(fake.yaml);
             yaml=trimOne(rules.yaml);
             wechatNote="# hetu-wechat-transport: fake-ip="+fake.state+" rules="+rules.state+"\n";
+        }
+        if(cnipFakeIp!=CNIP_FAKE_IP_OFF&&(profile.mode==ProxyRuntimeProfile.Mode.TPROXY
+                ||profile.mode==ProxyRuntimeProfile.Mode.REDIRECT||profile.mode==ProxyRuntimeProfile.Mode.ENHANCE)){
+            CnipFakeIp.Result cn=CnipFakeIp.ensureFakeIpFilter(yaml,cnipFakeIp==CNIP_FAKE_IP_GEOSITE);
+            yaml=trimOne(cn.yaml);
+            wechatNote+="# hetu-cnip-fake-ip: "+cn.state+"\n";
         }
         if(validationHosts!=null&&!validationHosts.isEmpty()){
             CaptivePortalBypass.Result probe=CaptivePortalBypass.apply(yaml,validationHosts);

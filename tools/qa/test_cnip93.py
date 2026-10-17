@@ -7,8 +7,10 @@ shipped CN snapshots (assets/cnip) are the address lists.
 
 * With ipset: both sets are restored (create *_new -> rename/swap), every capture/guard chain
   RETURNs CN destinations, the DNS hijack chains never reference a set, and status says ipset.
-* Without ipset (or a kernel without the set match): the start still succeeds, nothing references
-  a set and status reports cnip=degraded (the core RULE-SET keeps doing the job).
+* Without ipset (or a kernel without the set match) and without the connmark/conntrack matches the
+  iptables fallback needs: the start still succeeds, nothing references a set and status reports
+  cnip=degraded (the core RULE-SET keeps doing the job). The iptables fallback itself is covered by
+  test_cnip_xt93.py.
 * Stop leaves no hetu_ set, no HETU_ chain (heads or *_T tails) and no rule referencing a set;
   sets are destroyed only after the sweep was verified.
 * Restart with unchanged data reuses the sets (no restore); changed data is swapped in atomically,
@@ -102,6 +104,8 @@ die('unsupported ' + ' '.join(a))
 FAKE_SET_MATCH_GUARD = r'''#!/bin/sh
 # Refuse "-m set" rules when the fixture says the kernel lacks xt_set.
 for a in "$@"; do if [ "$a" = set ] && [ -e "$HETU_IPSET_STATE.nomatch" ]; then echo "iptables: Couldn't load match \`set'" >&2; exit 1; fi; done
+# Refuse the connmark probe of the iptables fallback when the fixture says the kernel lacks it.
+case " $* " in *" HETU_PROBE "*" connmark "*) if [ -e "$HETU_IPSET_STATE.noconnmark" ]; then echo "iptables: Couldn't load match \`connmark'" >&2; exit 1; fi;; esac
 exec %(py)s %(model)s %(tool)s "$@"
 '''
 
@@ -329,9 +333,11 @@ class Cnip93(unittest.TestCase):
         self.policy()
         # A binary that cannot run (no ipset in this ROM); the fixture shadows any host ipset.
         Path(str(self.ipstate) + '.absent').write_text('')
+        Path(str(self.ipstate) + '.noconnmark').write_text('')
         self.start()
         self.assertIn('CNIP=degraded\n', self.read(self.base / 'run/session.state'))
-        self.assertIn('CNIP_REASON=ipset-unavailable\n', self.read(self.base / 'run/session.state'))
+        self.assertIn('CNIP_REASON=ipset-unavailable,xt-connmark-unavailable\n', self.read(self.base / 'run/session.state'))
+        self.assertFalse([l for l in self.all_rules() if 'HETU_CN' in l or 'connmark --mark 0x20000000' in l])
         self.assertFalse([l for l in self.all_rules() if '--match-set' in l])
         self.assertTrue(any('HETU_MOUT' in l for l in self.all_rules()), 'the capture itself is installed')
         st = self.status(); self.assertEqual('degraded', st['cnip']); self.assertEqual(0, st['cnipV4Entries'])
@@ -344,6 +350,7 @@ class Cnip93(unittest.TestCase):
     def test_kernel_without_set_match_degrades(self):
         self.policy()
         Path(str(self.ipstate) + '.nomatch').write_text('')
+        Path(str(self.ipstate) + '.noconnmark').write_text('')
         self.start()
         self.assertIn('CNIP=degraded\n', self.read(self.base / 'run/session.state'))
         self.assertFalse([l for l in self.all_rules() if '--match-set' in l])

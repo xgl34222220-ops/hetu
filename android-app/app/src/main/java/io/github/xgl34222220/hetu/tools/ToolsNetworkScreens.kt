@@ -21,6 +21,7 @@ import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.homeAnimatedFraction
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.rememberHomeStagger
 import io.github.xgl34222220.hetu.ui.ht
@@ -257,7 +258,7 @@ internal fun ToolsCnIpScreen(
             HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
                 ToolsSwitchRow(
                     "内核绕过 IPv4", state.kernelV4, { onKernelChange(it, state.kernelV6) },
-                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset）",
+                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）",
                     enabled = state.load is ToolsLoad.Ready,
                 )
                 HomeRowDivider(start = HomeRowDims.textStart)
@@ -277,7 +278,8 @@ internal fun ToolsCnIpScreen(
                     )
                     HomeRowDivider(start = HomeRowDims.textStart)
                 }
-                ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = ht(cnIpKernelStatusText(state)))
+                val kernelStatusText = buildList { for (part in cnIpKernelStatusParts(state)) add(ht(part.key).fill(*part.args.toTypedArray())) }.joinToString(" · ")
+                ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = kernelStatusText)
             }
         }
         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
@@ -287,17 +289,40 @@ internal fun ToolsCnIpScreen(
     }
 }
 
-internal fun cnIpKernelStatusText(state: ToolsCnIpState): String = when {
-    !state.kernelV4 && !state.kernelV6 -> "未开启"
-    state.kernelStatus == "ipset" -> buildString {
-        append("内核 ipset 生效")
-        if (state.kernelV4Entries > 0) append(" · IPv4 ").append(state.kernelV4Entries).append(" 段")
-        if (state.kernelV6Entries > 0) append(" · IPv6 ").append(state.kernelV6Entries).append(" 段")
+/** One translatable table key of the 内核状态 line plus its %s values. */
+internal data class CnIpStatusPart(val key: String, val args: List<Any> = emptyList())
+
+/**
+ * 内核状态 of the running session: ipset or the iptables tree (ROMs without an ipset binary, such as
+ * stock ColorOS) both keep CN destinations out of the core; degraded names why the core RULE-SET
+ * does the job instead. Each part is a table key so every language gets the whole line.
+ */
+internal fun cnIpKernelStatusParts(state: ToolsCnIpState): List<CnIpStatusPart> {
+    val reason = state.kernelReason
+    return when {
+        !state.kernelV4 && !state.kernelV6 -> listOf(CnIpStatusPart("未开启"))
+        state.kernelStatus == "ipset" || state.kernelStatus == "iptables" -> buildList {
+            add(CnIpStatusPart(if (state.kernelStatus == "ipset") "内核 ipset 生效" else "内核 iptables 规则生效（本机没有 ipset）"))
+            if (state.kernelV4Entries > 0) add(CnIpStatusPart("IPv4 %s 段", listOf(state.kernelV4Entries)))
+            if (state.kernelV6Entries > 0) add(CnIpStatusPart("IPv6 %s 段", listOf(state.kernelV6Entries)))
+            if (state.kernelV6 && reason.contains("v6-mode-")) add(CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式"))
+        }
+        state.kernelStatus == "degraded" -> listOf(when {
+            reason.contains("chain-missing") -> CnIpStatusPart("内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复")
+            reason.contains("xt-connmark-unavailable") -> CnIpStatusPart("设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则")
+            reason.contains("mode-tun") || reason.contains("mode-ebpf") -> CnIpStatusPart("当前代理模式不支持内核绕过，已降级为核心内规则")
+            reason.contains("iptables-failed") || reason.contains("restore-missing") -> CnIpStatusPart("内核 iptables 规则安装失败，已降级为核心内规则（%s）", listOf(reason))
+            reason.contains("data-invalid") || reason.contains("data-missing") -> CnIpStatusPart("中国 IP 数据缺失或无效，已降级为核心内规则（%s）", listOf(reason))
+            // A session started by an older version (ipset only): the next start uses the iptables rules.
+            reason == "ipset-unavailable" -> CnIpStatusPart("设备没有 ipset：重启代理后改用 iptables 内核规则")
+            reason.contains("v6-mode-") -> CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式")
+            reason.isBlank() -> CnIpStatusPart("内核绕过未生效，已降级为核心内规则")
+            else -> CnIpStatusPart("内核绕过未生效，已降级为核心内规则（%s）", listOf(reason))
+        })
+        else -> listOf(CnIpStatusPart("重启代理后生效"))
     }
-    state.kernelStatus == "degraded" -> when {
-        state.kernelReason.contains("ipset-unavailable") -> "设备不支持 ipset，已降级为核心内规则"
-        state.kernelReason.contains("mode-") -> "当前代理模式不支持内核绕过，已降级为核心内规则"
-        else -> "内核绕过未生效，已降级为核心内规则" + if (state.kernelReason.isBlank()) "" else "（" + state.kernelReason + "）"
-    }
-    else -> "重启代理后生效"
 }
+
+/** Plain Chinese 内核状态 line (diagnostics text, tests). */
+internal fun cnIpKernelStatusText(state: ToolsCnIpState): String =
+    cnIpKernelStatusParts(state).joinToString(" · ") { it.key.fill(*it.args.toTypedArray()) }

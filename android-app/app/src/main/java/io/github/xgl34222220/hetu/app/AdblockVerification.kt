@@ -303,7 +303,7 @@ internal object AdblockVerification {
             else -> "IPv6 DNS 未劫持"
         }
         parts += when (chain.cnip) {
-            "ipset" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
+            "ipset", "iptables" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
             "degraded" -> "CNIP 由核心规则处理"
             else -> "CNIP 关闭"
         }
@@ -321,7 +321,7 @@ internal object AdblockVerification {
             "disabled" -> out += "订阅关闭了域名嗅探（sniffer 未启用）：直连 IP 的广告连接没有域名，连接层规则无法识别，只能靠 DNS 层拦截。"
             "pure-ip-off" -> out += "订阅设置了 parse-pure-ip: false：直连 IP 的连接不做嗅探，这部分广告无法按域名识别。"
         }
-        if (chain.cnip == "ipset") out += if (chain.dnsLayer)
+        if (chain.cnip == "ipset" || chain.cnip == "iptables") out += if (chain.dnsLayer)
             "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
         else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
         if (!chain.sourceHasDns && !chain.recommendedDns)

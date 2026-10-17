@@ -36148,7 +36148,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..a0d82ee 100755
+index ae832da..951ae00 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36211,7 +36211,7 @@ index ae832da..a0d82ee 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +100,158 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +100,167 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -36230,6 +36230,15 @@ index ae832da..a0d82ee 100755
 +CN_CHAIN=""
 +CNIP_STATE=off
 +CNIP_REASON=""
++# Without the ipset binary (stock ColorOS/OxygenOS and many other ROMs ship none) the same bypass
++# runs as an iptables CIDR tree in mangle: OUTPUT/PREROUTING -> HETU_CNC -> HETU_CNL (one rule per
++# /8 or /16 block, nested HETU_CN_<bits>_<key> chains of at most ~32 entries) -> HETU_CNY. Only a
++# connection's first packet (ctstate NEW, verdict not yet stored) walks the tree; the verdict is
++# kept in two conntrack-mark bits (CN_CT_CHK = classified, CN_CT_CN = CN destination), so every
++# later packet skips it and the capture/guard chains only test the CN bit. status: cnip=iptables.
++CN_CT_CN=0x20000000
++CN_CT_CHK=0x40000000
++CN_CT_BOTH=0x60000000
 +
 +# Opt-in eBPF rule matcher (default off). The App writes $BASE/policy/ebpf (ENABLED=1) and deploys
 +# the loader and object from assets/hetu-bpf to $BASE/bin. When enabled and every probe passes, the
@@ -36373,7 +36382,7 @@ index ae832da..a0d82ee 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +263,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +272,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -36497,7 +36506,7 @@ index ae832da..a0d82ee 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +385,53 @@ acquire_lock(){
+@@ -99,10 +394,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -36553,7 +36562,7 @@ index ae832da..a0d82ee 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +517,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +526,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -36577,23 +36586,25 @@ index ae832da..a0d82ee 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +566,8 @@ cleanup4(){
+@@ -233,7 +575,9 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
 -  unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
 +  if [ "$PRESERVE_KILL" != 1 ]; then unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; fi
 +  cn_drop_tails xt4; share_drop_tails xt4
++  if [ "$PRESERVE_KILL" != 1 ] && ! cleanup_chain_absent xt4 mangle HETU_CNC; then cnip_xt_drop 4 || true; fi
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +582,451 @@ cleanup6(){
+@@ -248,13 +592,452 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
 -  unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"
 +  if [ "$PRESERVE_KILL" != 1 ]; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
 +  cn_drop_tails xt6; share_drop_tails xt6
++  if [ "$PRESERVE_KILL" != 1 ] && ! cleanup_chain_absent xt6 mangle HETU_CNC; then cnip_xt_drop 6 || true; fi
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -36609,7 +36620,7 @@ index ae832da..a0d82ee 100755
 +sweep_plan(){
 +  awk -v keep="$PRESERVE_KILL" -v want="$1" -v only="${SWEEP_ONLY:-}" '
 +    function own(c){ if (only != "") return index(" " only " ", " " c " ") > 0; return c ~ /^(HETU|BICHEN)_/ }
-+    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T" || c == "HETU_KFWD_S") }
++    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T" || c == "HETU_KFWD_S" || c ~ /^HETU_CN(C|Y|L|_)/) }
 +    function hook(   i){ for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1)) && !kept($(i+1))) return 1; return 0 }
 +    $1 == "-N" && own($2) && !kept($2) { n++; chain[n] = $2; next }
 +    $1 == "-A" && own($2) && !kept($2) { next }
@@ -37041,7 +37052,7 @@ index ae832da..a0d82ee 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +1058,21 @@ findcorepid(){
+@@ -286,8 +1069,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -37064,7 +37075,7 @@ index ae832da..a0d82ee 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +1081,8 @@ stopcore(){
+@@ -296,6 +1092,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -37073,7 +37084,7 @@ index ae832da..a0d82ee 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,6 +1107,14 @@ stopcore(){
+@@ -320,6 +1118,14 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -37088,7 +37099,7 @@ index ae832da..a0d82ee 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -362,6 +1157,138 @@ v6disabled(){
+@@ -362,6 +1168,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -37227,7 +37238,7 @@ index ae832da..a0d82ee 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1383,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1394,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -37325,7 +37336,7 @@ index ae832da..a0d82ee 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1491,8 @@ core_return(){
+@@ -473,8 +1502,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -37336,7 +37347,7 @@ index ae832da..a0d82ee 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1516,14 @@ append_scoped(){
+@@ -498,12 +1527,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -37353,7 +37364,7 @@ index ae832da..a0d82ee 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1531,21 @@ scoped_redirect(){
+@@ -511,17 +1542,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -37378,7 +37389,7 @@ index ae832da..a0d82ee 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,15 +1557,281 @@ bypass4(){
+@@ -533,15 +1568,440 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -37409,7 +37420,7 @@ index ae832da..a0d82ee 100755
 +cnip_load_session(){
 +  CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
 +  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
-+  [ "$CNIP_STATE" = ipset ] || return 0
++  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || return 0
 +  [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
 +  [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
 +  [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
@@ -37478,7 +37489,19 @@ index ae832da..a0d82ee 100755
 +  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""
 +  cnip_load_policy || { CN_FORCE=""; return 0; }
 +  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; return 0;; esac
-+  if ! cnip_capable; then CNIP_STATE=degraded; CNIP_REASON=ipset-unavailable; CN_FORCE=""; return 0; fi
++  if ! cnip_capable; then
++    # No ipset: the iptables CIDR tree (installed by cnip_xt_install after the start's cleanup).
++    CNIP_REASON=ipset-unavailable
++    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; return 0; fi
++    if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN4_ON=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
++    if [ "$CNP_V6" = 1 ]; then
++      if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables && has ip6tables-restore; then
++        if [ -s "$CN_FILE6" ]; then CN6_ON=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
++      else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
++    fi
++    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; fi
++    return 0
++  fi
 +  if [ "$CNP_V4" = 1 ]; then cnip_import 4 && CN4_ON=1; fi
 +  if [ "$CNP_V6" = 1 ]; then
 +    if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then cnip_import 6 && CN6_ON=1
@@ -37494,20 +37517,22 @@ index ae832da..a0d82ee 100755
 +  CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
 +  case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
 +  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
++  # ipset: the set match; iptables tree: the CN verdict bit HETU_CNC stored on the connection.
++  CS_M="-m set --match-set $CS_SET dst"; [ "$CNIP_STATE" != iptables ] || CS_M="-m connmark --mark $CN_CT_CN/$CN_CT_CN"
 +  if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
 +    CS_TAIL="${CS_C}_T"
 +    if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
 +    else "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" || return 1; fi
 +    CS_OLDIFS=$IFS; IFS=,; set -- $CN_FORCE; IFS=$CS_OLDIFS
 +    for CS_U in "$@"; do "$CS_BIN" -t "$CS_T" -A "$CS_C" -m owner --uid-owner "$CS_U" -g "$CS_TAIL" || return 1; done
-+    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN || return 1
++    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P $CS_M -j RETURN || return 1
 +    "$CS_BIN" -t "$CS_T" -A "$CS_C" -g "$CS_TAIL" || return 1
 +    CN_CHAIN="$CS_TAIL"; return 0
 +  fi
 +  if [ "$CS_KIND" = mark ] && [ -n "$MARK" ]; then
-+    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
++    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m mark ! --mark "$MARK/$MASK" $CS_M -j RETURN; return
 +  fi
-+  "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN
++  "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P $CS_M -j RETURN
 +}
 +# Per-chain fallback: an unreferenced "<chain>_T" left by a failed batch sweep.
 +cn_drop_tail(){ cleanup_chain_absent "$1" "$2" "$3" && return 0; "$1" -t "$2" -F "$3" >/dev/null 2>&1 || true; "$1" -t "$2" -X "$3" >/dev/null 2>&1 || true; }
@@ -37544,6 +37569,7 @@ index ae832da..a0d82ee 100755
 +cnip_reload(){ (
 +  trap 'release_lock' EXIT
 +  cnip_load_session
++  [ "$CNIP_STATE" != iptables ] || cnip_xt_reload
 +  if [ "$CNIP_STATE" != ipset ]; then printf '{"ok":true,"reloaded":false,"cnip":"%s","message":"内核 CNIP 未生效，数据已保存，下次启动使用"}\n' "$CNIP_STATE"; exit 0; fi
 +  CR_DUE=0
 +  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
@@ -37557,6 +37583,150 @@ index ae832da..a0d82ee 100755
 +  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ipset","message":"CNIP ipset 已热更新"}\n'
 +  else printf '{"ok":false,"reloaded":false,"cnip":"ipset","message":"CNIP 新数据无效或导入失败，继续使用原集合"}\n'; fi
 +); }
++
++# ---------------------------------------------------------------- CNIP (iptables tree, no ipset)
++# The kernel needs conntrack + connmark matches and the CONNMARK target in mangle (both are used
++# by Android netd itself); iptables-restore installs the whole tree in one commit per family.
++cnip_xt_capable(){
++  has iptables-restore || return 1
++  CX_OK=0
++  if xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1; then
++    xt4 -t mangle -A HETU_PROBE -m conntrack --ctstate NEW -m connmark ! --mark "$CN_CT_CHK/$CN_CT_CHK" -j CONNMARK --set-xmark "$CN_CT_CHK/$CN_CT_CHK" >/dev/null 2>&1 && CX_OK=1
++    xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true
++  fi
++  [ "$CX_OK" = 1 ]
++}
++cnip_xt_restore(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 20 "$1" -w 5 --noflush; else "$1" -w 5 --noflush; fi; }
++# iptables-restore body (mangle) of one family's tree, read from the CN list on stdin; the number
++# of accepted networks goes to $5. Same validation and limits as the ipset import; exit 3 when the
++# count is out of range. Entries stay in the deepest block chain (<= 32 per chain where the
++# prefix allows), direct entries before block jumps, so overlapping lists still match.
++cnip_xt_tree(){
++  awk -v f="$1" -v lo="$2" -v hi="$3" -v proto="$4" -v countfile="$5" -v top=HETU_CNL -v both="$CN_CT_BOTH" -v chk="$CN_CT_CHK" '
++    function hexval(s,   i, c, v) { v = 0; s = tolower(s); if (s == "" || length(s) > 4) return -1
++      for (i = 1; i <= length(s); i++) { c = index("0123456789abcdef", substr(s, i, 1)); if (c == 0) return -1; v = v * 16 + c - 1 }
++      return v }
++    function pow2(n,   r) { r = 1; while (n-- > 0) r *= 2; return r }
++    function block(v, b,   x, h1, h2, h3) {
++      if (f == 4) { x = v * pow2(32 - b); h1 = int(x / 16777216); x -= h1 * 16777216; h2 = int(x / 65536); x -= h2 * 65536; h3 = int(x / 256); x -= h3 * 256
++        return sprintf("%d.%d.%d.%d/%d", h1, h2, h3, x, b) }
++      x = v * pow2(48 - b); h1 = int(x / 4294967296); x -= h1 * 4294967296; h2 = int(x / 65536); x -= h2 * 65536
++      return sprintf("%x:%x:%x::/%d", h1, h2, x, b) }
++    { sub(/\r$/, ""); sub(/[ \t]*#.*/, ""); gsub(/^[ \t]+|[ \t]+$/, ""); if ($0 == "") next
++      n = split($0, a, "/")
++      if (f == 4) {
++        if ($0 !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/) next
++        split(a[1], o, "."); bad = 0; for (i = 1; i <= 4; i++) if (o[i] + 0 > 255) bad = 1; if (bad) next
++        p = (n == 2) ? a[2] + 0 : 32; if (p < 8 || p > 32) next
++        key = ((o[1] * 256 + o[2]) * 256 + o[3]) * 256 + o[4]; W = 32
++      } else {
++        if ($0 !~ /^[0-9A-Fa-f:]+(\/[0-9]+)?$/ || $0 !~ /:/) next
++        p = (n == 2) ? a[2] + 0 : 128; if (p < 16 || p > 128) next
++        if (substr(a[1], 1, 1) == ":") next
++        d = index(a[1], "::"); head = (d > 0) ? substr(a[1], 1, d - 1) : a[1]
++        m = split(head, h, ":"); if (d == 0 && m != 8) next; if (m > 8) next
++        for (i = m + 1; i <= 3; i++) h[i] = "0"
++        v1 = hexval(h[1]); v2 = hexval(h[2]); v3 = hexval(h[3]); if (v1 < 0 || v2 < 0 || v3 < 0) next
++        key = (v1 * 65536 + v2) * 65536 + v3; W = 48
++      }
++      N++; net[N] = $0; pl[N] = p; k[N] = key; ch[N] = top
++    }
++    END {
++      if (N < lo || N > hi) exit 3
++      nl = split(f == 4 ? "8 12 16 20 24" : "16 20 24 28 32 36 40 44 48", lv, " ")
++      for (l = 1; l <= nl; l++) {
++        b = lv[l] + 0; split("", cnt)
++        for (i = 1; i <= N; i++) cnt[ch[i]]++
++        for (i = 1; i <= N; i++) {
++          if (cnt[ch[i]] <= 32 || pl[i] <= b) continue
++          kb = int(k[i] / pow2(W - b)); c = sprintf("HETU_CN_%d_%.0f", b, kb)
++          if (!(c in par)) { par[c] = ch[i]; cidr[c] = block(kb, b); order[++nc] = c }
++          ch[i] = c
++        }
++      }
++      printf "-N HETU_CNC\n-N HETU_CNY\n-N %s\n", top
++      for (j = 1; j <= nc; j++) printf "-N %s\n", order[j]
++      printf "-A HETU_CNY -j CONNMARK --set-xmark %s/%s\n", both, both
++      for (i = 1; i <= N; i++) printf "-A %s -d %s -g HETU_CNY\n", ch[i], net[i]
++      for (j = 1; j <= nc; j++) printf "-A %s -d %s -g %s\n", par[order[j]], cidr[order[j]], order[j]
++      printf "-A HETU_CNC %s-m conntrack --ctstate NEW -m connmark ! --mark %s/%s -j %s\n", proto, chk, chk, top
++      printf "-A HETU_CNC -m conntrack --ctstate NEW -j CONNMARK --set-xmark %s/%s\n", chk, chk
++      printf "-I PREROUTING 1 -j HETU_CNC\n-I OUTPUT 1 -j HETU_CNC\n"
++      printf "%d\n", N > countfile
++    }
++  '
++}
++# Removes one family's tree and its hooks (one restore, verified). Kept with a preserved Kill
++# Switch only through sweep_plan; this function always removes.
++cnip_xt_drop(){
++  CXD_BIN=xt$1; CXD_RESTORE=iptables-restore
++  if [ "$1" = 6 ]; then has ip6tables || return 0; CXD_RESTORE=ip6tables-restore; fi
++  CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
++  CXD_PLAN=$(printf '%s\n' "$CXD_RULES" | awk '
++    function own(c){ return c ~ /^HETU_CN(C|Y|L|_)/ }
++    $1 == "-N" && own($2) { n++; chain[n] = $2; next }
++    $1 == "-A" && !own($2) { for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1))) { line = $0; sub(/^-A /, "-D ", line); print line; break } }
++    END { for (i = 1; i <= n; i++) print "-F " chain[i]; for (i = 1; i <= n; i++) print "-X " chain[i] }')
++  [ -n "$CXD_PLAN" ] || return 0
++  has "$CXD_RESTORE" || return 1
++  printf '*mangle\n%s\nCOMMIT\n' "$CXD_PLAN" | cnip_xt_restore "$CXD_RESTORE" >/dev/null 2>&1 || return 1
++  CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
++  ! printf '%s\n' "$CXD_RULES" | grep -Eq '(^-N | -j | -g )HETU_CN(C|Y|L|_)'
++}
++# (Re)builds one family: the new data is validated and rendered before the old tree goes, so a bad
++# list keeps the installed tree; the stamp/count record what is live.
++cnip_xt_build(){
++  CXB_F="$1"; CXB_FILE=$CN_FILE4; CXB_LO=1000; CXB_HI=20000; CXB_RESTORE=iptables-restore; CXB_BIN=xt4
++  if [ "$CXB_F" = 6 ]; then CXB_FILE=$CN_FILE6; CXB_LO=500; CXB_HI=30000; CXB_RESTORE=ip6tables-restore; CXB_BIN=xt6; fi
++  [ -s "$CXB_FILE" ] || { CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-data-missing"; return 1; }
++  has "$CXB_RESTORE" || { CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-restore-missing"; return 1; }
++  CXB_SIG=$(cnip_file_sig "$CXB_FILE"); [ -n "$CXB_SIG" ] || return 1
++  mkdir -p "$RUN/state" 2>/dev/null || true
++  CXB_BATCH="$RUN/.cnipxt$CXB_F.$$"; CXB_P=""; [ "$CN_TCPONLY" != 1 ] || CXB_P="-p tcp "
++  printf '*mangle\n' > "$CXB_BATCH" || return 1
++  cnip_xt_tree "$CXB_F" "$CXB_LO" "$CXB_HI" "$CXB_P" "$CXB_BATCH.count" < "$CXB_FILE" >> "$CXB_BATCH"; CXB_RC=$?
++  if [ "$CXB_RC" != 0 ]; then
++    rm -f "$CXB_BATCH" "$CXB_BATCH.count"
++    if [ "$CXB_RC" = 3 ]; then CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-data-invalid"; fi
++    return 1
++  fi
++  printf 'COMMIT\n' >> "$CXB_BATCH"
++  if ! cnip_xt_drop "$CXB_F"; then rm -f "$CXB_BATCH" "$CXB_BATCH.count"; CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-iptables-failed"; return 1; fi
++  if ! cnip_xt_restore "$CXB_RESTORE" < "$CXB_BATCH" >/dev/null 2>&1 || ! "$CXB_BIN" -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1; then
++    rm -f "$CXB_BATCH" "$CXB_BATCH.count"; cnip_xt_drop "$CXB_F" || true
++    CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CXB_F-iptables-failed"; return 1
++  fi
++  mv -f "$CXB_BATCH.count" "$RUN/state/cnip-xt$CXB_F.count" 2>/dev/null || true
++  printf '%s\n' "$CXB_SIG" > "$RUN/state/cnip-xt$CXB_F.stamp" 2>/dev/null || true
++  rm -f "$CXB_BATCH"
++}
++# Start stage after the start's cleanup and before any capture rule: install what cnip_prepare
++# decided; a family that cannot be installed is switched off before a capture rule tests its bit.
++cnip_xt_install(){
++  if [ "$CNIP_STATE" != iptables ]; then
++    # A preserved bootstrap Kill Switch keeps an older tree through cleanup; drop it.
++    if [ "$PRESERVE_KILL" = 1 ]; then cnip_xt_drop 4 || true; cnip_xt_drop 6 || true; fi
++    return 0
++  fi
++  if [ "$CN4_ON" = 1 ]; then cnip_xt_build 4 || CN4_ON=0; else cnip_xt_drop 4 || true; fi
++  if [ "$CN6_ON" = 1 ]; then cnip_xt_build 6 || CN6_ON=0; else cnip_xt_drop 6 || true; fi
++  if [ "$CN4_ON" != 1 ] && [ "$CN6_ON" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; fi
++  return 0
++}
++cnip_xt_reload(){
++  CR_DUE=0
++  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-xt4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
++  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-xt6.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
++  if [ "$CR_DUE" = 0 ]; then printf '{"ok":true,"reloaded":false,"cnip":"iptables","message":"CNIP 数据未变化"}\n'; exit 0; fi
++  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
++  CR_FAILED=0; CNIP_REASON=""
++  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-xt4.stamp" 2>/dev/null)" ]; then cnip_xt_build 4 || CR_FAILED=1; fi
++  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-xt6.stamp" 2>/dev/null)" ]; then cnip_xt_build 6 || CR_FAILED=1; fi
++  printf '%s cnip-reload(iptables) failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
++  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"iptables","message":"CNIP iptables 规则已热更新"}\n'
++  else printf '{"ok":false,"reloaded":false,"cnip":"iptables","message":"CNIP 新数据无效或规则更新失败，内核绕过可能暂时经核心处理"}\n'; fi
++  exit 0
++}
 +
 +# ---------------------------------------------------------------- eBPF rule matcher (opt-in)
 +ebpf_policy_enabled(){ [ "$(sed -n 's/^ENABLED=//p' "$BASE/policy/ebpf" 2>/dev/null | head -n 1)" = 1 ]; }
@@ -37660,7 +37830,7 @@ index ae832da..a0d82ee 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -710,8 +2000,12 @@ local_destination_return(){
+@@ -710,8 +2170,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -37674,7 +37844,7 @@ index ae832da..a0d82ee 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +2025,23 @@ install_mangle4(){
+@@ -731,22 +2195,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -37707,7 +37877,7 @@ index ae832da..a0d82ee 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +2056,45 @@ install_mangle6(){
+@@ -761,40 +2226,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -37767,7 +37937,7 @@ index ae832da..a0d82ee 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +2122,12 @@ remove_dot_guard(){
+@@ -822,12 +2292,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -37782,7 +37952,7 @@ index ae832da..a0d82ee 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +2141,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2311,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -37804,7 +37974,7 @@ index ae832da..a0d82ee 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +2166,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2336,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -37848,7 +38018,7 @@ index ae832da..a0d82ee 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +2225,128 @@ v6_disable_guard_ready(){
+@@ -921,16 +2395,128 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -37982,7 +38152,7 @@ index ae832da..a0d82ee 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,10 +2377,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,10 +2547,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -38070,7 +38240,7 @@ index ae832da..a0d82ee 100755
  check_start_ports(){
    listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
    M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
-@@ -1019,20 +2511,662 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2681,662 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -38675,7 +38845,7 @@ index ae832da..a0d82ee 100755
 +    if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
 +      MISS=0; H_TICK=$((H_TICK+1))
 +      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
-+        [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; wd_net_watch; fi
++        case "$CNIP_STATE" in ipset|iptables) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
 +      wd_selfheal_tick
 +      sleep 2
 +    else MISS=$((MISS+1)); sleep 0.20; fi
@@ -38741,7 +38911,7 @@ index ae832da..a0d82ee 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +3179,45 @@ probe_core_owner(){
+@@ -1045,9 +3349,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -38788,7 +38958,7 @@ index ae832da..a0d82ee 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +3228,29 @@ core_identity_prepare(){
+@@ -1058,14 +3398,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -38822,7 +38992,7 @@ index ae832da..a0d82ee 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +3264,9 @@ core_launch(){
+@@ -1079,8 +3434,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -38834,7 +39004,7 @@ index ae832da..a0d82ee 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +3333,21 @@ core_tune(){
+@@ -1147,6 +3503,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -38856,7 +39026,7 @@ index ae832da..a0d82ee 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,16 +3426,90 @@ google_firewall_maintain(){ (
+@@ -1225,16 +3596,90 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -38947,7 +39117,7 @@ index ae832da..a0d82ee 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +3517,16 @@ start(){
+@@ -1242,8 +3687,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -38965,7 +39135,7 @@ index ae832da..a0d82ee 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +3536,93 @@ start(){
+@@ -1253,75 +3706,96 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -39066,6 +39236,9 @@ index ae832da..a0d82ee 100755
 +  # any capture rule references it. Every failure falls back to the owner/CIDR rules.
 +  start_stage "ebpf-matcher"
 +  ebpf_prepare
++  # CNIP without ipset: the iptables tree goes in before any capture rule tests its verdict bit.
++  start_stage "cnip-chain"
++  cnip_xt_install
 +  start_stage "install-capture-batch"
 +  xt_batch_begin || fail "无法准备防火墙批量规则"
 +  XT_BATCH=1; install_capture_rules; XT_BATCH=0
@@ -39097,14 +39270,14 @@ index ae832da..a0d82ee 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +3634,92 @@ start(){
+@@ -1333,19 +3807,92 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
 -  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 DNS 接管状态，已停止本次启动"; }
 -  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
 +  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$([ "$CNIP_STATE" = ipset ] && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
++  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
 +  printf 'EBPF_MATCH=%s\nEBPF_REASON=%s\n' "$EBPF_STATE" "$EBPF_REASON" >> "$SESSION" || { fail "无法记录 eBPF 匹配状态，已停止本次启动"; }
 +  printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
 +  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
@@ -39195,7 +39368,7 @@ index ae832da..a0d82ee 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +3732,8 @@ status(){
+@@ -1358,6 +3905,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -39204,7 +39377,7 @@ index ae832da..a0d82ee 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1407,6 +3783,12 @@ status(){
+@@ -1407,6 +3956,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -39217,7 +39390,7 @@ index ae832da..a0d82ee 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +3869,24 @@ status(){
+@@ -1487,13 +4042,30 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -39229,11 +39402,17 @@ index ae832da..a0d82ee 100755
 +    [ "$CN4_ON" != 1 ] || CNIP4N=$(cnip_set_size "$CN_SET4"); [ "$CN6_ON" != 1 ] || CNIP6N=$(cnip_set_size "$CN_SET6")
 +    case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
 +    if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
++  elif [ "$CNIP_STATE" = iptables ]; then
++    # The tree is not in the integrity manifest (too large to diff each poll): check its hooks here.
++    if [ "$CN4_ON" = 1 ]; then CNIP4N=$(cat "$RUN/state/cnip-xt4.count" 2>/dev/null); xt4q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v4-chain-missing"; fi
++    if [ "$CN6_ON" = 1 ]; then CNIP6N=$(cat "$RUN/state/cnip-xt6.count" 2>/dev/null); xt6q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v6-chain-missing"; fi
++    case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
++    case "$CNIPR" in *chain-missing*) CNIP_STATE=degraded;; esac
 +  fi
 +  ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
 +  # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | offline), else empty.
 +  EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
-+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
++  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
  }
 
  # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -39244,7 +39423,7 @@ index ae832da..a0d82ee 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +4010,8 @@ health_collect(){
+@@ -1617,6 +4189,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -39253,7 +39432,7 @@ index ae832da..a0d82ee 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +4061,18 @@ health_restore_table(){
+@@ -1666,16 +4240,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -39274,7 +39453,7 @@ index ae832da..a0d82ee 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +4121,7 @@ health_repair(){ (
+@@ -1724,7 +4300,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -39283,7 +39462,7 @@ index ae832da..a0d82ee 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +4154,481 @@ health_json(){ (
+@@ -1757,6 +4333,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -39765,7 +39944,7 @@ index ae832da..a0d82ee 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +4646,33 @@ case "${1:-status}" in
+@@ -1774,10 +4825,33 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -52572,10 +52751,10 @@ index f104cef..2380e94 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-index 71d5484..cf40688 100644
+index 71d5484..5fa85da 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-@@ -69,6 +69,54 @@ final class MihomoStartupConfig {
+@@ -69,6 +69,73 @@ final class MihomoStartupConfig {
 
      static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
              ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface)throws IOException{
@@ -52627,10 +52806,29 @@ index 71d5484..cf40688 100644
 +    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
 +            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
 +            boolean recommendedDns,boolean wechatTransport,List<String> validationHosts)throws IOException{
++        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,
++                recommendedDns,wechatTransport,validationHosts,CNIP_FAKE_IP_OFF);
++    }
++
++    /** CNIP kernel bypass off (or a mode without it): fake-ip answers stay as the source says. */
++    static final int CNIP_FAKE_IP_OFF=0;
++    /** Bypass on, no GeoSite.dat in the core home: the offline domestic list gets real addresses. */
++    static final int CNIP_FAKE_IP_OFFLINE=1;
++    /** Bypass on and GeoSite.dat present: geosite:cn gets real addresses. */
++    static final int CNIP_FAKE_IP_GEOSITE=2;
++
++    /**
++     * [cnipFakeIp] (the Root start passes it while the CNIP kernel bypass is on in TPROXY/Redirect/
++     * Enhance): in fake-ip mode domestic names get real addresses so the kernel bypass can match
++     * them (see CnipFakeIp); user fake-ip-filter entries keep precedence.
++     */
++    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
++            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
++            boolean recommendedDns,boolean wechatTransport,List<String> validationHosts,int cnipFakeIp)throws IOException{
          if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
          if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
          if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
-@@ -116,6 +164,12 @@ final class MihomoStartupConfig {
+@@ -116,6 +183,12 @@ final class MihomoStartupConfig {
          // filtering chain is enabled. The user's source YAML remains untouched.
          if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
 
@@ -52643,7 +52841,7 @@ index 71d5484..cf40688 100644
          // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
          // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
          // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
-@@ -136,10 +190,33 @@ final class MihomoStartupConfig {
+@@ -136,10 +209,39 @@ final class MihomoStartupConfig {
              yaml=ensureAdblock(yaml);
          if(profile.cnIpDirect)
              yaml=ensureCnIpDirect(yaml);
@@ -52657,6 +52855,12 @@ index 71d5484..cf40688 100644
 +            WechatTransport.Result rules=WechatTransport.insertDirectRules(fake.yaml);
 +            yaml=trimOne(rules.yaml);
 +            wechatNote="# hetu-wechat-transport: fake-ip="+fake.state+" rules="+rules.state+"\n";
++        }
++        if(cnipFakeIp!=CNIP_FAKE_IP_OFF&&(profile.mode==ProxyRuntimeProfile.Mode.TPROXY
++                ||profile.mode==ProxyRuntimeProfile.Mode.REDIRECT||profile.mode==ProxyRuntimeProfile.Mode.ENHANCE)){
++            CnipFakeIp.Result cn=CnipFakeIp.ensureFakeIpFilter(yaml,cnipFakeIp==CNIP_FAKE_IP_GEOSITE);
++            yaml=trimOne(cn.yaml);
++            wechatNote+="# hetu-cnip-fake-ip: "+cn.state+"\n";
 +        }
 +        if(validationHosts!=null&&!validationHosts.isEmpty()){
 +            CaptivePortalBypass.Result probe=CaptivePortalBypass.apply(yaml,validationHosts);
@@ -52677,7 +52881,7 @@ index 71d5484..cf40688 100644
          switch(profile.mode){
              case TPROXY:
                  tp=TPROXY_PORT;
-@@ -372,12 +449,16 @@ final class MihomoStartupConfig {
+@@ -372,12 +474,16 @@ final class MihomoStartupConfig {
      /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
      private static String ensureAdblock(String source)throws IOException{
          String yaml=normalize(source);
@@ -52696,7 +52900,7 @@ index 71d5484..cf40688 100644
          String[] lines=normalize(source).split("\n",-1);
          int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
          for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
-@@ -391,7 +472,13 @@ final class MihomoStartupConfig {
+@@ -391,7 +497,13 @@ final class MihomoStartupConfig {
                  "    type: file\n"+
                  "    behavior: domain\n"+
                  "    format: text\n"+
@@ -52711,7 +52915,7 @@ index 71d5484..cf40688 100644
          if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
          String rest=found.group(1).trim();
          if(rest.startsWith("#"))rest="";
-@@ -400,7 +487,8 @@ final class MihomoStartupConfig {
+@@ -400,7 +512,8 @@ final class MihomoStartupConfig {
          for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
          for(int i=index+1;i<end;i++){
              String t=lines[i].trim();
@@ -52721,7 +52925,7 @@ index 71d5484..cf40688 100644
                  throw new IOException("源配置占用了河图保留的 DNS 过滤 provider 名称");
          }
          StringBuilder out=new StringBuilder();
-@@ -610,6 +698,45 @@ final class MihomoStartupConfig {
+@@ -610,6 +723,45 @@ final class MihomoStartupConfig {
                  "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
      }
 
@@ -53491,7 +53695,7 @@ index 738ebf5..428a4cc 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..623be45 100644
+index 4f004b9..54dbae7 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
@@ -53571,7 +53775,7 @@ index 4f004b9..623be45 100644
                      val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                          else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                      if (observedPid > 0) live.put("pid", observedPid)
-+                    // CNIP kernel bypass as the running session reports it (ipset / degraded / off).
++                    // CNIP kernel bypass as the running session reports it (ipset / iptables / degraded / off).
 +                    if (live.has("cnip")) {
 +                        val cnip = if (live.optBoolean("running", false)) live.optString("cnip", "off") else "off"
 +                        val reason = live.optString("cnipReason", "")
@@ -58763,7 +58967,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..7c0fb88 100644
+index 9cd82da..63e4823 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,17 +21,87 @@ final class RootProxyManager {
@@ -59021,7 +59225,7 @@ index 9cd82da..7c0fb88 100644
 +        ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
 +        source=cleaned.text;
 +        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
-+                prefs.getBoolean("proxyRecommendedDns",false),true,validationHosts());
++                prefs.getBoolean("proxyRecommendedDns",false),true,validationHosts(),cnipFakeIpPolicy(profile));
          RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
          // Private comments carry an already validated routing projection into start/boot.
          // Keep the established startup argument protocol and the user's source untouched.
@@ -59744,9 +59948,9 @@ index 9cd82da..7c0fb88 100644
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
 -            }finally{CONTROL_LOCK.unlock();}
 +            }finally{if(ownIntent)START_INTENT.remove();CONTROL_LOCK.unlock();}
-         }
-     }
-
++        }
++    }
++
 +    private void recoverFailedHandoff(boolean nativeSucceeded,boolean nativeAttempted,boolean coordinatorEntered)throws Exception{
 +        if(nativeSucceeded){
 +            rollbackUnpublishedStart();
@@ -59760,9 +59964,9 @@ index 9cd82da..7c0fb88 100644
 +                prefs.edit().putString("proxyAutoRecoveryError","启动结果未确认，已保留代理与过滤接管现场；请检查后停止")
 +                        .putString("proxyNetworkIntegrity","unknown").apply();
 +            }
-+        }
-+    }
-+
+         }
+     }
+
 +    private void rollbackUnpublishedStart()throws Exception{
 +        // Still owns CONTROL_LOCK: a newer start cannot be destroyed by this cleanup.
 +        Long previousStop=STOP_DEADLINE.get();
@@ -60202,7 +60406,7 @@ index 9cd82da..7c0fb88 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1987,136 @@ final class RootProxyManager {
+@@ -1269,14 +1987,153 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -60276,6 +60480,23 @@ index 9cd82da..7c0fb88 100644
 +     * captive_portal_*_url and the probe URLs NetworkRevalidation last read as Root (cached; read after a start,
 +     * never on the start path).
 +     */
++    /**
++     * CNIP kernel bypass x fake-IP: while the bypass is on (TPROXY/Redirect/Enhance), domestic names get
++     * real addresses in fake-ip mode. geosite:cn only when the core home already holds GeoSite.dat
++     * (Mihomo would download it during the start otherwise); else the offline list (CnipFakeIp).
++     */
++    private int cnipFakeIpPolicy(ProxyRuntimeProfile profile){
++        if(!CnipFakeIp.kernelBypassWanted(prefs.getBoolean(CnipFakeIp.PREF_V4,false),prefs.getBoolean(CnipFakeIp.PREF_V6,false)))
++            return MihomoStartupConfig.CNIP_FAKE_IP_OFF;
++        if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE)
++            return MihomoStartupConfig.CNIP_FAKE_IP_OFF;
++        boolean geosite=false;
++        try{
++            RootBridge.Result listing=boundedRootShell(context,"ls -ln "+RootBridge.quote(ROOT+"/run")+" 2>/dev/null; :",5_000L);
++            geosite=listing.ok()&&CnipFakeIp.geositeAvailable(listing.output);
++        }catch(RuntimeException ignored){}
++        return geosite?MihomoStartupConfig.CNIP_FAKE_IP_GEOSITE:MihomoStartupConfig.CNIP_FAKE_IP_OFFLINE;
++    }
 +    private List<String> validationHosts(){
 +        ArrayList<String> values=new ArrayList<>();
 +        for(String key:CaptivePortalBypass.SETTINGS_KEYS){
@@ -60342,7 +60563,7 @@ index 9cd82da..7c0fb88 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2129,7 @@ final class RootProxyManager {
+@@ -1289,7 +2146,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -60351,7 +60572,7 @@ index 9cd82da..7c0fb88 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2153,7 @@ final class RootProxyManager {
+@@ -1313,7 +2170,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -60360,7 +60581,7 @@ index 9cd82da..7c0fb88 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2173,28 @@ final class RootProxyManager {
+@@ -1333,13 +2190,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -60390,7 +60611,7 @@ index 9cd82da..7c0fb88 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2221,53 @@ final class RootProxyManager {
+@@ -1366,13 +2238,53 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -60444,7 +60665,7 @@ index 9cd82da..7c0fb88 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2279,12 @@ final class RootProxyManager {
+@@ -1384,7 +2296,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -60458,7 +60679,7 @@ index 9cd82da..7c0fb88 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2293,13 @@ final class RootProxyManager {
+@@ -1393,6 +2310,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -60472,7 +60693,7 @@ index 9cd82da..7c0fb88 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,22 +2319,80 @@ final class RootProxyManager {
+@@ -1412,22 +2336,80 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -61835,7 +62056,7 @@ index 4722bed..812986e 100644
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt
 new file mode 100644
-index 0000000..b779c0c
+index 0000000..bfafcc1
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt
 @@ -0,0 +1,340 @@
@@ -62144,7 +62365,7 @@ index 0000000..b779c0c
 +            else -> "IPv6 DNS 未劫持"
 +        }
 +        parts += when (chain.cnip) {
-+            "ipset" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
++            "ipset", "iptables" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
 +            "degraded" -> "CNIP 由核心规则处理"
 +            else -> "CNIP 关闭"
 +        }
@@ -62162,7 +62383,7 @@ index 0000000..b779c0c
 +            "disabled" -> out += "订阅关闭了域名嗅探（sniffer 未启用）：直连 IP 的广告连接没有域名，连接层规则无法识别，只能靠 DNS 层拦截。"
 +            "pure-ip-off" -> out += "订阅设置了 parse-pure-ip: false：直连 IP 的连接不做嗅探，这部分广告无法按域名识别。"
 +        }
-+        if (chain.cnip == "ipset") out += if (chain.dnsLayer)
++        if (chain.cnip == "ipset" || chain.cnip == "iptables") out += if (chain.dnsLayer)
 +            "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
 +        else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
 +        if (!chain.sourceHasDns && !chain.recommendedDns)
@@ -62450,6 +62671,209 @@ index 0000000..5f196ab
 +    }
 +
 +    private fun spaces(n: Int): String = " ".repeat(maxOf(0, n))
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CnipFakeIp.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CnipFakeIp.kt
+new file mode 100644
+index 0000000..05ba4ab
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CnipFakeIp.kt
+@@ -0,0 +1,197 @@
++package io.github.xgl34222220.hetu
++
++import java.util.Locale
++
++/**
++ * CNIP kernel bypass x fake-IP DNS (pure Kotlin, no Android API).
++ *
++ * The kernel bypass (ipset or the iptables tree in hetu-root.sh) matches the real destination
++ * address. In fake-ip mode an app asks the core for a domestic name and gets 198.18.x.y back, so its
++ * connection never matches a CN network and always enters the core, even with the bypass on. While
++ * the bypass is on, domestic names therefore get real addresses in the private runtime copy:
++ *
++ *  - `geosite:cn` (fake-ip-filter, blacklist mode) or `GEOSITE,cn,real-ip` (rule mode), but only when
++ *    the core's home directory already holds GeoSite.dat ([geositeAvailable], checked by Root before
++ *    the start). Mihomo would otherwise try to download it during the start and fail without network.
++ *  - otherwise an offline list: every `.cn` name plus the big domestic services and phone vendors.
++ *
++ * Entries are appended; nothing the user wrote is removed or reordered (rule mode is first-match:
++ * ours go after the user's entries and before a final `MATCH`, so user rules keep precedence).
++ * Whitelist mode and a list that already names geosite:cn are left alone. Apps that resolve with their own DoH/DoT or hard-coded IPs are not affected.
++ */
++object CnipFakeIp {
++    const val PREF_V4 = "proxyCnIpKernelV4"
++    const val PREF_V6 = "proxyCnIpKernelV6"
++    const val GEOSITE_ENTRY = "geosite:cn"
++    const val GEOSITE_RULE = "GEOSITE,cn,real-ip"
++
++    /** Offline fallback (no GeoSite.dat): `.cn` plus the domestic services seen most on phones. */
++    @JvmField val OFFLINE_SUFFIXES: List<String> = listOf(
++        "cn", "baidu.com", "bdstatic.com", "bcebos.com", "qq.com", "gtimg.com", "qpic.cn", "tencent.com",
++        "myqcloud.com", "tencent-cloud.net", "wechat.com", "taobao.com", "tmall.com", "alicdn.com", "alipay.com",
++        "alipayobjects.com", "aliyun.com", "aliyuncs.com", "alibaba.com", "jd.com", "360buyimg.com",
++        "bilibili.com", "hdslb.com", "biliapi.net", "douyin.com", "douyinpic.com", "douyinvod.com", "amemv.com",
++        "snssdk.com", "pstatp.com", "bytedance.com", "byteimg.com", "zijieapi.com", "toutiao.com", "ixigua.com",
++        "kuaishou.com", "weibo.com", "sinaimg.cn", "163.com", "126.net", "netease.com", "meituan.com",
++        "meituan.net", "dianping.com", "pinduoduo.com", "yangkeduo.com", "iqiyi.com", "youku.com",
++        "xiaohongshu.com", "xhscdn.com", "zhihu.com", "zhimg.com", "ctrip.com", "ele.me", "amap.com",
++        "autonavi.com", "heytapmobi.com", "heytap.com", "oppomobile.com", "coloros.com", "allawntech.com",
++        "mi.com", "xiaomi.com", "miui.com", "xiaomi.net", "vivo.com.cn", "huawei.com", "hicloud.com",
++        "dbankcloud.com", "dbankcdn.com",
++    )
++
++    class Result(@JvmField val yaml: String, @JvmField val state: String)
++
++    /** True when the CNIP kernel bypass is switched on for either family. */
++    @JvmStatic
++    fun kernelBypassWanted(v4: Boolean, v6: Boolean): Boolean = v4 || v6
++
++    /** A case-insensitive `GeoSite.dat` in a `ls -l`-style listing of the core home, larger than 64 KiB. */
++    @JvmStatic
++    fun geositeAvailable(listing: String?): Boolean = (listing ?: "").lineSequence().any { line ->
++        val words = line.trim().split(Regex("\\s+"))
++        words.size >= 2 && words.last().lowercase(Locale.ROOT) == "geosite.dat" &&
++            (words.firstOrNull { w -> w.all { it.isDigit() } && w.length >= 5 }?.toLongOrNull() ?: 0L) > 65_536L
++    }
++
++    /**
++     * States: no-dns, inline-dns, not-fake-ip, whitelist-kept, inline-skipped, user-entry (the list already
++     * has geosite:cn), geosite / offline (blacklist entries added), rule-geosite / rule-offline (rule entries).
++     */
++    @JvmStatic
++    fun ensureFakeIpFilter(source: String?, geosite: Boolean): Result {
++        val yaml = (source ?: "").replace("\r\n", "\n").replace('\r', '\n')
++        val lines = yaml.split("\n").toMutableList()
++        val start = lines.indexOfFirst { indent(it) == 0 && key(it.trim()) == "dns" }
++        if (start < 0) return Result(yaml, "no-dns")
++        if (value(lines[start]).isNotEmpty()) return Result(yaml, "inline-dns")
++        val end = blockEnd(lines, start)
++        val child = childIndent(lines, start, end)
++        val enhanced = findChild(lines, start, end, child, "enhanced-mode")
++        if (enhanced < 0 || !unquote(value(lines[enhanced])).equals("fake-ip", ignoreCase = true)) return Result(yaml, "not-fake-ip")
++        val modeLine = findChild(lines, start, end, child, "fake-ip-filter-mode")
++        val mode = if (modeLine < 0) "blacklist" else unquote(value(lines[modeLine])).lowercase(Locale.ROOT)
++        if (mode == "whitelist") return Result(yaml, "whitelist-kept")
++        val rule = mode == "rule"
++        val items = when {
++            rule && geosite -> listOf(GEOSITE_RULE)
++            rule -> OFFLINE_SUFFIXES.map { "DOMAIN-SUFFIX,$it,real-ip" }
++            geosite -> listOf(GEOSITE_ENTRY)
++            else -> OFFLINE_SUFFIXES.map { "+.$it" }
++        }
++        val state = (if (rule) "rule-" else "") + (if (geosite) "geosite" else "offline")
++        val filter = findChild(lines, start, end, child, "fake-ip-filter")
++        if (filter >= 0) {
++            val rest = value(lines[filter])
++            when {
++                rest.isEmpty() -> {
++                    var g = -1
++                    var last = filter
++                    var match = -1
++                    val existing = HashSet<String>()
++                    for (i in filter + 1 until end) {
++                        val t = lines[i].trim()
++                        if (t.isEmpty() || t.startsWith("#")) continue
++                        val ind = indent(lines[i])
++                        if (ind > child || (ind == child && t.startsWith("-"))) {
++                            last = i
++                            if (t.startsWith("-")) {
++                                val entry = unquote(stripComment(t.substring(1).trim()))
++                                if (namesGeositeCn(entry)) return Result(yaml, "user-entry")
++                                existing.add(entry.lowercase(Locale.ROOT))
++                                if (match < 0 && rule && entry.substringBefore(',').trim().equals("MATCH", ignoreCase = true)) match = i
++                                if (g < 0) g = ind
++                            }
++                        } else break
++                    }
++                    if (g < 0) g = child + 2
++                    val entries = items.filter { it.lowercase(Locale.ROOT) !in existing }.map { spaces(g) + "- '" + it + "'" }
++                    // User entries keep precedence: blacklist order does not matter, rule mode is first-match,
++                    // so ours go after the user's entries but before a final MATCH.
++                    lines.addAll(if (match >= 0) match else last + 1, entries)
++                }
++                rest == "[]" -> {
++                    lines[filter] = spaces(child) + "fake-ip-filter:"
++                    lines.addAll(filter + 1, items.map { spaces(child + 2) + "- '" + it + "'" })
++                }
++                else -> return Result(yaml, "inline-skipped")
++            }
++        } else {
++            var at = lastContentLine(lines, start, end) + 1
++            lines.add(at++, spaces(child) + "fake-ip-filter:")
++            for (item in items) lines.add(at++, spaces(child + 2) + "- '" + item + "'")
++            if (!rule) for (d in AdblockDnsPolicy.MIHOMO_DEFAULT_FAKE_IP_FILTER) lines.add(at++, spaces(child + 2) + "- '" + d + "'")
++        }
++        return Result(lines.joinToString("\n"), state)
++    }
++
++    private fun namesGeositeCn(entry: String): Boolean {
++        val e = entry.lowercase(Locale.ROOT).replace(" ", "")
++        return e == GEOSITE_ENTRY || e.startsWith("geosite,cn,") || e == "geosite:cn" || e.startsWith("geosite:cn,")
++    }
++
++    private fun blockEnd(lines: List<String>, start: Int): Int {
++        for (i in start + 1 until lines.size) {
++            val t = lines[i].trim()
++            if (t.isEmpty() || t.startsWith("#")) continue
++            if (indent(lines[i]) == 0) return i
++        }
++        return lines.size
++    }
++
++    private fun childIndent(lines: List<String>, start: Int, end: Int): Int {
++        var child = Int.MAX_VALUE
++        for (i in start + 1 until end) {
++            val t = lines[i].trim()
++            if (t.isEmpty() || t.startsWith("#")) continue
++            child = minOf(child, indent(lines[i]))
++        }
++        return if (child == Int.MAX_VALUE || child == 0) 2 else child
++    }
++
++    private fun findChild(lines: List<String>, start: Int, end: Int, child: Int, name: String): Int {
++        for (i in start + 1 until end) if (indent(lines[i]) == child && key(lines[i].trim()) == name) return i
++        return -1
++    }
++
++    private fun lastContentLine(lines: List<String>, start: Int, end: Int): Int {
++        var last = start
++        for (i in start + 1 until end) if (lines[i].trim().isNotEmpty()) last = i
++        return last
++    }
++
++    private fun key(trimmed: String): String {
++        if (trimmed.startsWith("-") || trimmed.startsWith("#")) return ""
++        val colon = trimmed.indexOf(':')
++        if (colon <= 0) return ""
++        return unquote(trimmed.substring(0, colon).trim())
++    }
++
++    private fun value(line: String): String {
++        val t = line.trim()
++        val colon = t.indexOf(':')
++        if (colon < 0) return ""
++        return stripComment(t.substring(colon + 1).trim())
++    }
++
++    private fun stripComment(rest: String): String {
++        var single = false
++        var dbl = false
++        for (i in rest.indices) {
++            val c = rest[i]
++            if (c == '\'' && !dbl) single = !single
++            else if (c == '"' && !single) dbl = !dbl
++            else if (c == '#' && !single && !dbl && (i == 0 || rest[i - 1].isWhitespace())) return rest.substring(0, i).trim()
++        }
++        return rest.trim()
++    }
++
++    private fun unquote(v: String): String {
++        val t = v.trim()
++        if (t.length >= 2 && ((t.first() == '"' && t.last() == '"') || (t.first() == '\'' && t.last() == '\''))) return t.substring(1, t.length - 1).trim()
++        return t
++    }
++
++    private fun indent(s: String): Int { var n = 0; while (n < s.length && (s[n] == ' ' || s[n] == '\t')) n++; return n }
++    private fun spaces(n: Int): String = " ".repeat(n)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 index 63c8e03..47e4143 100644
@@ -68142,13 +68566,14 @@ index 0000000..8751083
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
 new file mode 100644
-index 0000000..6c667a6
+index 0000000..560c2eb
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
-@@ -0,0 +1,502 @@
+@@ -0,0 +1,567 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
++import java.io.EOFException
 +import java.io.IOException
 +import java.net.ConnectException
 +import java.net.HttpURLConnection
@@ -68486,8 +68911,12 @@ index 0000000..6c667a6
 +    /** Live rate of the running phase, sampled every [SpeedTest.SAMPLE_MS]. */
 +    data class Live(val upload: Boolean, val mbps: Double, val bytes: Long) : SpeedEvent
 +    data class Finished(val upload: Boolean, val mbps: Double, val bytes: Long) : SpeedEvent
-+    data class Failed(val reason: String) : SpeedEvent
++    /** [reason] is a word-table key (Chinese); [args] fill its %s placeholders. */
++    data class Failed(val reason: String, val args: List<String> = emptyList()) : SpeedEvent
 +}
++
++/** A non-2xx answer of the speed server itself (the request reached it). */
++internal class SpeedHttpStatus(val code: Int) : IOException("HTTP $code")
 +
 +/**
 + * Cloudflare speed test through the current proxy node: metadata of the exit (`/meta`), idle
@@ -68506,6 +68935,54 @@ index 0000000..6c667a6
 +    internal const val UP_CHUNK = 4_000_000
 +
 +    fun mbps(bytes: Long, millis: Long): Double = if (millis <= 0) 0.0 else bytes * 8.0 / (millis / 1000.0) / 1_000_000.0
++
++    /** Fallback for the exit card: Cloudflare's own trace over the same proxy path (works when /meta is refused). */
++    const val TRACE_FALLBACK = "https://www.cloudflare.com/cdn-cgi/trace"
++
++    const val FAIL_CLOSED_EXIT_KNOWN = "出口正常，但测速站 speed.cloudflare.com 的连接被立即关闭：通常是当前节点（机场）禁止测速，或分流规则把它拒绝（REJECT）。可换个节点再试"
++    const val FAIL_CLOSED = "连接被立即关闭，出口也查询不到：当前节点可能不可用，或分流规则拒绝了这些连接。请换个节点再试"
++    const val FAIL_LOCAL_PORT = "无法连接河图核心的本地测速入口（127.0.0.1:%s）：代理可能刚停止或正在重启，请稍后再试"
++    const val FAIL_REFUSED = "测速服务器拒绝连接"
++    const val FAIL_TIMEOUT = "测速请求超时：当前节点响应太慢或不可用"
++    const val FAIL_DNS = "无法解析测速服务器域名"
++    const val FAIL_TLS = "与测速服务器的 TLS 握手失败（%s）"
++    const val FAIL_HTTP = "测速服务器返回 HTTP %s，当前出口可能被 Cloudflare 限制"
++    const val FAIL_IO = "测速连接中断（%s）"
++    const val FAIL_OTHER = "测速失败"
++
++    /**
++     * Friendly reason for a failed run. Through Mihomo's HTTP listener a CONNECT is answered "200" before
++     * the core dials, so a REJECT rule, a node that refuses the target or a dead node all surface as the
++     * TLS handshake hitting end-of-stream ("connection closed") right away.
++     */
++    fun failure(error: Throwable, exitKnown: Boolean, port: Int?): SpeedEvent.Failed {
++        val message = error.message.orEmpty()
++        val closed = error is EOFException || error.cause is EOFException ||
++            message.contains("connection closed", ignoreCase = true) || message.contains("closed by peer", ignoreCase = true) ||
++            message.contains("unexpected end of stream", ignoreCase = true) || message.contains("end of file", ignoreCase = true) ||
++            message.contains("Connection reset", ignoreCase = true)
++        return when {
++            error is SpeedHttpStatus -> SpeedEvent.Failed(FAIL_HTTP, listOf(error.code.toString()))
++            closed -> SpeedEvent.Failed(if (exitKnown) FAIL_CLOSED_EXIT_KNOWN else FAIL_CLOSED)
++            error is ConnectException && port != null -> SpeedEvent.Failed(FAIL_LOCAL_PORT, listOf(port.toString()))
++            error is ConnectException -> SpeedEvent.Failed(FAIL_REFUSED)
++            error is SocketTimeoutException -> SpeedEvent.Failed(FAIL_TIMEOUT)
++            error is UnknownHostException -> SpeedEvent.Failed(FAIL_DNS)
++            error is SSLException -> SpeedEvent.Failed(FAIL_TLS, listOf(message.ifBlank { error.javaClass.simpleName }.take(60)))
++            error is IOException -> SpeedEvent.Failed(FAIL_IO, listOf(message.ifBlank { error.javaClass.simpleName }.take(60)))
++            else -> SpeedEvent.Failed(FAIL_OTHER)
++        }
++    }
++
++    /** Exit of a Cloudflare `/cdn-cgi/trace` body (ip, loc, colo); null unless it carries ip and loc. */
++    fun parseTraceMeta(body: String): SpeedMeta? {
++        val fields = body.lineSequence().mapNotNull { line ->
++            val at = line.indexOf('='); if (at <= 0) null else line.substring(0, at).trim() to line.substring(at + 1).trim()
++        }.toMap()
++        val ip = fields["ip"].orEmpty(); val loc = fields["loc"].orEmpty()
++        if (ip.isBlank() || loc.length != 2) return null
++        return SpeedMeta(ip = ip, country = loc.uppercase(Locale.ROOT), city = "", colo = fields["colo"].orEmpty(), org = "")
++    }
 +
 +    fun parseMeta(body: String): SpeedMeta? = try {
 +        val json = JSONObject(body)
@@ -68554,7 +69031,7 @@ index 0000000..6c667a6
 +            currentCoroutineContext().ensureActive()
 +            val connection = open("$base/__down?bytes=$DOWN_CHUNK", port)
 +            guarded(connection) {
-+                if (connection.responseCode !in 200..299) throw IOException("下载请求失败：HTTP ${connection.responseCode}")
++                if (connection.responseCode !in 200..299) throw SpeedHttpStatus(connection.responseCode)
 +                connection.inputStream.use { input ->
 +                    while (System.nanoTime() < deadline) {
 +                        currentCoroutineContext().ensureActive()
@@ -68594,13 +69071,24 @@ index 0000000..6c667a6
 +    }
 +
 +    /** Runs the whole test; the flow completes after [SpeedEvent.Finished] for upload, or [SpeedEvent.Failed]. */
-+    fun run(port: Int?, base: String = "https://speed.cloudflare.com", phaseMs: Long = PHASE_MS, streams: Int = STREAMS, upChunk: Int = UP_CHUNK): Flow<SpeedEvent> = channelFlow {
++    fun run(port: Int?, base: String = "https://speed.cloudflare.com", phaseMs: Long = PHASE_MS, streams: Int = STREAMS, upChunk: Int = UP_CHUNK,
++            traceUrls: List<String> = listOf("$base/cdn-cgi/trace", TRACE_FALLBACK)): Flow<SpeedEvent> = channelFlow {
++        var meta: SpeedMeta? = null
 +        try {
 +            send(SpeedEvent.Phase(SpeedPhase.Meta))
-+            val meta = try {
++            meta = try {
 +                val connection = open("$base/meta", port)
 +                guarded(connection) { if (connection.responseCode == 200) parseMeta(connection.inputStream.bufferedReader().use { it.readText() }) else null }
 +            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++            // /meta refused (node or rule blocks the speed host): the exit still comes from Cloudflare's trace
++            // over the same proxy listener, so the card shows the real exit and the failure can say so.
++            if (meta == null) for (url in traceUrls) {
++                meta = try {
++                    val connection = open(url, port)
++                    guarded(connection) { if (connection.responseCode == 200) parseTraceMeta(connection.inputStream.bufferedReader().use { it.readText().take(4_096) }) else null }
++                } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++                if (meta != null) break
++            }
 +            send(SpeedEvent.Meta(meta))
 +
 +            send(SpeedEvent.Phase(SpeedPhase.Latency))
@@ -68612,7 +69100,8 @@ index 0000000..6c667a6
 +                val started = System.nanoTime()
 +                val connection = open("$base/__down?bytes=0", port)
 +                guarded(connection) {
-+                    connection.responseCode
++                    val code = connection.responseCode
++                    if (code !in 200..299) throw SpeedHttpStatus(code)
 +                    connection.inputStream.use { it.readBytes() }
 +                }
 +                samples += (System.nanoTime() - started) / 1_000_000
@@ -68644,16 +69133,16 @@ index 0000000..6c667a6
 +        } catch (cancel: CancellationException) {
 +            throw cancel
 +        } catch (error: Exception) {
-+            send(SpeedEvent.Failed(NetworkTest.failureText(error).takeIf { error !is IOException || error.message.isNullOrBlank() } ?: error.message!!.take(80)))
++            send(failure(error, meta != null, port))
 +        }
 +    }.flowOn(Dispatchers.IO)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
 new file mode 100644
-index 0000000..f08adc2
+index 0000000..ec39f99
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,572 @@
+@@ -0,0 +1,575 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.animation.core.animateFloatAsState
@@ -68717,6 +69206,7 @@ index 0000000..f08adc2
 +import io.github.xgl34222220.hetu.home.LocalHomeColors
 +import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 +import io.github.xgl34222220.hetu.home.badText
++import io.github.xgl34222220.hetu.home.fill
 +import io.github.xgl34222220.hetu.home.goodText
 +import io.github.xgl34222220.hetu.home.warnText
 +import io.github.xgl34222220.hetu.panel.PanelIcons
@@ -68748,7 +69238,9 @@ index 0000000..f08adc2
 +    var live by mutableStateOf(0.0)
 +    var down by mutableStateOf<Pair<Double, Long>?>(null)
 +    var up by mutableStateOf<Pair<Double, Long>?>(null)
++    /** Word-table key of the failure and its %s values (filled after translation). */
 +    var error by mutableStateOf<String?>(null)
++    var errorArgs: List<String> = emptyList()
 +    /** Bytes moved so far in each direction (from live samples), for the history of a stopped run. */
 +    var liveBytesDown = 0L
 +    var liveBytesUp = 0L
@@ -68759,7 +69251,7 @@ index 0000000..f08adc2
 +
 +    fun reset() {
 +        phase = SpeedPhase.Meta; meta = null; metaKnown = false; latency = -1L; live = 0.0
-+        down = null; up = null; error = null; downSamples.clear(); upSamples.clear(); liveBytesDown = 0L; liveBytesUp = 0L
++        down = null; up = null; error = null; errorArgs = emptyList(); downSamples.clear(); upSamples.clear(); liveBytesDown = 0L; liveBytesUp = 0L
 +    }
 +
 +    fun accept(event: SpeedEvent) {
@@ -68775,7 +69267,7 @@ index 0000000..f08adc2
 +                if (list.size > SAMPLE_CAP) list.removeAt(0)
 +            }
 +            is SpeedEvent.Finished -> if (event.upload) up = event.mbps to event.bytes else down = event.mbps to event.bytes
-+            is SpeedEvent.Failed -> { error = event.reason; phase = SpeedPhase.Failed }
++            is SpeedEvent.Failed -> { errorArgs = event.args; error = event.reason; phase = SpeedPhase.Failed }
 +        }
 +    }
 +
@@ -68886,7 +69378,7 @@ index 0000000..f08adc2
 +            // 测速历史: keep this run (complete or stopped), additive to the test itself.
 +            if (speed.down != null || speed.latency >= 0 || speed.error != null) {
 +                SpeedTestHistory.add(context, SpeedTestHistory.bandwidthRecord("网速测试", speed.latency, speed.down, speed.up,
-+                    speed.liveBytesDown, speed.liveBytesUp, speed.error, System.currentTimeMillis()))
++                    speed.liveBytesDown, speed.liveBytesUp, speed.error?.fill(*speed.errorArgs.toTypedArray()), System.currentTimeMillis()))
 +                historyVersion++
 +            }
 +            // A late finish of an older run must not stop the one that replaced it.
@@ -69124,7 +69616,7 @@ index 0000000..f08adc2
 +                    SpeedPhase.Download -> ht("正在测量下载…")
 +                    SpeedPhase.Upload -> ht("正在测量上传…")
 +                    SpeedPhase.Done -> ht("下载速率")
-+                    SpeedPhase.Failed -> speed.error?.let { ht(it) } ?: ht("测速失败")
++                    SpeedPhase.Failed -> speed.error?.let { ht(it).fill(*speed.errorArgs.toTypedArray()) } ?: ht("测速失败")
 +                },
 +                color = if (speed.phase == SpeedPhase.Failed) c.badText else c.t3, style = HomeType.caption,
 +            )
@@ -77693,7 +78185,7 @@ index 378e395..d49eb16 100644
  }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..fd9a0fa 100644
+index 40111ed..8bc0a0a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 @@ -144,17 +144,28 @@ internal data class ToolsBypassState(
@@ -77741,7 +78233,7 @@ index 40111ed..fd9a0fa 100644
 +    /** Kernel-level bypass (ipset): China IPs skip the core entirely, per family. */
 +    val kernelV4: Boolean = false,
 +    val kernelV6: Boolean = false,
-+    /** Running session as status reports it: ipset / degraded / off ("" = not known yet). */
++    /** Running session as status reports it: ipset / iptables (no ipset binary) / degraded / off ("" = not known yet). */
 +    val kernelStatus: String = "",
 +    val kernelReason: String = "",
 +    val kernelV4Entries: Int = 0,
@@ -78065,10 +78557,18 @@ index 60a38ad..824a0e5 100644
  ) {
      /** Non-null while a query is typed: the filtered cards (possibly empty → empty state). */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-index 4bdee7e..dd32845 100644
+index 4bdee7e..d7706ff 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-@@ -105,9 +105,10 @@ internal fun ToolsDiscardChangesDialogCard(onConfirm: () -> Unit, onCancel: () -
+@@ -21,6 +21,7 @@ import io.github.xgl34222220.hetu.home.HomeTone
+ import io.github.xgl34222220.hetu.home.HomeType
+ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.home.homeAnimatedFraction
++import io.github.xgl34222220.hetu.home.fill
+ import io.github.xgl34222220.hetu.home.homeEnter
+ import io.github.xgl34222220.hetu.home.rememberHomeStagger
+ import io.github.xgl34222220.hetu.ui.ht
+@@ -105,9 +106,10 @@ internal fun ToolsDiscardChangesDialogCard(onConfirm: () -> Unit, onCancel: () -
  /**
   * 共享网络 (工具 › 共享网络). Stateless: edits go to the draft in [state], ✓ saves it.
   *
@@ -78082,7 +78582,7 @@ index 4bdee7e..dd32845 100644
   */
  @Composable
  internal fun ToolsShareScreen(
-@@ -123,7 +124,6 @@ internal fun ToolsShareScreen(
+@@ -123,7 +125,6 @@ internal fun ToolsShareScreen(
      val draft = state.draft
      val ready = state.load is ToolsLoad.Ready
      val editable = ready && !state.saving
@@ -78090,7 +78590,7 @@ index 4bdee7e..dd32845 100644
      val stagger = rememberHomeStagger()
      ToolsPage(
          title = "共享网络",
-@@ -143,30 +143,49 @@ internal fun ToolsShareScreen(
+@@ -143,30 +144,49 @@ internal fun ToolsShareScreen(
                  ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
              }
              ToolsLoad.Ready -> {
@@ -78146,7 +78646,7 @@ index 4bdee7e..dd32845 100644
                      }
                      HomeCard(Modifier.fillMaxWidth()) {
                          ToolsCardTitle("下游设备")
-@@ -177,28 +196,30 @@ internal fun ToolsShareScreen(
+@@ -177,28 +197,30 @@ internal fun ToolsShareScreen(
                              if (index > 0) HomeRowDivider(start = HomeRowDims.textStart)
                              val mac = client.mac.lowercase()
                              ToolsSwitchRow(
@@ -78186,7 +78686,7 @@ index 4bdee7e..dd32845 100644
                      Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                  )
              }
-@@ -217,18 +238,66 @@ internal fun ToolsCnIpScreen(
+@@ -217,18 +239,90 @@ internal fun ToolsCnIpScreen(
      onBack: () -> Unit,
      onEnabledChange: (Boolean) -> Unit,
      modifier: Modifier = Modifier,
@@ -78213,7 +78713,7 @@ index 4bdee7e..dd32845 100644
 +            HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
 +                ToolsSwitchRow(
 +                    "内核绕过 IPv4", state.kernelV4, { onKernelChange(it, state.kernelV6) },
-+                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset）",
++                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）",
 +                    enabled = state.load is ToolsLoad.Ready,
 +                )
 +                HomeRowDivider(start = HomeRowDims.textStart)
@@ -78233,30 +78733,54 @@ index 4bdee7e..dd32845 100644
 +                    )
 +                    HomeRowDivider(start = HomeRowDims.textStart)
 +                }
-+                ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = ht(cnIpKernelStatusText(state)))
++                val kernelStatusText = buildList { for (part in cnIpKernelStatusParts(state)) add(ht(part.key).fill(*part.args.toTypedArray())) }.joinToString(" · ")
++                ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = kernelStatusText)
 +            }
-         }
++        }
 +        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
 +            ToolsRow(AnnotatedString(ht("数据源")), icon = ToolsIcons.Database,
 +                subtitle = ht("gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，内核集合随之热更新"))
+         }
+     }
+ }
++
++/** One translatable table key of the 内核状态 line plus its %s values. */
++internal data class CnIpStatusPart(val key: String, val args: List<Any> = emptyList())
++
++/**
++ * 内核状态 of the running session: ipset or the iptables tree (ROMs without an ipset binary, such as
++ * stock ColorOS) both keep CN destinations out of the core; degraded names why the core RULE-SET
++ * does the job instead. Each part is a table key so every language gets the whole line.
++ */
++internal fun cnIpKernelStatusParts(state: ToolsCnIpState): List<CnIpStatusPart> {
++    val reason = state.kernelReason
++    return when {
++        !state.kernelV4 && !state.kernelV6 -> listOf(CnIpStatusPart("未开启"))
++        state.kernelStatus == "ipset" || state.kernelStatus == "iptables" -> buildList {
++            add(CnIpStatusPart(if (state.kernelStatus == "ipset") "内核 ipset 生效" else "内核 iptables 规则生效（本机没有 ipset）"))
++            if (state.kernelV4Entries > 0) add(CnIpStatusPart("IPv4 %s 段", listOf(state.kernelV4Entries)))
++            if (state.kernelV6Entries > 0) add(CnIpStatusPart("IPv6 %s 段", listOf(state.kernelV6Entries)))
++            if (state.kernelV6 && reason.contains("v6-mode-")) add(CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式"))
 +        }
++        state.kernelStatus == "degraded" -> listOf(when {
++            reason.contains("chain-missing") -> CnIpStatusPart("内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复")
++            reason.contains("xt-connmark-unavailable") -> CnIpStatusPart("设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则")
++            reason.contains("mode-tun") || reason.contains("mode-ebpf") -> CnIpStatusPart("当前代理模式不支持内核绕过，已降级为核心内规则")
++            reason.contains("iptables-failed") || reason.contains("restore-missing") -> CnIpStatusPart("内核 iptables 规则安装失败，已降级为核心内规则（%s）", listOf(reason))
++            reason.contains("data-invalid") || reason.contains("data-missing") -> CnIpStatusPart("中国 IP 数据缺失或无效，已降级为核心内规则（%s）", listOf(reason))
++            // A session started by an older version (ipset only): the next start uses the iptables rules.
++            reason == "ipset-unavailable" -> CnIpStatusPart("设备没有 ipset：重启代理后改用 iptables 内核规则")
++            reason.contains("v6-mode-") -> CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式")
++            reason.isBlank() -> CnIpStatusPart("内核绕过未生效，已降级为核心内规则")
++            else -> CnIpStatusPart("内核绕过未生效，已降级为核心内规则（%s）", listOf(reason))
++        })
++        else -> listOf(CnIpStatusPart("重启代理后生效"))
 +    }
 +}
 +
-+internal fun cnIpKernelStatusText(state: ToolsCnIpState): String = when {
-+    !state.kernelV4 && !state.kernelV6 -> "未开启"
-+    state.kernelStatus == "ipset" -> buildString {
-+        append("内核 ipset 生效")
-+        if (state.kernelV4Entries > 0) append(" · IPv4 ").append(state.kernelV4Entries).append(" 段")
-+        if (state.kernelV6Entries > 0) append(" · IPv6 ").append(state.kernelV6Entries).append(" 段")
-+    }
-+    state.kernelStatus == "degraded" -> when {
-+        state.kernelReason.contains("ipset-unavailable") -> "设备不支持 ipset，已降级为核心内规则"
-+        state.kernelReason.contains("mode-") -> "当前代理模式不支持内核绕过，已降级为核心内规则"
-+        else -> "内核绕过未生效，已降级为核心内规则" + if (state.kernelReason.isBlank()) "" else "（" + state.kernelReason + "）"
-     }
-+    else -> "重启代理后生效"
- }
++/** Plain Chinese 内核状态 line (diagnostics text, tests). */
++internal fun cnIpKernelStatusText(state: ToolsCnIpState): String =
++    cnIpKernelStatusParts(state).joinToString(" · ") { it.key.fill(*it.args.toTypedArray()) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
 index 7967521..17acd48 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
@@ -78619,7 +79143,7 @@ index 9841062..4f452b7 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..6568d16 100644
+index 578ce9d..6044a8b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -78666,7 +79190,7 @@ index 578ce9d..6568d16 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,411 @@ private val vocabularyConnection = """
+@@ -969,16 +990,440 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -79058,7 +79582,36 @@ index 578ce9d..6568d16 100644
 +无法移除旧版河图停止后留下的 fake-IP 拦截规则（HXFAKE_REJECT），请重试启动或重启手机|Could not remove the fake-IP block left by an older Hetu stop (HXFAKE_REJECT). Try starting again or restart the phone|無法移除舊版河圖停止後留下的 fake-IP 攔截規則（HXFAKE_REJECT），請重試啟動或重新啟動手機|Не удалось снять блокировку fake-IP, оставленную остановкой старой версии Hetu (HXFAKE_REJECT). Запустите снова или перезагрузите телефон
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop).joinToString("\n")
++
++// 2026-10 CNIP without ipset (iptables tree) and the speed test failure reasons.
++private val vocabularyCnipSpeed = """
++国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
++内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
++内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)
++IPv4 %s 段|IPv4 %s ranges|IPv4 %s 段|IPv4: %s диапазонов
++IPv6 %s 段|IPv6 %s ranges|IPv6 %s 段|IPv6: %s диапазонов
++IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs IPv6 mode "Enable / Strict"|IPv6 未生效：需要 IPv6「啟用／嚴格」模式|IPv6 не применён: нужен режим IPv6 «Включить / Строгий»
++内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复|The kernel bypass rules are gone; the core rules handle it now. Restart the proxy to restore them|核心繞過規則已遺失，已降級為核心內規則；重新啟動代理可恢復|Правила обхода в ядре пропали, теперь работают правила ядра прокси. Перезапустите прокси, чтобы вернуть их
++设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则|This device has no ipset and no iptables connection marks; the core rules handle it instead|裝置沒有 ipset，也不支援 iptables 連線標記，已降級為核心內規則|На устройстве нет ipset и меток соединений iptables; вместо этого работают правила ядра прокси
++当前代理模式不支持内核绕过，已降级为核心内规则|The current proxy mode has no kernel bypass; the core rules handle it instead|目前代理模式不支援核心繞過，已降級為核心內規則|Текущий режим прокси не поддерживает обход в ядре; вместо этого работают правила ядра прокси
++内核 iptables 规则安装失败，已降级为核心内规则（%s）|Installing the kernel iptables rules failed; the core rules handle it instead (%s)|核心 iptables 規則安裝失敗，已降級為核心內規則（%s）|Не удалось установить правила iptables; вместо этого работают правила ядра прокси (%s)
++中国 IP 数据缺失或无效，已降级为核心内规则（%s）|China IP data is missing or invalid; the core rules handle it instead (%s)|中國 IP 資料缺失或無效，已降級為核心內規則（%s）|Данные об IP Китая отсутствуют или неверны; вместо этого работают правила ядра прокси (%s)
++设备没有 ipset：重启代理后改用 iptables 内核规则|This device has no ipset: restart the proxy to switch to kernel iptables rules|裝置沒有 ipset：重新啟動代理後改用 iptables 核心規則|На устройстве нет ipset: перезапустите прокси, чтобы перейти на правила iptables
++内核绕过未生效，已降级为核心内规则|Kernel bypass not active; the core rules handle it instead|核心繞過未生效，已降級為核心內規則|Обход в ядре не активен; вместо этого работают правила ядра прокси
++内核绕过未生效，已降级为核心内规则（%s）|Kernel bypass not active; the core rules handle it instead (%s)|核心繞過未生效，已降級為核心內規則（%s）|Обход в ядре не активен; вместо этого работают правила ядра прокси (%s)
++重启代理后生效|Takes effect after a proxy restart|重新啟動代理後生效|Вступит в силу после перезапуска прокси
++出口正常，但测速站 speed.cloudflare.com 的连接被立即关闭：通常是当前节点（机场）禁止测速，或分流规则把它拒绝（REJECT）。可换个节点再试|The exit works, but connections to speed.cloudflare.com are closed at once: usually the current node (provider) forbids speed tests, or a routing rule rejects it (REJECT). Try another node|出口正常，但測速站 speed.cloudflare.com 的連線被立即關閉：通常是目前節點（機場）禁止測速，或分流規則將其拒絕（REJECT）。可換個節點再試|Выход работает, но соединения с speed.cloudflare.com сразу закрываются: обычно текущий узел (провайдер) запрещает тесты скорости или правило маршрутизации его отклоняет (REJECT). Попробуйте другой узел
++连接被立即关闭，出口也查询不到：当前节点可能不可用，或分流规则拒绝了这些连接。请换个节点再试|Connections are closed at once and the exit cannot be looked up either: the current node may be down, or a routing rule rejects these connections. Try another node|連線被立即關閉，出口也查詢不到：目前節點可能無法使用，或分流規則拒絕了這些連線。請換個節點再試|Соединения сразу закрываются, и выход тоже не определить: текущий узел может быть недоступен или правило маршрутизации отклоняет эти соединения. Попробуйте другой узел
++无法连接河图核心的本地测速入口（127.0.0.1:%s）：代理可能刚停止或正在重启，请稍后再试|Cannot reach the core's local speed-test entry (127.0.0.1:%s): the proxy may have just stopped or be restarting. Try again shortly|無法連線河圖核心的本機測速入口（127.0.0.1:%s）：代理可能剛停止或正在重新啟動，請稍後再試|Нет связи с локальным входом теста скорости ядра (127.0.0.1:%s): прокси мог только что остановиться или перезапускается. Повторите чуть позже
++测速服务器拒绝连接|The speed test server refused the connection|測速伺服器拒絕連線|Сервер теста скорости отклонил соединение
++测速请求超时：当前节点响应太慢或不可用|The speed test timed out: the current node is too slow or unavailable|測速請求逾時：目前節點回應太慢或無法使用|Тайм-аут теста скорости: текущий узел слишком медленный или недоступен
++无法解析测速服务器域名|Cannot resolve the speed test server's name|無法解析測速伺服器網域|Не удалось разрешить имя сервера теста скорости
++与测速服务器的 TLS 握手失败（%s）|TLS handshake with the speed test server failed (%s)|與測速伺服器的 TLS 交握失敗（%s）|Сбой TLS-рукопожатия с сервером теста скорости (%s)
++测速服务器返回 HTTP %s，当前出口可能被 Cloudflare 限制|The speed test server answered HTTP %s; Cloudflare may be limiting this exit|測速伺服器回傳 HTTP %s，目前出口可能被 Cloudflare 限制|Сервер теста скорости ответил HTTP %s; Cloudflare может ограничивать этот выход
++测速连接中断（%s）|The speed test connection broke off (%s)|測速連線中斷（%s）|Соединение теста скорости прервалось (%s)
++""".trimIndent()
++
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {

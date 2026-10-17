@@ -197,7 +197,7 @@ internal data class ToolsCnIpState(
     /** Kernel-level bypass (ipset): China IPs skip the core entirely, per family. */
     val kernelV4: Boolean = false,
     val kernelV6: Boolean = false,
-    /** Running session as status reports it: ipset / degraded / off ("" = not known yet). */
+    /** Running session as status reports it: ipset / iptables (no ipset binary) / degraded / off ("" = not known yet). */
     val kernelStatus: String = "",
     val kernelReason: String = "",
     val kernelV4Entries: Int = 0,

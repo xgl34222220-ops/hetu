@@ -61,6 +61,7 @@ import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.badText
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.goodText
 import io.github.xgl34222220.hetu.home.warnText
 import io.github.xgl34222220.hetu.panel.PanelIcons
@@ -92,7 +93,9 @@ internal class SpeedUiState {
     var live by mutableStateOf(0.0)
     var down by mutableStateOf<Pair<Double, Long>?>(null)
     var up by mutableStateOf<Pair<Double, Long>?>(null)
+    /** Word-table key of the failure and its %s values (filled after translation). */
     var error by mutableStateOf<String?>(null)
+    var errorArgs: List<String> = emptyList()
     /** Bytes moved so far in each direction (from live samples), for the history of a stopped run. */
     var liveBytesDown = 0L
     var liveBytesUp = 0L
@@ -103,7 +106,7 @@ internal class SpeedUiState {
 
     fun reset() {
         phase = SpeedPhase.Meta; meta = null; metaKnown = false; latency = -1L; live = 0.0
-        down = null; up = null; error = null; downSamples.clear(); upSamples.clear(); liveBytesDown = 0L; liveBytesUp = 0L
+        down = null; up = null; error = null; errorArgs = emptyList(); downSamples.clear(); upSamples.clear(); liveBytesDown = 0L; liveBytesUp = 0L
     }
 
     fun accept(event: SpeedEvent) {
@@ -119,7 +122,7 @@ internal class SpeedUiState {
                 if (list.size > SAMPLE_CAP) list.removeAt(0)
             }
             is SpeedEvent.Finished -> if (event.upload) up = event.mbps to event.bytes else down = event.mbps to event.bytes
-            is SpeedEvent.Failed -> { error = event.reason; phase = SpeedPhase.Failed }
+            is SpeedEvent.Failed -> { errorArgs = event.args; error = event.reason; phase = SpeedPhase.Failed }
         }
     }
 
@@ -230,7 +233,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
             // 测速历史: keep this run (complete or stopped), additive to the test itself.
             if (speed.down != null || speed.latency >= 0 || speed.error != null) {
                 SpeedTestHistory.add(context, SpeedTestHistory.bandwidthRecord("网速测试", speed.latency, speed.down, speed.up,
-                    speed.liveBytesDown, speed.liveBytesUp, speed.error, System.currentTimeMillis()))
+                    speed.liveBytesDown, speed.liveBytesUp, speed.error?.fill(*speed.errorArgs.toTypedArray()), System.currentTimeMillis()))
                 historyVersion++
             }
             // A late finish of an older run must not stop the one that replaced it.
@@ -468,7 +471,7 @@ private fun SpeedHeroCard(speed: SpeedUiState, active: Boolean, onToggle: () -> 
                     SpeedPhase.Download -> ht("正在测量下载…")
                     SpeedPhase.Upload -> ht("正在测量上传…")
                     SpeedPhase.Done -> ht("下载速率")
-                    SpeedPhase.Failed -> speed.error?.let { ht(it) } ?: ht("测速失败")
+                    SpeedPhase.Failed -> speed.error?.let { ht(it).fill(*speed.errorArgs.toTypedArray()) } ?: ht("测速失败")
                 },
                 color = if (speed.phase == SpeedPhase.Failed) c.badText else c.t3, style = HomeType.caption,
             )

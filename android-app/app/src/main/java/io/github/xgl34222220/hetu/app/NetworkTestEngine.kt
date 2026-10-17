@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import android.content.Context
+import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.HttpURLConnection
@@ -338,8 +339,12 @@ internal sealed interface SpeedEvent {
     /** Live rate of the running phase, sampled every [SpeedTest.SAMPLE_MS]. */
     data class Live(val upload: Boolean, val mbps: Double, val bytes: Long) : SpeedEvent
     data class Finished(val upload: Boolean, val mbps: Double, val bytes: Long) : SpeedEvent
-    data class Failed(val reason: String) : SpeedEvent
+    /** [reason] is a word-table key (Chinese); [args] fill its %s placeholders. */
+    data class Failed(val reason: String, val args: List<String> = emptyList()) : SpeedEvent
 }
+
+/** A non-2xx answer of the speed server itself (the request reached it). */
+internal class SpeedHttpStatus(val code: Int) : IOException("HTTP $code")
 
 /**
  * Cloudflare speed test through the current proxy node: metadata of the exit (`/meta`), idle
@@ -358,6 +363,54 @@ internal object SpeedTest {
     internal const val UP_CHUNK = 4_000_000
 
     fun mbps(bytes: Long, millis: Long): Double = if (millis <= 0) 0.0 else bytes * 8.0 / (millis / 1000.0) / 1_000_000.0
+
+    /** Fallback for the exit card: Cloudflare's own trace over the same proxy path (works when /meta is refused). */
+    const val TRACE_FALLBACK = "https://www.cloudflare.com/cdn-cgi/trace"
+
+    const val FAIL_CLOSED_EXIT_KNOWN = "出口正常，但测速站 speed.cloudflare.com 的连接被立即关闭：通常是当前节点（机场）禁止测速，或分流规则把它拒绝（REJECT）。可换个节点再试"
+    const val FAIL_CLOSED = "连接被立即关闭，出口也查询不到：当前节点可能不可用，或分流规则拒绝了这些连接。请换个节点再试"
+    const val FAIL_LOCAL_PORT = "无法连接河图核心的本地测速入口（127.0.0.1:%s）：代理可能刚停止或正在重启，请稍后再试"
+    const val FAIL_REFUSED = "测速服务器拒绝连接"
+    const val FAIL_TIMEOUT = "测速请求超时：当前节点响应太慢或不可用"
+    const val FAIL_DNS = "无法解析测速服务器域名"
+    const val FAIL_TLS = "与测速服务器的 TLS 握手失败（%s）"
+    const val FAIL_HTTP = "测速服务器返回 HTTP %s，当前出口可能被 Cloudflare 限制"
+    const val FAIL_IO = "测速连接中断（%s）"
+    const val FAIL_OTHER = "测速失败"
+
+    /**
+     * Friendly reason for a failed run. Through Mihomo's HTTP listener a CONNECT is answered "200" before
+     * the core dials, so a REJECT rule, a node that refuses the target or a dead node all surface as the
+     * TLS handshake hitting end-of-stream ("connection closed") right away.
+     */
+    fun failure(error: Throwable, exitKnown: Boolean, port: Int?): SpeedEvent.Failed {
+        val message = error.message.orEmpty()
+        val closed = error is EOFException || error.cause is EOFException ||
+            message.contains("connection closed", ignoreCase = true) || message.contains("closed by peer", ignoreCase = true) ||
+            message.contains("unexpected end of stream", ignoreCase = true) || message.contains("end of file", ignoreCase = true) ||
+            message.contains("Connection reset", ignoreCase = true)
+        return when {
+            error is SpeedHttpStatus -> SpeedEvent.Failed(FAIL_HTTP, listOf(error.code.toString()))
+            closed -> SpeedEvent.Failed(if (exitKnown) FAIL_CLOSED_EXIT_KNOWN else FAIL_CLOSED)
+            error is ConnectException && port != null -> SpeedEvent.Failed(FAIL_LOCAL_PORT, listOf(port.toString()))
+            error is ConnectException -> SpeedEvent.Failed(FAIL_REFUSED)
+            error is SocketTimeoutException -> SpeedEvent.Failed(FAIL_TIMEOUT)
+            error is UnknownHostException -> SpeedEvent.Failed(FAIL_DNS)
+            error is SSLException -> SpeedEvent.Failed(FAIL_TLS, listOf(message.ifBlank { error.javaClass.simpleName }.take(60)))
+            error is IOException -> SpeedEvent.Failed(FAIL_IO, listOf(message.ifBlank { error.javaClass.simpleName }.take(60)))
+            else -> SpeedEvent.Failed(FAIL_OTHER)
+        }
+    }
+
+    /** Exit of a Cloudflare `/cdn-cgi/trace` body (ip, loc, colo); null unless it carries ip and loc. */
+    fun parseTraceMeta(body: String): SpeedMeta? {
+        val fields = body.lineSequence().mapNotNull { line ->
+            val at = line.indexOf('='); if (at <= 0) null else line.substring(0, at).trim() to line.substring(at + 1).trim()
+        }.toMap()
+        val ip = fields["ip"].orEmpty(); val loc = fields["loc"].orEmpty()
+        if (ip.isBlank() || loc.length != 2) return null
+        return SpeedMeta(ip = ip, country = loc.uppercase(Locale.ROOT), city = "", colo = fields["colo"].orEmpty(), org = "")
+    }
 
     fun parseMeta(body: String): SpeedMeta? = try {
         val json = JSONObject(body)
@@ -406,7 +459,7 @@ internal object SpeedTest {
             currentCoroutineContext().ensureActive()
             val connection = open("$base/__down?bytes=$DOWN_CHUNK", port)
             guarded(connection) {
-                if (connection.responseCode !in 200..299) throw IOException("下载请求失败：HTTP ${connection.responseCode}")
+                if (connection.responseCode !in 200..299) throw SpeedHttpStatus(connection.responseCode)
                 connection.inputStream.use { input ->
                     while (System.nanoTime() < deadline) {
                         currentCoroutineContext().ensureActive()
@@ -446,13 +499,24 @@ internal object SpeedTest {
     }
 
     /** Runs the whole test; the flow completes after [SpeedEvent.Finished] for upload, or [SpeedEvent.Failed]. */
-    fun run(port: Int?, base: String = "https://speed.cloudflare.com", phaseMs: Long = PHASE_MS, streams: Int = STREAMS, upChunk: Int = UP_CHUNK): Flow<SpeedEvent> = channelFlow {
+    fun run(port: Int?, base: String = "https://speed.cloudflare.com", phaseMs: Long = PHASE_MS, streams: Int = STREAMS, upChunk: Int = UP_CHUNK,
+            traceUrls: List<String> = listOf("$base/cdn-cgi/trace", TRACE_FALLBACK)): Flow<SpeedEvent> = channelFlow {
+        var meta: SpeedMeta? = null
         try {
             send(SpeedEvent.Phase(SpeedPhase.Meta))
-            val meta = try {
+            meta = try {
                 val connection = open("$base/meta", port)
                 guarded(connection) { if (connection.responseCode == 200) parseMeta(connection.inputStream.bufferedReader().use { it.readText() }) else null }
             } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+            // /meta refused (node or rule blocks the speed host): the exit still comes from Cloudflare's trace
+            // over the same proxy listener, so the card shows the real exit and the failure can say so.
+            if (meta == null) for (url in traceUrls) {
+                meta = try {
+                    val connection = open(url, port)
+                    guarded(connection) { if (connection.responseCode == 200) parseTraceMeta(connection.inputStream.bufferedReader().use { it.readText().take(4_096) }) else null }
+                } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+                if (meta != null) break
+            }
             send(SpeedEvent.Meta(meta))
 
             send(SpeedEvent.Phase(SpeedPhase.Latency))
@@ -464,7 +528,8 @@ internal object SpeedTest {
                 val started = System.nanoTime()
                 val connection = open("$base/__down?bytes=0", port)
                 guarded(connection) {
-                    connection.responseCode
+                    val code = connection.responseCode
+                    if (code !in 200..299) throw SpeedHttpStatus(code)
                     connection.inputStream.use { it.readBytes() }
                 }
                 samples += (System.nanoTime() - started) / 1_000_000
@@ -496,7 +561,7 @@ internal object SpeedTest {
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
-            send(SpeedEvent.Failed(NetworkTest.failureText(error).takeIf { error !is IOException || error.message.isNullOrBlank() } ?: error.message!!.take(80)))
+            send(failure(error, meta != null, port))
         }
     }.flowOn(Dispatchers.IO)
 }
