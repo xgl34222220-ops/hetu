@@ -20,6 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeCard
 import io.github.xgl34222220.hetu.home.HomeDims
@@ -53,6 +56,7 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
     ToolsEntry.Cores -> ToolsIcons.Cpu
     ToolsEntry.Adblock -> ToolsIcons.ShieldX
     ToolsEntry.Diag -> ToolsIcons.Activity
+    ToolsEntry.NetTest -> PanelIcons.Gauge
     ToolsEntry.WebUi -> ToolsIcons.Monitor
 }
 
@@ -136,7 +140,7 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
     val c = LocalHomeColors.current
     Column(Modifier.fillMaxWidth().padding(bottom = HomeDims.gap).homeEnter(stagger, index), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (group.title != null) {
-            Text(ht(group.title), Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp), color = c.t2, style = HomeType.noteStrong)
+            Text(ht(group.title), Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp).semantics { heading() }, color = c.t2, style = HomeType.noteStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         HomeCard(Modifier.fillMaxWidth()) {
             group.entries.forEach { entry ->

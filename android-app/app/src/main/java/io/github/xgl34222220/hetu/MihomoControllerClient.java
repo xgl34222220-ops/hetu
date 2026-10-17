@@ -74,6 +74,14 @@ final class MihomoControllerClient {
             secret=string(snapshot,customApi?"proxyCustomApiSecret":"proxyControllerSecret","");
             if(secret.indexOf('\r')>=0||secret.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
             if(!customApi&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
+            // Xray / V2Fly / Hysteria have no Clash-compatible controller: report the explicit
+            // unsupported state instead of a refused connection on the local port.
+            // Kept free of other app classes: the network soak harness compiles this file standalone.
+            if(!customApi){
+                Object running=snapshot.get("proxyRootRuntimeCore");
+                String label="xray".equals(running)?"Xray":"v2fly".equals(running)?"V2Fly":"hysteria".equals(running)?"Hysteria":null;
+                if(label!=null)throw new IOException("此核心不支持面板、策略组与测速（没有 Clash 控制接口）（"+label+"）");
+            }
         }
 
         private static String string(Map<String,?> values,String key,String fallback)throws IOException {
@@ -309,7 +317,10 @@ final class MihomoControllerClient {
             raw.flush();
 
             BufferedInputStream in=new BufferedInputStream(socket.getInputStream());
-            String status=readLine(in);if(status==null||!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
+            String status=readLine(in);
+            // A connection closed before any reply byte is a lost reply (retryable), not a malformed one.
+            if(status==null)throw new EOFException("Mihomo 控制接口返回无效 HTTP 响应");
+            if(!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
             String[] bits=status.split(" ",3);if(bits.length<2)throw new IOException("Mihomo 控制接口状态行无效");
             int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
             HashMap<String,String> headers=new HashMap<>();String line;

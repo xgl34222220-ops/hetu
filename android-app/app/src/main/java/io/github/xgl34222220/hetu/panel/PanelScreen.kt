@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.panel
 
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -50,11 +52,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeBarBackdrop
 import io.github.xgl34222220.hetu.home.HomeBarGlass
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
@@ -107,6 +111,11 @@ internal fun PanelScreen(
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomPad = contentPadding.calculateBottomPadding()
+    // Measured height of the 策略 floating stack (定位当前节点 + 收起节点). While it is shown the list
+    // reserves that room too, so the right column's delays and the last row can scroll clear of it.
+    var fabStack by remember { mutableStateOf(0.dp) }
+    val fabShown = view.tab == PanelTab.Groups && data.running && view.expandedGroups.isNotEmpty() && data.readError.isBlank() && !data.loading && data.core.supports(PanelTab.Groups)
+    val listBottom = if (fabShown && fabStack > 0.dp) maxOf(bottomPad, bottomPad.coerceAtLeast(16.dp) + fabStack + 12.dp) else bottomPad
     // The title block follows the font scale, so a large system font never spills into the tabs.
     val titleHeight = with(density) { HomeType.largeTitle.lineHeight.toDp() } + 8.dp
     val titlePx = with(density) { titleHeight.toPx() }
@@ -118,9 +127,19 @@ internal fun PanelScreen(
     val running = data.running
     val configuration = LocalConfiguration.current
     val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
-    val displayView = view.copy(layout = effectiveLayout)
+    // Same instance while equal: group/node cards compare it by identity, so a fresh copy on
+    // every 1 s traffic sample recomposed every visible card while the list scrolled.
+    val displayView = remember(view, effectiveLayout) { view.copy(layout = effectiveLayout) }
     val motion = LocalHomeMotionEnabled.current
-    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(data, displayView) else emptyList() }
+    // The 策略 tab reads only these fields. Traffic, connections and logs change every second;
+    // keeping them out of the instance the cards receive lets those cards skip recomposition.
+    val groupData = remember(data.status, data.globalMode, data.groups, data.delays, data.settledDelays,
+        data.testingGroups, data.testingAll, data.switching) {
+        PanelData(status = data.status, globalMode = data.globalMode, groups = data.groups, delays = data.delays,
+            settledDelays = data.settledDelays, testingGroups = data.testingGroups, testingAll = data.testingAll,
+            switching = data.switching)
+    }
+    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(groupData, displayView) else emptyList() }
     val headerItems = panelHeaderItemCount(data, view)
     // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
     val stagger = key(view.tab) { rememberHomeStagger() }
@@ -139,7 +158,7 @@ internal fun PanelScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().homeGlassSource(glass),
             state = listState,
-            contentPadding = PaddingValues(top = statusTop + PanelDims.barHeight, bottom = bottomPad),
+            contentPadding = PaddingValues(top = statusTop + PanelDims.barHeight, bottom = listBottom),
         ) {
             // The header itself is drawn above the list; these two items only reserve its room.
             item(key = "panel-title") { Spacer(Modifier.height(titleHeight)) }
@@ -149,6 +168,21 @@ internal fun PanelScreen(
                     PanelEmptyState(PanelIcons.ServerOff, "代理未运行", "启动代理后可查看策略与节点") {
                         HomeButton("启动代理", actions.onStart, kind = HomeButtonKind.Primary, icon = PanelIcons.Power, loading = data.status == PanelStatus.Starting)
                     }
+                }
+                return@LazyColumn
+            }
+            // A tab the running core cannot feed is an explained state, not a read error or a toast.
+            data.core.features[view.tab]?.let { feature ->
+                item(key = "panel-core-unsupported") {
+                    val fallback = data.core.fallbackFor(view.tab)
+                    val way: (@Composable RowScope.() -> Unit)? = if (fallback == null) null else {
+                        { HomeButton("查看" + fallback.label, { onView(view.withTab(fallback)) }, kind = HomeButtonKind.Primary) }
+                    }
+                    HomeCoreUnsupportedCard(
+                        data.core.core, feature, data.core.details[view.tab].orEmpty(),
+                        Modifier.panelGutter().padding(top = 24.dp).then(hetuAnimateItem(motion)),
+                        actions = way,
+                    )
                 }
                 return@LazyColumn
             }
@@ -176,14 +210,14 @@ internal fun PanelScreen(
             }
             when (view.tab) {
                 PanelTab.Groups -> panelGroupsTab(
-                    rows = rows, data = data, view = displayView, stagger = stagger,
+                    rows = rows, data = groupData, view = displayView, stagger = stagger,
                     onToggleGroup = { name ->
                         // Capture this card row before an accordion removes rows above it. The
                         // stable lazy key matches panelGroupsTab; an old numeric index does not.
                         val cardRow = rows.firstOrNull { it is PanelGroupRow.Cards && it.groups.any { group -> group.name == name } } as? PanelGroupRow.Cards
                         val anchor = cardRow?.let { row -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "g:" + row.groups.first().name } }
                         val next = view.toggleGroup(name)
-                        val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+                        val at = PanelLogic.groupRows(groupData, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
                         onView(next)
                         if (anchor != null && at >= 0) {
                             // Apply with the new rows on the next measure, retaining the tapped
@@ -204,7 +238,7 @@ internal fun PanelScreen(
                 )
                 PanelTab.Subscriptions -> panelSubscriptionsTab(PanelLogic.subscriptions(data, view), view.needle, stagger, actions.onUpdateSubscription)
                 PanelTab.Connections -> panelConnectionsTab(data, view, stagger, onView, onOpen = { onOverlay(PanelOverlay.ConnectionDetail(it)) }, onCloseAll = { onOverlay(PanelOverlay.CloseAllDialog) })
-                PanelTab.Rules -> panelRulesTab(PanelLogic.rules(data, view), view.needle, data.ruleTotal, stagger)
+                PanelTab.Rules -> panelRulesTab(PanelLogic.rules(data, view), view.needle, data.ruleTotal, stagger, view.ruleFocus) { onView(view.copy(ruleFocus = null)) }
                 PanelTab.RuleSets -> panelRuleSetsTab(PanelLogic.ruleSets(data, view), view.needle, stagger, actions.onUpdateRuleSet)
                 PanelTab.Logs -> panelLogsTab(PanelLogic.logs(data, view), view, stagger, onView, onOrderMenu = { onOverlay(PanelOverlay.LogOrderMenu) }, orderMenu = { menu(PanelOverlay.LogOrderMenu) })
             }
@@ -213,12 +247,13 @@ internal fun PanelScreen(
         PanelHeader(data, view, overlay, actions, glass, collapse, titleHeight, statusTop, listState, onView, onOverlay, menu)
 
         // 策略: once a group is open, “定位当前节点” and a collapse capsule float above the dock.
-        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups }
+        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups && data.core.supports(PanelTab.Groups) }
         var lastOpen by remember { mutableStateOf("") }
         SideEffect { if (openGroup != null) lastOpen = openGroup }
         val shownGroup = openGroup ?: lastOpen
         Column(
-            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp)),
+            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp))
+                .onSizeChanged { size -> fabStack = with(density) { size.height.toDp() } },
             horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HomePop(openGroup != null) {
@@ -288,7 +323,7 @@ private fun BoxScope.PanelHeader(
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1)
+            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // Restored cards are display-only until the first fresh read lands; say so quietly.
             HomePop(data.running && data.syncing) { PanelSyncChip() }
         }
@@ -317,9 +352,9 @@ private fun BoxScope.PanelHeader(
                 alpha = shown
                 translationY = (1f - shown) * 8.dp.toPx()
             },
-            color = c.t1, style = HomeType.barTitle, maxLines = 1,
+            color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        if (data.running && data.readError.isBlank()) {
+        if (data.running && data.readError.isBlank() && data.core.supports(tab)) {
             val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
                 Box {
                     HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint, glyph = 26.dp)
@@ -437,6 +472,6 @@ private fun PanelSyncChip() {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
-        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1)
+        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

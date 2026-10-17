@@ -10,7 +10,7 @@ import java.util.Locale
 /* ---------------------------- 工具 (tab root) ---------------------------- */
 
 /**
- * The 14 entries of the tools tab.
+ * The 15 entries of the tools tab.
  *
  * @param summary line under the title on the root list (concept page 1).
  * @param brief shorter line shown in search results (concept page 3).
@@ -30,6 +30,7 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
     Cores("核心管理", "下载与更新", "下载与更新", "内核 mihomo xray sing-box"),
     Adblock("广告过滤", "规则与屏蔽", "规则与屏蔽", "去广告 adguard 拦截"),
     Diag("诊断工具", "网络与环境", "网络与环境", "预检 恢复网络 排查"),
+    NetTest("网络测试", "连通性与网速", "连通性与网速", "测速 解锁 延迟 speedtest cloudflare chatgpt netflix"),
     WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
 }
 
@@ -37,18 +38,33 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
 internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEntry>)
 
 internal object ToolsCatalog {
-    /** Concept layout (03A page 1): six untitled cards. This is the default. */
+    /** Concept layout (03A page 1): six untitled cards (the default before 3.3.3). */
     val concept: List<ToolsGroupSpec> = listOf(
-        ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
+        // 网络测试 is the most used tool: it opens the first card (approved concept c2), and
+        // 配置管理 still sits fully above the floating dock without scrolling.
+        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest, ToolsEntry.Files)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Logs)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
+        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
+    )
+
+    /**
+     * Audit5 U14 (3.3.3, not default): the concept order kept row for row, folded into four titled
+     * cards so the single-row cards (日志文件, 应用管理) join their neighbours and every card says
+     * what it holds. Titles never repeat an entry's own text, so a search hit is never doubled.
+     */
+    val grouped: List<ToolsGroupSpec> = listOf(
+        ToolsGroupSpec("常用工具", listOf(ToolsEntry.NetTest, ToolsEntry.Files, ToolsEntry.Logs)),
+        ToolsGroupSpec("分流与网络", listOf(ToolsEntry.Apps, ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
+        ToolsGroupSpec("配置与规则", listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
+        ToolsGroupSpec("核心与维护", listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
     )
 
     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
     val titled: List<ToolsGroupSpec> = listOf(
+        ToolsGroupSpec("网络测试", listOf(ToolsEntry.NetTest)),
         ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
         ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
         ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
@@ -81,6 +97,8 @@ internal object ToolsCatalog {
 internal data class ToolsRootState(
     val searching: Boolean = false,
     val query: String = "",
+    // The frozen NewUiShell83 dock test needs 配置管理 fully above the dock without scrolling,
+    // which the titled grouping (U14) pushes below it, so the concept layout stays the default.
     val groups: List<ToolsGroupSpec> = ToolsCatalog.concept,
 ) {
     /** Non-null while a query is typed: the filtered cards (possibly empty → empty state). */

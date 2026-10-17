@@ -135,8 +135,9 @@ internal fun ConnectionsScreen(vm: HetuViewModel, bottomPadding: Dp, forcedSecti
     val body: LazyListScope.(String) -> Unit = { tab ->
         when (tab) {
             "logs" -> logItems(vm, logState, searching && section == "logs")
-            "rank" -> if (!state.running && !rankState.historical) {
-                item(key = "rank-stopped") { HxEmpty(Icons.Rounded.SwapVert, "代理未运行", "实时排行来自运行中的连接；开启历史采集后可查看 24 小时排行") }
+            // With history collection on, the controls stay so the collected history can be opened while stopped.
+            "rank" -> if (!state.running && !rankState.historical && !rankState.historyEnabled) {
+                item(key = "rank-stopped") { HxEmpty(Icons.Rounded.SwapVert, "代理未运行", "实时排行来自运行中的连接；开启历史采集后可查看最长 30 天的排行") }
             } else rankItems(vm, rankState)
             else -> {
                 if (!state.running) {

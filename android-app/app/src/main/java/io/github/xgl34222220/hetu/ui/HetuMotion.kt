@@ -201,11 +201,12 @@ internal fun Modifier.hetuStaggerIn(
     distance: androidx.compose.ui.unit.Dp = 12.dp,
 ): Modifier {
     val animate = remember { motion && !state.settled }
-    val progress = remember { Animatable(if (animate) 0f else 1f) }
-    if (animate) {
-        LaunchedEffect(Unit) {
-            progress.animateTo(1f, HetuMotion.enter(true, durationMs = 300, delayMs = index.coerceIn(0, 7) * 38))
-        }
+    // Rows composed after the first cascade (most rows while scrolling a long list) never
+    // animate: give them no Animatable and no extra render layer at all.
+    if (!animate) return this
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, HetuMotion.enter(true, durationMs = 300, delayMs = index.coerceIn(0, 7) * 38))
     }
     return graphicsLayer {
         val p = progress.value.coerceIn(0f, 1f)

@@ -8,6 +8,7 @@ android-app/app/build/
 android-app/app/src/main/jniLibs/
 android-app/app/src/main/assets/mihomo-root/
 android-app/app/src/main/assets/mihomo-revision.txt
+android-app/app/src/main/assets/hetu-bpf/
 out/
 *.keystore
 *.jks

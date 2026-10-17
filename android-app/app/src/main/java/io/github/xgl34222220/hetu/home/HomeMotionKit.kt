@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -75,7 +76,7 @@ internal fun HomeRollingText(
     alignment: Alignment = Alignment.CenterEnd,
 ) {
     if (!LocalHomeMotionEnabled.current) {
-        Text(text, modifier, color = color, style = style, maxLines = 1, softWrap = false)
+        Text(text, modifier, color = color, style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         return
     }
     AnimatedContent(
@@ -94,7 +95,10 @@ internal fun HomeRollingText(
         contentAlignment = alignment,
         label = "home-roll",
     ) { value ->
-        Text(value, color = color, style = style, maxLines = 1, softWrap = false)
+        // Ellipsis instead of a hard cut when a translated or long status outgrows its slot. With
+        // softWrap = false Compose still lays the line out against the incoming max width once an
+        // overflow is set, so no fillMaxWidth (which would change the measured size at rest).
+        Text(value, color = color, style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
 

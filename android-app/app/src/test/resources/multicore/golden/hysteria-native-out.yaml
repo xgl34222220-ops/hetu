@@ -1,0 +1,29 @@
+# Hetu: native Hysteria 2 client config; ingress replaced by Hetu
+server: hy.example.com:443
+auth: secret-pass
+tls:
+  sni: hy.example.com
+  insecure: false
+bandwidth:
+  up: 30 mbps
+  down: 100 mbps
+# --- Hetu runtime isolation ---
+resolver:
+  type: udp
+  udp:
+    addr: 223.5.5.5:53
+    timeout: 4s
+tcpTProxy:
+  listen: :19898
+udpTProxy:
+  listen: :19898
+  timeout: 60s
+http:
+  listen: 127.0.0.1:29150
+tcpForwarding:
+  - listen: :11053
+    remote: 1.1.1.1:53
+udpForwarding:
+  - listen: :11053
+    remote: 1.1.1.1:53
+    timeout: 20s

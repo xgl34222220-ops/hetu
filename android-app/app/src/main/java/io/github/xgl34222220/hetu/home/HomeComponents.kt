@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu.home
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,6 +48,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -76,9 +78,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -117,13 +122,26 @@ internal fun HomeCard(
     clickLabel: String? = null,
     background: Color = LocalHomeColors.current.surface,
     shape: Shape = HomeDims.cardShape,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHomeHaptics.current
     val label = clickLabel?.let { ht(it) }
-    val tappable = if (onClick == null) modifier else modifier.homeTap(onClickLabel = label, role = Role.Button) {
-        haptics(HomeHaptic.Tap)
-        onClick()
+    val tappable = when {
+        onClick == null -> modifier
+        onLongClick == null -> modifier.homeTap(onClickLabel = label, role = Role.Button) {
+            haptics(HomeHaptic.Tap)
+            onClick()
+        }
+        else -> modifier.homeTap(
+            onClickLabel = label, role = Role.Button,
+            onLongClickLabel = longClickLabel?.let { ht(it) },
+            onLongClick = { haptics(HomeHaptic.Confirm); onLongClick() },
+        ) {
+            haptics(HomeHaptic.Tap)
+            onClick()
+        }
     }
     Column(tappable.homeGlassPanel(shape, background), content = content)
 }
@@ -240,7 +258,7 @@ internal fun HomeBanner(
                 Modifier.clip(SharedBadgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
                     .heightIn(min = 32.dp).padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1) }
+            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }
@@ -313,15 +331,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
  */
 @Composable
 internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
-    val tint by animateColorAsState(color, HomeMotion.fade(LocalHomeMotionEnabled.current, 320), label = "home-dot")
-    val wave = if (pulse && LocalHomeMotionEnabled.current) {
-        val transition = rememberInfiniteTransition(label = "home-dot-pulse")
-        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate), RepeatMode.Restart), label = "home-dot-wave")
-    } else null
+    val motion = LocalHomeMotionEnabled.current
+    val tint by animateColorAsState(color, HomeMotion.fade(motion, 320), label = "home-dot")
+    // A few rings announce the change to “live”, then the dot rests. A never-ending pulse kept
+    // the whole page (and the glass dock sampling it) redrawing on every frame.
+    val wave = remember { Animatable(1f) }
+    LaunchedEffect(pulse, motion) {
+        if (!pulse || !motion) { wave.snapTo(1f); return@LaunchedEffect }
+        repeat(3) {
+            wave.snapTo(0f)
+            wave.animateTo(1f, tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate))
+        }
+    }
     Canvas(modifier.size(size)) {
         val radius = this.size.minDimension / 2f
-        val phase = wave?.value
-        if (phase != null) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
+        val phase = wave.value
+        if (phase < 1f) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
         drawCircle(tint, radius)
     }
 }
@@ -506,13 +531,18 @@ internal fun HomeIconButton(
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val spoken = ht(label)
+    val working = ht("处理中")
     val angle = homeSpinAngle(spinning)
     Box(
         modifier
             .size(HomeDims.touch)
             .clip(CircleShape)
             .homeTap(enabled = enabled && !loading, onClickLabel = spoken, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-            .semantics { contentDescription = spoken },
+            .semantics {
+                contentDescription = spoken
+                // The spinner alone says nothing to a screen reader.
+                if (loading) stateDescription = working
+            },
         contentAlignment = Alignment.Center,
     ) {
         if (loading) HomeSpinner(size = 20.dp, color = c.t2)
@@ -638,6 +668,9 @@ internal fun HomeNotice(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
     filled: Boolean = true,
+    /** Audit4: an optional × after the action that clears what the strip reports. */
+    onClose: (() -> Unit)? = null,
+    closeLabel: String = "关闭提示",
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -647,7 +680,7 @@ internal fun HomeNotice(
             .heightIn(min = if (filled) 44.dp else 28.dp)
             .clip(HomeDims.controlShape)
             .let { if (filled) it.background(tone.soft()) else it }
-            .padding(start = if (filled) 14.dp else 4.dp, end = if (actionLabel == null) 14.dp else 4.dp),
+            .padding(start = if (filled) 14.dp else 4.dp, end = if (actionLabel == null && onClose == null) 14.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, Modifier.size(18.dp), tint = tone.foreground())
@@ -657,7 +690,14 @@ internal fun HomeNotice(
             Box(
                 Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
+            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+        if (onClose != null) {
+            Box(
+                Modifier.size(40.dp).clip(HomeDims.badgeShape)
+                    .homeTap(onClickLabel = ht(closeLabel), role = Role.Button) { haptics(HomeHaptic.Tap); onClose() },
+                contentAlignment = Alignment.Center,
+            ) { Icon(HomeIcons.X, ht(closeLabel), Modifier.size(16.dp), tint = tone.foreground()) }
         }
     }
 }
@@ -731,23 +771,31 @@ internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
 }
 
 /** Put this on the scrolling content that passes beneath the bar. */
-internal fun Modifier.homeGlassSource(glass: HomeBarGlass): Modifier {
-    val haze = glass.haze
-    return if (haze != null && glass.active) hazeSource(haze) else this
+internal fun Modifier.homeGlassSource(@Suppress("UNUSED_PARAMETER") glass: HomeBarGlass): Modifier {
+    // Liquid-glass pass: scrolling content is never recorded for a live blur. The bar below fakes
+    // its frost with a cached translucent gradient, so scrolling costs no offscreen pass.
+    return this
 }
 
 /**
  * Background of a pinned bar. Invisible at the top of the page; once content scrolls beneath it
- * the bar turns to frosted glass (real blur when allowed, a near-opaque canvas tint otherwise)
- * with a hairline along its lower edge.
+ * the bar fades in as an opaque copy of the page canvas behind it (the same wash over the page
+ * height), with a hairline along its lower edge. Scrolled cards never show through the title.
+ * [canvas] is the page's canvas colour when it is not the theme background.
  */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier) {
+internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier, canvas: Color? = null) {
     if (!glass.active) return
     val c = LocalHomeColors.current
+    val density = LocalDensity.current
+    val pageHeight = with(density) {
+        LocalConfiguration.current.screenHeightDp.dp.toPx() +
+            WindowInsets.statusBars.getTop(this) + WindowInsets.navigationBars.getBottom(this)
+    }
     val line = c.line
-    val haze = glass.haze
+    // No live blur (see homeGlassSource): the frosted bar is a static translucent canvas tint.
+    val haze: HazeState? = null
     val progressive = haze != null && LocalHomeBarProgressive.current
     val surface = if (haze != null) {
         Modifier
@@ -759,7 +807,7 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
                 if (progressive) Brush.verticalGradient(listOf(c.bg.copy(alpha = .56f), c.bg.copy(alpha = .30f), c.bg.copy(alpha = .06f)))
                 else Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))),
             )
-    } else Modifier.background(c.bg.copy(alpha = .965f))
+    } else Modifier.homeDiffuseCanvas(canvas, pageHeight)
     Box(
         modifier
             .graphicsLayer { alpha = glass.shown }
@@ -890,7 +938,7 @@ internal fun HomeTextField(
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1)
+                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
             },

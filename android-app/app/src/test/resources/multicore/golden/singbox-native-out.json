@@ -1,0 +1,120 @@
+{
+  "log": {
+    "level": "warn"
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "google",
+        "server": "8.8.8.8"
+      }
+    ],
+    "final": "google"
+  },
+  "inbounds": [
+    {
+      "type": "tproxy",
+      "tag": "hetu-tproxy",
+      "listen": "::",
+      "listen_port": 19898
+    },
+    {
+      "type": "direct",
+      "tag": "hetu-dns-in",
+      "listen": "::",
+      "listen_port": 11053
+    },
+    {
+      "type": "http",
+      "tag": "hetu-egress-probe",
+      "listen": "127.0.0.1",
+      "listen_port": 29150
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "proxy",
+      "server": "203.0.113.20",
+      "server_port": 443,
+      "uuid": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3",
+      "tls": {
+        "enabled": true,
+        "server_name": "example.com"
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in"],
+        "action": "sniff"
+      },
+      {
+        "inbound": ["hetu-dns-in"],
+        "action": "hijack-dns"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": ["hetu-adblock"]
+          },
+          {
+            "rule_set": ["hetu-adblock-allow"],
+            "invert": true
+          }
+        ],
+        "action": "reject"
+      },
+      {
+        "domain_suffix": ["cn"],
+        "outbound": "direct"
+      }
+    ],
+    "final": "proxy",
+    "rule_set": [
+      {
+        "type": "inline",
+        "tag": "hetu-adblock",
+        "rules": [
+          {
+            "domain_suffix": ["ads.example.net", "tracker.example.org"]
+          }
+        ]
+      },
+      {
+        "type": "inline",
+        "tag": "hetu-adblock-allow",
+        "rules": [
+          {
+            "domain_suffix": ["ok.tracker.example.org"]
+          }
+        ]
+      }
+    ],
+    "auto_detect_interface": true
+  },
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:29090",
+      "secret": "fixture-secret",
+      "default_mode": "rule"
+    },
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "store_fakeip": true
+    }
+  }
+}

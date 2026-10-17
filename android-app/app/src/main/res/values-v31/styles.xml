@@ -1,0 +1,16 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#12806F</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#F4F5F7</item>
+        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+        <!-- Android 12+ system splash: centre colour of hetu_splash_art (light) + glowing swirl mark. -->
+        <item name="android:windowSplashScreenBackground">#D5D5F1</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/hetu_splash_icon</item>
+    </style>
+</resources>

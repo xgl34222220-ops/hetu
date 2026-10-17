@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.home.HetuHomeV2
 import io.github.xgl34222220.hetu.home.HomeWanExtras
@@ -9,8 +10,15 @@ import io.github.xgl34222220.hetu.home.HomeWanExtras
 @Composable
 internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Unit) {
     val nav = LocalNav.current
-    val tracked = vm.providers.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val providers = vm.providers
+    val tracked = remember(providers) { providers.filter { it.hasSubscriptionInfo && it.total > 0L } }
     val rt = vm.runtime
+    // Audit G1: preferences only (no file access); re-read when a start ends or fails.
+    val lastGoodCore = remember(vm.startupError, vm.state.running, vm.operation) { ProxyRuntimeProfile.load(vm.prefs).core.id }
+    val lastGood = remember(lastGoodCore, vm.startupError, vm.state.running, vm.operation) {
+        LastGoodConfig.info(vm.prefs, lastGoodCore)?.let { io.github.xgl34222220.hetu.home.HomeLastGood(it.label, it.savedAt) }
+    }
+    val lastGoodRunning = remember(vm.state.running, vm.state.corePid, vm.operation) { LastGoodConfig.active(vm.prefs, vm.state.running)?.label }
     HetuHomeV2(
         data = CompactHomeData(
             running = vm.state.running, busy = vm.operation != null,
@@ -24,7 +32,9 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
             refreshing = vm.refreshing, testing = vm.siteTesting,
             uptimeSeconds = rt.elapsedSeconds, core = vm.state.core,
             mode = vm.state.mode, config = vm.state.config, message = vm.state.message,
-            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(), delays = vm.siteDelays,
+            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(),
+            // Proxy-path numbers only while that path exists; stopped, the card shows the direct test.
+            delays = if (vm.state.running) vm.siteDelays else emptyMap(),
             latencyTargets = ProxyLatencyTargets.load(vm.prefs).map { it.name },
             wan = rt.wanAddress, lan = rt.lanAddress, countryCode = rt.wanCountryCode,
             region = rt.wanRegion.ifBlank { listOf(rt.wanCountry, rt.wanCity).filter { it.isNotBlank() }.distinct().joinToString(" · ") },
@@ -37,11 +47,11 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         groups = vm.state.groups, trafficMode = vm.state.trafficMode,
         startupError = vm.startupError, corePid = rt.pid, coreVersion = vm.coreVersion,
         bottomPadding = bottom, onToggle = vm::toggle, onReload = vm::reload,
-        onRestart = vm::restart, onDelay = vm::measureSites, onRefresh = vm::pullRefresh,
+        onRestart = vm::restart, onDelay = vm::probeSites, onRefresh = vm::pullRefresh,
         onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
         onOpenSubscription = { vm.openPanel("providers") },
         onOpenBasicSettings = { nav.push(HxRoute.Network) },
-        onOpenConfigs = { nav.push(HxRoute.Configs) },
+        onOpenConfigs = { vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs) },
         onViewConfig = { nav.push(HxRoute.ConfigEditor) },
         onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
         cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
@@ -49,16 +59,24 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         wanExtras = HomeWanExtras(
             city = rt.wanCity, organization = rt.wanOrganization, ipType = rt.wanIpType,
             timezone = rt.wanTimezone, coordinates = rt.wanCoordinates,
-            state = rt.wanState, error = rt.wanError,
+            state = rt.wanState, error = rt.wanError, checkedAt = rt.wanCheckedAt,
         ),
         operationText = vm.operationText,
+        onUpdateProviders = vm::updateAllProviders,
         connection = io.github.xgl34222220.hetu.home.HomeConnectionObservation(
-            controllerReady = vm.state.panelReady,
-            controllerReadFailed = vm.state.controllerReadFailed,
+            // A core without a Clash controller has nothing to read: that is not a controller fault.
+            controllerReady = vm.state.panelReady || !vm.state.controllerSupported,
+            controllerReadFailed = vm.state.controllerReadFailed && vm.state.controllerSupported,
             controllerError = vm.state.controllerError,
             takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
             runtimeMessage = vm.state.message,
             egressVerified = vm.state.running && vm.egressVerified,
         ),
+        lastGood = lastGood,
+        lastGoodRunning = lastGoodRunning,
+        onStartLastGood = vm::startLastGood,
+        onOpenControllerKey = vm::openPanelApi,
+        onOpenDiagnostics = { vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Diag) },
+        directProbes = if (vm.state.running) emptyMap() else vm.directSiteDelays,
     )
 }

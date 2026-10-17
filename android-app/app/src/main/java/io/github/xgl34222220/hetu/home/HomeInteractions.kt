@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -16,6 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -42,6 +48,23 @@ internal fun Modifier.homeTap(
         .clickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel, onClick = onClick)
 }
 
+/** [homeTap] with a long press as well (spoken as its own action by TalkBack). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun Modifier.homeTap(
+    enabled: Boolean = true,
+    role: Role = Role.Button,
+    onClickLabel: String? = null,
+    onLongClickLabel: String?,
+    onLongClick: () -> Unit,
+    onClick: () -> Unit,
+): Modifier {
+    val source = remember { MutableInteractionSource() }
+    return hetuPressScale(source, enabled, pressedScale = .975f, motion = LocalHomeMotionEnabled.current)
+        .combinedClickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel,
+            onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)
+}
+
 /** A real nested-scroll refresh gesture; the caller owns its request and completion state. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +78,13 @@ internal fun HomeRefreshBox(
 ) {
     val state = rememberPullToRefreshState()
     val colors = LocalHomeColors.current
+    val motion = LocalHomeMotionEnabled.current
+    // The page follows the finger a little while it is pulled (rubber-banded past the trigger
+    // point) and eases back once the refresh starts, so at rest — refreshing or not — nothing
+    // is offset. Both values are read in the layer only: pulling never recomposes the page.
+    val follow = androidx.compose.animation.core.animateFloatAsState(
+        if (refreshing || !motion) 0f else 1f, HomeMotion.glide(motion), label = "home-refresh-follow",
+    )
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = { if (!refreshing) onRefresh() },
@@ -74,6 +104,14 @@ internal fun HomeRefreshBox(
                 color = colors.accent,
             )
         },
-        content = content,
-    )
+    ) {
+        Box(
+            Modifier.fillMaxSize().graphicsLayer {
+                val f = state.distanceFraction
+                val pull = f.coerceIn(0f, 1f) * 22.dp.toPx() + (f - 1f).coerceAtLeast(0f) * 8.dp.toPx()
+                translationY = pull * follow.value
+            },
+            content = content,
+        )
+    }
 }

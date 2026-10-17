@@ -16,6 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.xgl34222220.hetu.ui.HetuComposeController
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -75,11 +76,29 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         get() = tabState
         set(value) { tabState = value }
 
+    /** A tools page another tab asked to open (e.g. 首页 › 打开配置管理); the tools tab consumes it once. */
+    var toolsRequest by mutableStateOf<io.github.xgl34222220.hetu.tools.ToolsEntry?>(null)
+
+    /** Opens [entry] inside 工具, so every feature has one page wherever it is reached from. */
+    fun openTools(entry: io.github.xgl34222220.hetu.tools.ToolsEntry) {
+        toolsRequest = entry
+        tab = HxTab.Tools
+    }
+
     /** Open a live panel section from home cards, tools or deep links. */
     fun openPanel(section: String) {
         val requested = section.ifBlank { "overview" }
         panelSection = requested.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
         tabState = HxTab.Panel
+    }
+
+    /** Audit4 U3: one-shot request for 面板 › 策略 to open its 测速与 API sheet (consumed by PanelRoute). */
+    var panelApiRequest by mutableStateOf(false)
+
+    /** Audit4 U3: 首页 控制接口异常 › 设置密钥. */
+    fun openPanelApi() {
+        openPanel("proxies")
+        panelApiRequest = true
     }
 
     fun setDefaultPanelSection(section: String) {
@@ -150,6 +169,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         private set
     var runtime by mutableStateOf(initialRuntime())
         private set
+    /** Public address as apps see it (through the proxy while running, direct while stopped). */
+    private val publicIp = HxPublicIpLookup(app) { view -> runtime = hxWithPublicIp(runtime, view, state.running) }
     var upRate by mutableLongStateOf(0L)
         private set
     var downRate by mutableLongStateOf(0L)
@@ -216,15 +237,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     var providersUpdatingAll by mutableStateOf(false)
         private set
 
+    /* ---------------- per-core degraded state ---------------- */
+    /** A feature the running core lacks: shown as the glass 「当前核心（X）不支持此功能」 card, never a toast. */
+    var coreNotice by mutableStateOf<CoreFeatureNotice?>(null)
+
+    private fun runningCore(): ProxyRuntimeProfile.Core = ProxyCoreSupport.running(prefs)
+
     /* ---------------- messages ---------------- */
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val messages: SharedFlow<String> = _messages
+    // Tones given explicitly by the caller; the keyword reading (hxToastTone) is only the fallback
+    // for messages posted without one. Bounded: only the most recent texts can still be on screen.
+    private val explicitToastTones = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, HxTone>(16, .75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HxTone>?) = size > 32
+        },
+    )
     fun toast(text: String) {
-        if (text.isNotBlank()) _messages.tryEmit(text)
+        if (text.isBlank()) return
+        explicitToastTones.remove(text)
+        _messages.tryEmit(text)
     }
+    /** Posts [text] with a fixed colour instead of reading it from the wording. */
+    fun toastAs(tone: HxTone, text: String) {
+        if (text.isBlank()) return
+        explicitToastTones[text] = tone
+        _messages.tryEmit(text)
+    }
+    /** The tone of a posted toast: the caller's explicit tone, else the keyword fallback. */
+    internal fun toastTone(text: String): HxTone = explicitToastTones[text] ?: hxToastTone(text)
 
-    private fun errorText(error: Throwable, fallback: String): String =
-        error.message?.takeIf { it.isNotBlank() } ?: fallback
+    /** JVM network / I/O failures become a short Chinese phrase plus reason code (原文 → 日志). */
+    private fun errorText(error: Throwable, fallback: String): String = hxErrorMessage(error, fallback)
 
     /* ---------------- polling ---------------- */
     private var pollJob: Job? = null
@@ -343,6 +387,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return request.takeIf { state.running && operation == null }
     }
 
+    /** Why a bulk update did nothing: the proxy is stopped, or another operation still owns it. */
+    private fun runtimeUnavailableText(what: String): String =
+        if (!state.running) "${what}需要代理运行中" else "请等待当前操作完成"
+
     private fun currentRuntimeRequest(request: RuntimeRequest, requireRunning: Boolean = true): Boolean {
         syncRequestSettings()
         return request.generation == runtimeRequestGeneration &&
@@ -373,6 +421,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             latestNodeProbe[node] = owner
             delays[node] = value
             measuredAt[node] = stamp
+            probeRunReadings[owner]?.put(node, value)
+        }
+    }
+
+    /** 测速历史: the readings each group / 全部 probe run (by owner) applied. Main thread only. */
+    private val probeRunReadings = HashMap<Long, MutableMap<String, Long>>()
+
+    /** Keeps one finished probe run in the speed-test history; observing only, never changes the probe. */
+    private fun recordProbeRun(owner: Long, title: String, targets: List<String>) {
+        val readings = probeRunReadings.remove(owner) ?: return
+        if (targets.isEmpty()) return
+        try {
+            SpeedTestHistory.add(getApplication(), SpeedTestHistory.latencyRecord(title, targets, readings, System.currentTimeMillis()))
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // History is best effort.
         }
     }
 
@@ -405,8 +470,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (operation == null) {
                     refreshNow()
                     maybeVerifyEgress()
+                    if (operation == null) {
+                        publicIp.request(state.running, force = false)
+                        maybeAutoProbeSites(this)
+                    }
                 }
-                delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
+                // Stopped and idle: probe Root every 8 s instead of every 2 s, but wake within a
+                // second when a tile / boot / network-match start flips the cached running hint.
+                val homeOrPanel = tab == HxTab.Home || tab == HxTab.Panel
+                val wait = HxPollCadence.delayMs(homeOrPanel, state.running, operation != null, ProxyStatusBridge.rootProxyRunning(app))
+                if (wait <= HxPollCadence.activeDelayMs(homeOrPanel)) delay(wait)
+                else {
+                    var waited = 0L
+                    while (waited < wait && operation == null && !state.running && !ProxyStatusBridge.rootProxyRunning(app)) {
+                        delay(HxPollCadence.WakeStepMs); waited += HxPollCadence.WakeStepMs
+                    }
+                }
             }
         }
         ProxyStatusNotificationService.refresh(app)
@@ -484,7 +563,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return true
     }
 
-    private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
+    private fun initialRuntime(): ProxyRuntimeSnapshot = initialRuntimeCached().let { cached ->
+        // The cached address was the proxy exit; with the proxy stopped it is not the device's address.
+        if (cached.running) cached else cached.copy(wanAddress = "—", wanCountryCode = "", wanCountry = "—", wanRegion = "—",
+            wanCity = "—", wanIsp = "—", wanAsn = "—", wanOrganization = "—", wanIpType = "—", wanTimezone = "—",
+            wanCoordinates = "—", wanState = "idle")
+    }
+
+    private fun initialRuntimeCached(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
         running = prefs.getBoolean("proxyUiLastRunning", false),
         elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
         rssBytes = prefs.getLong("proxyUiLastRss", 0L),
@@ -630,7 +716,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             }
             lastProcessTicks = sampled.processTicks
             lastSystemTicks = sampled.systemTicks
-            runtime = sampled
+            runtime = hxWithPublicIp(sampled, publicIp.view, next.running)
 
             if (!next.running) {
                 providers = emptyList()
@@ -645,6 +731,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     if (owner == latestProviderRead && currentRuntimeRequest(request, requireRunning = false)) {
                         lastProviderRefreshAt = now
                         if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
+                        HxSubscriptionAlerts.check(app, providers)
                     }
                 }
                 if (coreVersion.isBlank()) {
@@ -712,6 +799,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             refreshing = true
             try {
                 refreshNow()
+                if (operation == null) publicIp.request(state.running, force = true)
                 val request = activeRuntimeRequest()
                 if (request != null) {
                     val providerOwner = beginProviderRead()
@@ -722,6 +810,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         p.await()?.let {
                             if (providerOwner == latestProviderRead && currentRuntimeRequest(request)) {
                                 providers = it
+                                HxSubscriptionAlerts.check(app, providers)
                                 lastProviderRefreshAt = SystemClock.elapsedRealtime()
                             }
                         }
@@ -750,7 +839,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             try { toast(controller.setAutoStart(enabled)) }
             catch (cancel: CancellationException) { throw cancel }
-            catch (error: Exception) { toast(errorText(error, "开机自启设置失败")) }
+            catch (error: Exception) { toastAs(HxTone.Bad, errorText(error, "开机自启设置失败")) }
             finally { autoStartBusy = false; bumpSettings() }
         }
     }
@@ -760,33 +849,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         val stopping = state.running
         invalidateRuntimeRequests()
         operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
+        if (!stopping) directSiteDelays = emptyMap()
         viewModelScope.launch {
             operationText = if (stopping) "正在停止…" else "正在启动…"
             try {
-                if (stopping) controller.stop { operationText = it } else controller.start { operationText = it }
-                state = controller.state()
-                if (!stopping) toast("代理已启动")
+                if (stopping) {
+                    controller.stop { operationText = it }
+                    state = controller.state()
+                } else {
+                    val started = controller.start { operationText = it }
+                    // hetu-root.sh answers ok only after the core is alive, every listener is up,
+                    // rules, health baseline and watchdog are in place: show 运行中 now. The
+                    // status/network-health read follows in the background (refreshNow below),
+                    // and the watchdog/status self-heal cadence is unchanged.
+                    state = state.copy(running = true, healthObserved = false,
+                        message = started.optString("message", state.message))
+                    toastAs(HxTone.Good, "代理已启动")
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 val reason = errorText(error, "操作失败")
                 // Configuration problems are known before Root is touched; report them at once.
-                val configProblem = !stopping && (reason.contains("占位") || reason.contains("尚未选择配置") || reason.contains("仅所选应用代理"))
+                // Typed by the controller (ProxyStartProblem), never read from the wording.
+                val kind = if (stopping) HxStartFailure.Runtime else hxStartFailure(error)
+                val configProblem = kind != HxStartFailure.Runtime
                 operationText = "确认最终运行状态…"
                 val recovered = if (configProblem || stopping) null else settleStart()
                 if (recovered != null) {
                     state = recovered
                 } else if (!stopping) {
-                    startupError = if (reason.contains("仅所选应用代理")) {
+                    startupError = if (kind == HxStartFailure.AppScope) {
                         "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                     } else if (configProblem) {
                         reason
+                    } else if (!HxRootCheck.granted(app)) {
+                        // func-400 E1: without Root every diagnostic read fails too; say what to fix.
+                        HxRootCheck.message(reason)
                     } else {
                         val diagnostics = try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
                         if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                     }
                 } else {
-                    toast(reason)
+                    toastAs(HxTone.Bad, reason)
+                }
+            } finally {
+                operation = null
+                operationText = ""
+                // func-400 T2: an open Quick Settings panel re-reads the tile after an in-App start/stop.
+                HetuProxyTileService.requestRefresh(app)
+                refreshNow()
+            }
+        }
+    }
+
+    /**
+     * Audit G1: 「用上次可启动的版本启动」 from the start-failure sheet. Starts from the copy kept after
+     * the core's last successful start; the user's config file is not modified. Same operation slot,
+     * progress text and failure sheet as a normal start; [toggle] itself is unchanged.
+     */
+    fun startLastGood() {
+        if (operation != null || state.running) return
+        invalidateRuntimeRequests()
+        operation = HxRunOp.Start
+        viewModelScope.launch {
+            operationText = "正在用上次可启动的版本启动…"
+            try {
+                val started = controller.startLastGood { operationText = it }
+                state = state.copy(running = true, healthObserved = false,
+                    message = started.optString("message", state.message))
+                startupError = null
+                toastAs(HxTone.Warn, "已用上次可启动的版本启动，源配置未修改")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                val reason = errorText(error, "操作失败")
+                val kind = hxStartFailure(error)
+                operationText = "确认最终运行状态…"
+                val recovered = if (kind != HxStartFailure.Runtime) null else settleStart()
+                if (recovered != null) {
+                    state = recovered
+                } else {
+                    val diagnostics = if (kind != HxStartFailure.Runtime) "" else
+                        try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
+                    startupError = "上次可启动的版本也未能启动：$reason" +
+                        if (diagnostics.isBlank()) "" else "\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                 }
             } finally {
                 operation = null
@@ -813,14 +960,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             operationText = "正在重启…"
             ProxyRuntimeSettings.beginApply(prefs)
             try {
-                controller.restart { operationText = it }
+                val result = controller.restart { operationText = it }
                 prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
-                toast("已重启，设置已生效")
+                toastAs(HxTone.Good, if (result.optBoolean("ebpfHotUpdate", false)) "名单已通过 eBPF 热更新，无需重启" else "已重启，设置已生效")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 ProxyRuntimeSettings.recordFailure(prefs, error)
-                toast(errorText(error, "重启失败"))
+                toastAs(HxTone.Bad, errorText(error, "重启失败"))
             } finally {
                 operation = null
                 operationText = ""
@@ -832,6 +979,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun reload() {
         if (operation != null || !state.running) return
+        // sing-box / Xray / V2Fly / Hysteria apply config changes on restart: an explicit state, not an error.
+        val core = runningCore()
+        if (!ProxyCoreSupport.hotReload(core)) {
+            coreNotice = CoreFeatureNotice(core.label, "热重载",
+                "${core.label} 不能在运行中重新加载配置。使用「重启」即可应用修改，网络会短暂中断几秒。", offerRestart = true)
+            return
+        }
         invalidateRuntimeRequests()
         operation = HxRunOp.Reload
         viewModelScope.launch {
@@ -841,7 +995,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "重载失败"))
+                toastAs(HxTone.Bad, errorText(error, "重载失败"))
             } finally {
                 operation = null
                 operationText = ""
@@ -850,8 +1004,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    /**
+     * Hot-reloads the running core for a config transaction and hands the result (or failure) back to
+     * the caller, which decides whether to roll its source back. Same operation slot as [reload].
+     */
+    suspend fun reloadNow(): String {
+        if (!state.running) throw java.io.IOException("代理未运行，无法热重载")
+        if (operation != null) throw java.io.IOException("代理正在执行其他操作，请稍后重启代理应用配置")
+        invalidateRuntimeRequests()
+        operation = HxRunOp.Reload
+        operationText = "正在重载配置…"
+        try {
+            return controller.reload()
+        } finally {
+            operation = null
+            operationText = ""
+            try { refreshNow() } catch (_: Exception) { }
+        }
+    }
+
     fun setTrafficMode(mode: String) {
         if (!state.running) return
+        val core = runningCore()
+        if (!ProxyCoreSupport.trafficMode(core) && !prefs.getBoolean("proxyCustomApiEnabled", false)) {
+            coreNotice = CoreFeatureNotice(core.label, "规则 / 全局 / 直连 切换",
+                if (ProxyCoreSupport.clashApi(core)) "${core.label} 的 clash_api 只在配置含 clash_mode 规则时切换模式，河图写入的配置固定按规则分流。"
+                else "${core.label} 没有 Clash 兼容控制接口，无法在运行中切换流量模式；代理按配置中的规则分流。")
+            return
+        }
         viewModelScope.launch {
             try {
                 repo.setTrafficMode(mode)
@@ -859,12 +1039,24 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "切换模式失败"))
+                toastAs(HxTone.Bad, errorText(error, "切换模式失败"))
             }
         }
     }
 
-    fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
+    /** 测速 / 延迟 needs a Clash controller; without one the action shows the per-core card. */
+    private fun latencyUnsupported(): Boolean {
+        if (state.controllerSupported) return false
+        val core = runningCore()
+        coreNotice = CoreFeatureNotice(core.label, "节点测速 / 延迟",
+            "${core.label} 没有 Clash 兼容控制接口，无法逐个节点测速。首页的站点延迟经代理实测，仍可使用。")
+        return true
+    }
+
+    fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs) ||
+        // The eBPF switch is not part of the settings signature; the session's topology records it.
+        EbpfMatcher.switchPending(state.running, prefs.getBoolean(EbpfMatcher.PREF_ENABLED, false),
+            prefs.getString("proxyRootTopologyFingerprint", "").orEmpty())
 
     fun bumpSettings() { syncRequestSettings(); settingsRevision++ }
 
@@ -872,7 +1064,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun select(group: String, node: String) {
         if (refuseRestoredGroups()) return
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
         if (pendingSelection.containsKey(group)) return
         val current = state.groups.firstOrNull { it.name == group } ?: return
         if (current.now == node || current.nodes.none { it.name == node }) return
@@ -918,13 +1110,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             // A failed controller request is not a node timeout. Keep the last
             // measurement, but explain why the real spinner ended without a result.
             if (currentRuntimeRequest(request) && latestNodeProbe[node] == owner)
-                toast(errorText(error, "节点测速请求失败"))
+                toastAs(HxTone.Bad, errorText(error, "节点测速请求失败"))
         }
     }
 
     fun testNode(node: String) {
         if (refuseRestoredGroups()) return
-        val request = activeRuntimeRequest() ?: return
+        if (latencyUnsupported()) return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
         if (testingNodes[node] == true) return
         val owner = ++requestSequence
         holdNodeProbes(owner, listOf(node))
@@ -935,11 +1128,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun testGroup(group: ProxyGroupUi) {
         if (refuseRestoredGroups()) return
-        val request = activeRuntimeRequest() ?: return
+        if (latencyUnsupported()) return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
         if (testingGroups[group.name] == true) return
         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
         if (targets.isEmpty()) return
         val owner = ++requestSequence
+        probeRunReadings[owner] = LinkedHashMap()
         groupProbeOwners[group.name] = owner
         testingGroups[group.name] = true
         holdNodeProbes(owner, targets)
@@ -974,11 +1169,12 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request)) toast(errorText(error, "策略组测速失败"))
+                if (currentRuntimeRequest(request)) toastAs(HxTone.Bad, errorText(error, "策略组测速失败"))
             } finally {
                 landed.close()
                 progress.cancel()
                 releaseNodeProbes(owner, targets)
+                recordProbeRun(owner, "策略组 ${group.name}", targets)
                 if (groupProbeOwners[group.name] == owner) {
                     groupProbeOwners.remove(group.name)
                     testingGroups.remove(group.name)
@@ -989,13 +1185,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun testAll() {
         if (refuseRestoredGroups()) return
-        val request = activeRuntimeRequest() ?: return
+        if (latencyUnsupported()) return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
         if (testingAll) return
         val owner = ++requestSequence
         val targets = (state.groups.flatMap { it.nodes.map { node -> node.name } } +
             providers.flatMap { it.nodes } + delays.keys).distinct()
             .filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }
         allProbeOwner = owner
+        probeRunReadings[owner] = LinkedHashMap()
         holdNodeProbes(owner, targets)
         testingAll = true
         viewModelScope.launch {
@@ -1008,13 +1206,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 }
             }
             try {
-                val result = repo.globalDelay { node, value -> landed.trySend(node to value) }
+                val result = repo.globalDelay(targets.size) { node, value -> landed.trySend(node to value) }
                 val stamp = SystemClock.elapsedRealtime()
                 result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                 val ok = result.values.count { it > 0L }
+                // A per-node 超时 is that node's own reading (-1), never the whole test's 已到时限.
+                val timedOut = result.values.count { it == -1L }
                 if (currentRuntimeRequest(request)) {
                     if (result.isEmpty()) toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
-                    else toast("测速完成：$ok / ${result.size} 个节点可用")
+                    else toast("测速完成：$ok / ${result.size} 个节点可用" + if (timedOut > 0) "，$timedOut 个节点超时" else "")
                 }
             } catch (partial: IncompleteLatencyProbe) {
                 val stamp = SystemClock.elapsedRealtime()
@@ -1023,11 +1223,12 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request)) toast(errorText(error, "测速失败"))
+                if (currentRuntimeRequest(request)) toastAs(HxTone.Bad, errorText(error, "测速失败"))
             } finally {
                 landed.close()
                 progress.cancel()
                 releaseNodeProbes(owner, targets)
+                recordProbeRun(owner, "全部节点", targets)
                 if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
             }
         }
@@ -1059,18 +1260,109 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     var logsLoading by mutableStateOf(false)
         private set
 
+    /** Raw text behind [logEntries]: an unchanged quiet re-read skips parsing and list recomposition. */
+    private var lastRuntimeLog: String? = null
+
     fun loadLogs(quiet: Boolean = false) {
         if (logsLoading) return
         logsLoading = true
         viewModelScope.launch {
             try {
-                logEntries = refParseLogs19(inspector.runtimeLog())
+                val raw = inspector.runtimeLog()
+                if (!hxLogUnchanged(quiet, lastRuntimeLog, raw)) {
+                    logEntries = refParseLogs19(raw)
+                    lastRuntimeLog = raw
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (!quiet) toast(errorText(error, "日志读取失败"))
+                if (!quiet) toastAs(HxTone.Bad, errorText(error, "日志读取失败"))
             } finally {
                 logsLoading = false
+            }
+        }
+    }
+
+    /**
+     * Audit4 G8: 启动代理 / 停止代理 launcher shortcut. Reads the real runtime flag the QS tile reads
+     * (the first poll may not have landed on a cold start), then uses the normal guarded [toggle].
+     */
+    fun shortcutRun(start: Boolean) {
+        val running = ProxyStatusBridge.rootProxyRunning(app)
+        when {
+            operation != null -> toast("请等待当前操作完成")
+            running == start -> toast(if (start) "代理已在运行" else "代理未运行")
+            else -> {
+                if (state.running != running) state = state.copy(running = running)
+                toggle()
+            }
+        }
+    }
+
+    /** Audit4 G5: results of the last direct 本机直测 made while the proxy was stopped (memory only). */
+    var directSiteDelays by mutableStateOf<Map<String, Long>>(emptyMap())
+        private set
+    private var directSiteAt = 0L
+    private var siteAutoAt = 0L
+    private var siteAutoGeneration = -1L
+
+    /**
+     * 网络延迟 keeps itself current while 首页 is open, so it never shows an old or other-path
+     * number: once per runtime (start, restart, network change) and every five minutes through the
+     * proxy while it runs; a direct test right after stopping and every two minutes while stopped.
+     */
+    private fun maybeAutoProbeSites(scope: CoroutineScope) {
+        if (operation != null || siteTesting || tab != HxTab.Home) return
+        val now = SystemClock.elapsedRealtime()
+        if (state.running) {
+            if (!state.panelReady) return
+            if (siteAutoGeneration == runtimeRequestGeneration && now - siteAutoAt < 300_000L) return
+            siteAutoGeneration = runtimeRequestGeneration
+            siteAutoAt = now
+            // Children of the foreground poll: leaving the app cancels them.
+            scope.launch { measureSitesQuietly() }
+        } else {
+            if (directSiteDelays.isNotEmpty() && now - directSiteAt < 120_000L) return
+            if (siteAutoAt > 0L && now - siteAutoAt < 20_000L) return
+            siteAutoAt = now
+            measureSitesDirect(quiet = true, scope = scope)
+        }
+    }
+
+    override fun onCleared() {
+        publicIp.close()
+        super.onCleared()
+    }
+
+    /** Home ↻: the proxy-path probe while running; a direct test while stopped (Audit4 G5). */
+    fun probeSites() {
+        if (state.running || operation != null) measureSites() else measureSitesDirect()
+    }
+
+    /**
+     * Audit4 G5: stopped-state 本机直测. A separate direct request (hxDirectSiteLatencies), so the
+     * runtime-bound [measureSites] path and its probe identity are unchanged. Nothing is persisted:
+     * the saved last results stay those of the proxy path.
+     */
+    fun measureSitesDirect(quiet: Boolean = false, scope: CoroutineScope = viewModelScope) {
+        if (state.running || operation != null || siteTesting) return
+        val owner = beginSiteRead()
+        siteProbeOwner = owner
+        siteTesting = true
+        scope.launch {
+            try {
+                val measured = hxDirectSiteLatencies(app)
+                if (owner == latestSiteRead && !state.running && operation == null && measured.isNotEmpty()) {
+                    directSiteDelays = measured
+                    directSiteAt = SystemClock.elapsedRealtime()
+                    if (!quiet && measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                if (owner == latestSiteRead && !quiet) toastAs(HxTone.Bad, errorText(error, "测速失败"))
+            } finally {
+                if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
             }
         }
     }
@@ -1092,7 +1384,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && owner == latestSiteRead) toast(errorText(error, "测速失败"))
+                if (currentRuntimeRequest(request) && owner == latestSiteRead) toastAs(HxTone.Bad, errorText(error, "测速失败"))
             } finally {
                 if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
             }
@@ -1109,7 +1401,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "断开失败"))
+                toastAs(HxTone.Bad, errorText(error, "断开失败"))
             }
         }
     }
@@ -1123,7 +1415,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "断开失败"))
+                toastAs(HxTone.Bad, errorText(error, "断开失败"))
             }
         }
     }
@@ -1142,7 +1434,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && latestRulesRead == owner) toast(errorText(error, "规则读取失败"))
+                if (currentRuntimeRequest(request) && latestRulesRead == owner) toastAs(HxTone.Bad, errorText(error, "规则读取失败"))
             } finally {
                 if (latestRulesRead == owner) rulesLoading = false
             }
@@ -1161,7 +1453,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && latestRuleSetsRead == owner) toast(errorText(error, "规则集读取失败"))
+                if (currentRuntimeRequest(request) && latestRuleSetsRead == owner) toastAs(HxTone.Bad, errorText(error, "规则集读取失败"))
             } finally {
                 if (latestRuleSetsRead == owner) ruleSetsLoading = false
             }
@@ -1169,7 +1461,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun updateRuleSet(name: String) {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("规则集更新"))
         if (ruleSetTasks[name]?.running == true) return
         val owner = ++requestSequence
         ruleSetTaskOwners[name] = owner
@@ -1201,7 +1493,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
     fun updateAllRuleSets() {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("规则集更新"))
         if (ruleSetsUpdatingAll) return
         val owner = ++requestSequence
         ruleSetsUpdateAllOwner = owner
@@ -1262,7 +1554,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && ruleSetsUpdateAllOwner == owner) toast(errorText(error, "规则集更新失败"))
+                if (currentRuntimeRequest(request) && ruleSetsUpdateAllOwner == owner) toastAs(HxTone.Bad, errorText(error, "规则集更新失败"))
             } finally {
                 ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                     ruleSetTaskOwners.remove(name)
@@ -1281,18 +1573,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 val fresh = repo.providers()
                 if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                     providers = fresh
+                    HxSubscriptionAlerts.check(app, providers)
                     lastProviderRefreshAt = SystemClock.elapsedRealtime()
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && owner == latestProviderRead) toast(errorText(error, "订阅读取失败"))
+                if (currentRuntimeRequest(request) && owner == latestProviderRead) toastAs(HxTone.Bad, errorText(error, "订阅读取失败"))
             }
         }
     }
 
     fun updateProvider(name: String) {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("订阅更新"))
         if (providerTasks[name]?.running == true) return
         val owner = ++requestSequence
         providerTaskOwners[name] = owner
@@ -1303,6 +1596,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                 beginProviderRead()
                 if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
+                if (fresh != null) HxSubscriptionAlerts.check(app, providers)
                 providerTasks[name] = HxTask(ok = true, message = "已更新")
                 refreshNow()
             } catch (cancel: CancellationException) {
@@ -1321,7 +1615,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun updateAllProviders() {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("订阅更新"))
         if (providersUpdatingAll) return
         val owner = ++requestSequence
         providersUpdateAllOwner = owner
@@ -1344,7 +1638,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                             async {
                                 if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
                                 try {
-                                    repo.refreshProvider(item.name)
+                                    // func-400 S2: one quiet retry for a transient failure (timeout, 5xx,
+                                    // a provider busy with its own interval update) before reporting it.
+                                    try {
+                                        repo.refreshProvider(item.name)
+                                    } catch (cancel: CancellationException) {
+                                        throw cancel
+                                    } catch (first: Exception) {
+                                        if (!HxNetRetry.transient(first)) throw first
+                                        delay(HxNetRetry.PROVIDER_RETRY_DELAY_MS)
+                                        if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
+                                        repo.refreshProvider(item.name)
+                                    }
                                     if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
                                         providerTasks[item.name] = HxTask(ok = true, message = "已更新")
                                         ok++
@@ -1367,6 +1672,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                 if (readOwner == latestProviderRead) {
                     providers = fresh
+                    HxSubscriptionAlerts.check(app, providers)
                     lastProviderRefreshAt = SystemClock.elapsedRealtime()
                 }
                 toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
@@ -1374,7 +1680,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && providersUpdateAllOwner == owner) toast(errorText(error, "订阅更新失败"))
+                if (currentRuntimeRequest(request) && providersUpdateAllOwner == owner) toastAs(HxTone.Bad, errorText(error, "订阅更新失败"))
             } finally {
                 providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                     providerTaskOwners.remove(name)
@@ -1391,6 +1697,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             toast("$savedMessage，下次启动生效")
             return
         }
+        val core = runningCore()
+        if (!ProxyCoreSupport.hotReload(core)) {
+            coreNotice = CoreFeatureNotice(core.label, "热重载",
+                "$savedMessage。${core.label} 不能在运行中重新加载配置，重启代理后生效。", offerRestart = true)
+            return
+        }
         reload()
     }
 }
+
+/** The per-core degraded state of one action: 「当前核心（[core]）不支持此功能」, [feature], [detail]. */
+internal data class CoreFeatureNotice(
+    val core: String,
+    val feature: String,
+    val detail: String,
+    /** Offer 「重启代理」, which applies what a hot reload would have applied. */
+    val offerRestart: Boolean = false,
+)

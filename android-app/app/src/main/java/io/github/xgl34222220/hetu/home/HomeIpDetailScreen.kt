@@ -69,33 +69,35 @@ internal fun HomeIpDetailScreen(
             label = "home-ip-side",
         ) { shown ->
             val wan = shown == HomeNetSide.Wan
-            val rows = if (wan) {
-                if (live) listOf(
-                    IpRow("IP 地址", state.wan.ip),
-                    IpRow("地理位置", state.wan.region),
-                    IpRow("网络运营商", state.wan.isp),
-                    IpRow("ASN", state.wan.asn),
-                    IpRow("城市", state.wan.city),
-                    IpRow("组织", state.wan.organization),
-                    IpRow("IP 类型", state.wan.ipType),
-                    IpRow("时区", state.wan.timezone),
-                    IpRow("经纬度", state.wan.coordinates),
-                ) else listOf(IpRow("IP 地址", null, copyable = false), IpRow("地理位置", null, copyable = false))
-            } else listOf(IpRow("IP 地址", state.lan.ip), IpRow("网络接口", state.lan.iface))
-            val failure = state.wan.error?.takeIf { wan && live && state.wan.state == HomeWanState.Failed && it.isNotBlank() }
+            val rows = if (wan) listOf(
+                IpRow("IP 地址", state.wan.ip),
+                IpRow("地理位置", state.wan.region),
+                IpRow("网络运营商", state.wan.isp),
+                IpRow("ASN", state.wan.asn),
+                IpRow("城市", state.wan.city),
+                IpRow("组织", state.wan.organization),
+                IpRow("IP 类型", state.wan.ipType),
+                IpRow("时区", state.wan.timezone),
+                IpRow("经纬度", state.wan.coordinates),
+            ) else listOf(IpRow("IP 地址", state.lan.ip), IpRow("网络接口", state.lan.iface))
+            // A failed refresh with an earlier answer keeps that answer (labelled below); only
+            // a lookup that has nothing to show is reported as a failure.
+            val failure = state.wan.error?.takeIf { wan && state.wan.ip == null && state.wan.state == HomeWanState.Failed && it.isNotBlank() }
+            val kept = wan && state.wan.ip != null && (state.wan.state == HomeWanState.Stale || state.wan.state == HomeWanState.Failed)
+            val path = if (live) ht("经代理查询，与普通应用看到的出口相同。") else ht("代理未运行，显示本机直连的公网出口。")
             val note = when {
                 !wan -> null
-                !live -> ht("代理未运行，公网出口信息需要启动后经核心查询。")
-                state.wan.state == HomeWanState.Stale -> ht("这是上一次查询的结果；下拉首页或点右上角可重新查询。")
-                else -> ht("出口信息经代理核心查询，「未知」表示查询源未返回该字段。")
+                kept -> ht("%s；最新查询未成功，下拉首页或点右上角可重新查询。").fill(homeCheckedText(state.wan.checkedAt)) + " " + path
+                else -> path + " " + ht("「未知」表示查询源未返回该字段。")
             }
+            val loading = wan && state.wan.ip == null && (state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle)
             Column {
-                if (failure != null) HomeNotice(ht("公网信息查询失败：%s").fill(failure), HomeIcons.CircleAlert, Modifier.padding(bottom = HomeDims.gap), tone = HomeTone.Bad)
-                HomeCard(Modifier.fillMaxWidth().alpha(if (state.ipRefreshing) .5f else 1f)) {
+                if (failure != null) HomeNotice(ht("公网信息查询失败：%s").fill(ht(failure)), HomeIcons.CircleAlert, Modifier.padding(bottom = HomeDims.gap), tone = HomeTone.Bad)
+                HomeCard(Modifier.fillMaxWidth().alpha(if (state.ipRefreshing || kept) .6f else 1f)) {
                     rows.forEachIndexed { index, row ->
                         if (index > 0) HomeDivider(inset = HomeDims.cardPadding)
                         val value = row.value?.takeIf { it.isNotBlank() && it != HomeFormat.Dash }
-                        val placeholder = if (wan && !live) HomeFormat.Dash else ht("未知")
+                        val placeholder = if (loading) ht("正在查询") else ht("未知")
                         HomeKeyValueRow(
                             label = ht(row.label),
                             value = value ?: placeholder,

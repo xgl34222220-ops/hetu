@@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о�
 这些地址与接口在 Root 层直接放行，不进入 Mihomo。|These addresses and interfaces bypass Mihomo at the Root layer.|這些位址與介面在 Root 層直接放行，不進入 Mihomo。|Эти адреса и интерфейсы обходят Mihomo на уровне Root.
 接口名不能填写 lo。修改后重启代理生效。|The interface cannot be lo. Restart the proxy to apply changes.|介面名稱不能填寫 lo。修改後重新啟動代理生效。|Интерфейс не может быть lo. Перезапустите прокси для применения.
 热点、USB 与局域网转发流量|Hotspot, USB and LAN forwarded traffic|熱點、USB 與區域網路轉送流量|Пересылаемый трафик точки доступа, USB и LAN
-开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。|Hetu handles shared and forwarded traffic. Interface and MAC bypass rules apply at the Root layer after restarting the proxy.|開啟後河圖接管共用與轉送流量；介面與 MAC 直連在 Root 層生效，修改後重新啟動代理。|Hetu обрабатывает общий и пересылаемый трафик. Правила обхода интерфейсов и MAC применяются после перезапуска прокси.
 将共享流量纳入透明代理|Route shared traffic through the transparent proxy|將共用流量納入透明代理|Направлять общий трафик через прозрачный прокси
 没有检测到正在共享的接口。|No active sharing interfaces detected.|未偵測到正在共用的介面。|Активные общие интерфейсы не обнаружены.
 没有检测到下游设备。|No connected devices detected.|未偵測到下游裝置。|Подключённые устройства не обнаружены.
@@ -593,6 +592,26 @@ API 设置|API settings|API 設定|Настройки API
 // 工具: the tool pages rebuilt on the shared kit, and what their components say themselves.
 // "\n" in a line stands for a line break, so a two-line message can be a key.
 private val vocabularyTools = """
+网络测试|Network test|網路測試|Тест сети
+连通性|Connectivity|連通性|Доступность
+连通性与网速|Connectivity and speed|連通性與網速|Доступность и скорость
+开始测速|Start test|開始測速|Начать тест
+停止测速|Stop test|停止測速|Остановить тест
+测试中|Testing|測試中|Проверка
+未解锁|Blocked|未解鎖|Недоступно
+实时速率|Live rate|即時速率|Скорость в реальном времени
+测速结果|Results|測速結果|Результаты
+出口|Exit|出口|Выход
+重新测试|Test again|重新測試|Повторить
+可用|available|可用|доступно
+AI 服务|AI services|AI 服務|ИИ-сервисы
+社交媒体|Social|社群媒體|Соцсети
+影音娱乐|Streaming|影音娛樂|Видео и музыка
+工具与服务|Tools and services|工具與服務|Инструменты и сервисы
+尚未测速|Not tested yet|尚未測速|Тест не выполнялся
+下载速率|Download rate|下載速率|Скорость загрузки
+测速失败|Speed test failed|測速失敗|Тест не удался
+失败|Failed|失敗|Ошибка
 切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
 上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
 下一个匹配|Next match|下一個相符項目|Следующее совпадение
@@ -972,15 +991,440 @@ private val vocabularyConnection = """
 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
 接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
+配置选择|Configurations|設定選擇|Конфигурации
+当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
+内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
+尚无配置|No configurations yet|尚無設定|Конфигураций пока нет
+在 工具 › 配置管理 导入配置后会显示在这里|Configurations imported in Tools › Configurations appear here|在 工具 › 設定管理 匯入設定後會顯示在這裡|Импортированные в «Инструменты › Конфигурации» появятся здесь
+只读查看 · 点右上角编辑|Read-only · tap edit at the top right|唯讀檢視 · 點右上角編輯|Только чтение · нажмите «Изменить» справа вверху
+正在读取配置|Reading configuration|正在讀取設定|Чтение конфигурации
+暂不支持运行|Not runnable yet|暫不支援執行|Пока не запускается
+暂不支持：|Not supported: |暫不支援：|Не поддерживается: 
+Web 界面|Web interface|Web 介面|Веб-интерфейс
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
+// 2026-10 UI polish (toast detail, home metric empties, network-match status, startup-config viewer).
+private val vocabularyUiPolish = """
+完整信息|Full message|完整訊息|Полное сообщение
+暂无订阅流量信息|No subscription usage yet|暫無訂閱流量資訊|Нет данных о трафике подписки
+未开启|Off|未開啟|Выключено
+已匹配|Matched|已匹配|Совпало
+未匹配|Not matched|未匹配|Не совпало
+停止代理|Stop proxy|停止代理|Остановить прокси
+隐藏密钥|Hide secrets|隱藏密鑰|Скрыть секреты
+显示密钥|Show secrets|顯示密鑰|Показать секреты
+不换行|No wrap|不換行|Без переноса
+已隐藏订阅链接参数与 secret；复制和导出的是完整内容，请勿公开分享|Subscription URL parameters and secret are hidden; copy and export contain everything, so do not share them publicly|已隱藏訂閱連結參數與 secret；複製和匯出的是完整內容，請勿公開分享|Параметры ссылок подписки и secret скрыты; копирование и экспорт содержат всё — не публикуйте их
+""".trimIndent()
+
+// 2026-10-13 function polish: eBPF switch subtitle parts and reason tokens, log export, network type.
+private val vocabularyFuncPolish = """
+规则匹配|Rule matching|規則比對|Сопоставление правил
+eBPF 规则匹配|eBPF rule matching|eBPF 規則比對|Сопоставление правил eBPF
+用 eBPF 映射匹配分应用名单与绕过网段，名单变化时无需重启；设备不支持时自动回退到原 iptables 规则。默认关闭，重启代理后生效|Matches the per-app list and bypass networks with eBPF maps, so list changes need no restart; falls back to the iptables rules when the device lacks support. Off by default; takes effect after a proxy restart|以 eBPF 映射比對分應用名單與繞過網段，名單變更時無需重新啟動；裝置不支援時自動回退到原 iptables 規則。預設關閉，重新啟動代理後生效|Сопоставляет список приложений и обходные сети через карты eBPF, поэтому изменения списка не требуют перезапуска; без поддержки устройства используются правила iptables. По умолчанию выключено; действует после перезапуска прокси
+已生效：本次会话由 eBPF 匹配名单；只改应用名单或绕过网段时，「立即重启」会改为热更新，不中断连接|Active: this session matches the lists with eBPF; when only the app list or bypass networks change, Restart now updates them live without dropping connections|已生效：本次工作階段由 eBPF 比對名單；只改應用名單或繞過網段時，「立即重新啟動」會改為熱更新，不中斷連線|Активно: в этом сеансе списки сопоставляет eBPF; если меняются только список приложений или обходные сети, «Перезапустить» обновит их на лету без разрыва соединений
+本次会话未启用 eBPF 匹配，重启代理后生效|This session does not use eBPF matching; takes effect after a proxy restart|本次工作階段未啟用 eBPF 比對，重新啟動代理後生效|В этом сеансе eBPF не используется; действует после перезапуска прокси
+当前运行模式不支持 eBPF 规则匹配（仅 TPROXY / Redirect / Enhance）|The current run mode does not support eBPF rule matching (TPROXY / Redirect / Enhance only)|目前執行模式不支援 eBPF 規則比對（僅 TPROXY / Redirect / Enhance）|Текущий режим не поддерживает сопоставление eBPF (только TPROXY / Redirect / Enhance)
+已关闭，重启代理后停用 eBPF 匹配；本次会话仍由 eBPF 匹配名单|Turned off: eBPF matching stops after a proxy restart; this session still matches the lists with eBPF|已關閉，重新啟動代理後停用 eBPF 比對；本次工作階段仍由 eBPF 比對名單|Выключено: eBPF перестанет работать после перезапуска прокси; в этом сеансе списки всё ещё сопоставляет eBPF
+已启用但映射丢失：|Enabled but the maps are gone: |已啟用但映射遺失：|Включено, но карты потеряны: 
+未生效，已回退到 iptables 规则：|Not active, fell back to the iptables rules: |未生效，已回退到 iptables 規則：|Не активно, используются правила iptables: 
+未返回原因|No reason returned|未回傳原因|Причина не указана
+SELinux 拒绝了 bpf 调用|SELinux denied the bpf call|SELinux 拒絕了 bpf 呼叫|SELinux запретил вызов bpf
+系统没有挂载 bpf 文件系统|The bpf file system is not mounted|系統沒有掛載 bpf 檔案系統|Файловая система bpf не смонтирована
+内核不提供 bpf 系统调用|The kernel has no bpf system call|核心不提供 bpf 系統呼叫|Ядро не предоставляет системный вызов bpf
+内核不支持按应用 UID 匹配|The kernel cannot match by app UID|核心不支援依應用 UID 比對|Ядро не умеет сопоставлять по UID приложения
+内核不支持网段前缀映射|The kernel does not support prefix maps|核心不支援網段前綴映射|Ядро не поддерживает префиксные карты
+iptables 不支持 bpf 匹配|iptables does not support bpf matching|iptables 不支援 bpf 比對|iptables не поддерживает сопоставление bpf
+ip6tables 不支持 bpf 匹配|ip6tables does not support bpf matching|ip6tables 不支援 bpf 比對|ip6tables не поддерживает сопоставление bpf
+eBPF 组件未安装|eBPF components are not installed|eBPF 元件未安裝|Компоненты eBPF не установлены
+应用名单无效|The app list is invalid|應用名單無效|Список приложений недействителен
+绕过网段无效|The bypass networks are invalid|繞過網段無效|Обходные сети недействительны
+eBPF 程序文件无效|The eBPF program file is invalid|eBPF 程式檔案無效|Файл программы eBPF недействителен
+eBPF 映射已丢失，请重启代理|The eBPF maps are gone; restart the proxy|eBPF 映射已遺失，請重新啟動代理|Карты eBPF потеряны; перезапустите прокси
+旧的 eBPF 映射无法清理|Old eBPF maps could not be removed|舊的 eBPF 映射無法清理|Старые карты eBPF не удалось удалить
+eBPF 组件版本不匹配|eBPF component version mismatch|eBPF 元件版本不符|Несовпадение версии компонентов eBPF
+eBPF 组件运行出错|The eBPF component failed|eBPF 元件執行出錯|Ошибка компонента eBPF
+当前运行模式不支持（仅 TPROXY / Redirect / Enhance）|Not supported in the current run mode (TPROXY / Redirect / Enhance only)|目前執行模式不支援（僅 TPROXY / Redirect / Enhance）|Не поддерживается в текущем режиме (только TPROXY / Redirect / Enhance)
+内核拒绝加载 eBPF 程序|The kernel refused to load the eBPF program|核心拒絕載入 eBPF 程式|Ядро отказалось загружать программу eBPF
+内核无法创建 eBPF 映射|The kernel could not create the eBPF maps|核心無法建立 eBPF 映射|Ядро не смогло создать карты eBPF
+eBPF 映射写入失败|Writing the eBPF maps failed|eBPF 映射寫入失敗|Не удалось записать карты eBPF
+eBPF 映射读取失败|Reading the eBPF maps failed|eBPF 映射讀取失敗|Не удалось прочитать карты eBPF
+eBPF 映射无法固定到 bpf 文件系统|The eBPF maps could not be pinned to the bpf file system|eBPF 映射無法固定到 bpf 檔案系統|Карты eBPF не удалось закрепить в файловой системе bpf
+bpf 系统调用失败|The bpf system call failed|bpf 系統呼叫失敗|Системный вызов bpf не удался
+内核拒绝加载 eBPF 程序（权限不足）|The kernel refused to load the eBPF program (permission denied)|核心拒絕載入 eBPF 程式（權限不足）|Ядро отказалось загружать программу eBPF (нет прав)
+内核无法创建 eBPF 映射（权限不足）|The kernel could not create the eBPF maps (permission denied)|核心無法建立 eBPF 映射（權限不足）|Ядро не смогло создать карты eBPF (нет прав)
+eBPF 映射写入失败（权限不足）|Writing the eBPF maps failed (permission denied)|eBPF 映射寫入失敗（權限不足）|Не удалось записать карты eBPF (нет прав)
+eBPF 映射读取失败（权限不足）|Reading the eBPF maps failed (permission denied)|eBPF 映射讀取失敗（權限不足）|Не удалось прочитать карты eBPF (нет прав)
+eBPF 映射无法固定到 bpf 文件系统（权限不足）|The eBPF maps could not be pinned (permission denied)|eBPF 映射無法固定到 bpf 檔案系統（權限不足）|Карты eBPF не удалось закрепить (нет прав)
+bpf 系统调用失败（权限不足）|The bpf system call failed (permission denied)|bpf 系統呼叫失敗（權限不足）|Системный вызов bpf не удался (нет прав)
+导出当前日志|Export this log|匯出目前日誌|Экспортировать журнал
+加载更早 1600 行|Load 1600 earlier lines|載入更早 1600 行|Загрузить ещё 1600 строк
+Wi‑Fi（名称待网络匹配读取）|Wi‑Fi (name read by network automation)|Wi‑Fi（名稱待網路比對讀取）|Wi‑Fi (имя прочитает автоматизация сети)
+以太网|Ethernet|乙太網路|Ethernet
+无网络|No network|無網路|Нет сети
+尚未获取当前网络|Current network not read yet|尚未取得目前網路|Текущая сеть ещё не определена
+""".trimIndent()
+
+// 2026-10 i18n pass: pages and VM feedback that showed raw Chinese, the %s templates that replace
+// string concatenation, and the short phrases of hxFriendlyError (app/HxFriendlyError.kt).
+private val vocabularyCleanup = """
+同时把上面的内存限制和 I/O 权重交给内核执行（memcg memory.max 与 io 权重，优先 cgroup v2，不支持时用 v1）；核心超出内存上限时可能被系统结束。默认关闭，重启代理后生效|Also let the kernel enforce the memory limit and I/O weight above (memcg memory.max and io weight, cgroup v2 first, v1 as fallback). The core may be killed when it exceeds the memory limit. Off by default; restart the proxy to apply|同時把上面的記憶體限制和 I/O 權重交給核心執行（memcg memory.max 與 io 權重，優先 cgroup v2，不支援時用 v1）；核心超出記憶體上限時可能被系統結束。預設關閉，重新啟動代理後生效|Ядро ОС также применит лимит памяти и вес I/O выше (memcg memory.max и вес io, сначала cgroup v2, иначе v1). Ядро прокси может быть завершено при превышении лимита. По умолчанию выключено; перезапустите прокси для применения
+Root 守护|Root daemon|Root 守護|Root-демон
+卡1 · 蜂窝数据|SIM 1 · Mobile data|卡1 · 行動數據|SIM 1 · Мобильные данные
+默认数据卡在卡槽 1 且使用蜂窝网络时匹配|Matches when the default data SIM is in slot 1 and on mobile data|預設數據卡在卡槽 1 且使用行動網路時符合|Срабатывает, когда SIM для данных в слоте 1 и используются мобильные данные
+卡2 · 蜂窝数据|SIM 2 · Mobile data|卡2 · 行動數據|SIM 2 · Мобильные данные
+默认数据卡在卡槽 2 且使用蜂窝网络时匹配|Matches when the default data SIM is in slot 2 and on mobile data|預設數據卡在卡槽 2 且使用行動網路時符合|Срабатывает, когда SIM для данных в слоте 2 и используются мобильные данные
+最近动作|Recent actions|最近動作|Последние действия
+切换配置…|Switch configuration…|切換設定…|Сменить конфигурацию…
+运行脚本…|Run script…|執行腳本…|Запустить скрипт…
+请选择匹配时使用的配置|Choose the configuration to use on match|請選擇符合時使用的設定|Выберите конфигурацию для срабатывания
+请选择匹配时运行的脚本|Choose the script to run on match|請選擇符合時執行的腳本|Выберите скрипт для срабатывания
+脚本以 Root 运行，最长 12 秒，输出与退出码写入 scripts.log；环境变量 HETU_EVENT / HETU_NETWORK。|Scripts run as Root for up to 12 seconds; output and exit code go to scripts.log. Environment: HETU_EVENT / HETU_NETWORK.|腳本以 Root 執行，最長 12 秒，輸出與結束碼寫入 scripts.log；環境變數 HETU_EVENT / HETU_NETWORK。|Скрипты выполняются от Root до 12 секунд; вывод и код выхода пишутся в scripts.log. Переменные: HETU_EVENT / HETU_NETWORK.
+运行中会校验新配置后重启核心；失败时恢复原配置。|While running, the new configuration is validated and the core restarted; on failure the previous configuration is restored.|執行中會校驗新設定後重新啟動核心；失敗時復原原設定。|Во время работы новая конфигурация проверяется и ядро перезапускается; при ошибке восстанавливается прежняя.
+实测|Measured|實測|Измерено
+文件|File|檔案|Файл
+链接|Link|連結|Ссылка
+剪贴板|Clipboard|剪貼簿|Буфер обмена
+剪贴板内容|Clipboard content|剪貼簿內容|Содержимое буфера
+YAML 文本|YAML text|YAML 文字|Текст YAML
+读取剪贴板|Read clipboard|讀取剪貼簿|Прочитать буфер
+行|lines|行|строк
+请先读取剪贴板|Read the clipboard first|請先讀取剪貼簿|Сначала прочитайте буфер обмена
+导入前先用 Mihomo 校验，通过后设为当前配置；代理运行中会热重载，失败自动切回原配置。支持 UTF-8，最大 4 MiB。|Validated with Mihomo before import, then set as current; a running proxy hot-reloads and falls back to the previous configuration on failure. UTF-8, up to 4 MiB.|匯入前先用 Mihomo 校驗，通過後設為目前設定；代理執行中會熱重載，失敗自動切回原設定。支援 UTF-8，最大 4 MiB。|Перед импортом проверяется Mihomo и становится текущей; работающий прокси перезагружается на лету и при ошибке возвращает прежнюю. UTF-8, до 4 МиБ.
+经由河图代理 · 按当前规则与节点|Through Hetu · current rules and nodes|經由河圖代理 · 依目前規則與節點|Через Hetu · текущие правила и узлы
+代理未运行 · 直连测试|Proxy stopped · direct test|代理未執行 · 直連測試|Прокси остановлен · прямой тест
+准备测试…|Preparing test…|準備測試…|Подготовка теста…
+延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。解锁检测经系统网络（代理规则透明生效）向各服务实测，每项最长 8 秒：解锁、受限（如仅自制剧）、不可用，或失败及原因；有服务自报地区时以其为准。|Latency is time to first byte (DNS, handshake, TLS and first byte). Region comes from the service's Cloudflare exit report, other services on the same node, or the direct exit; hidden when it cannot be measured. Unlock checks query each service through the system network (proxy rules apply transparently), up to 8 seconds each: unlocked, limited (e.g. originals only), unavailable, or failed with a reason; a region reported by the service wins.|延遲為首包時間（DNS、交握、TLS 與首位元組）。地區來自該服務所在 Cloudflare 的出口報告、同一節點上的其他服務，或直連出口；無法實測時不顯示。解鎖檢測經系統網路（代理規則透明生效）向各服務實測，每項最長 8 秒：解鎖、受限（如僅自製劇）、不可用，或失敗及原因；有服務自報地區時以其為準。|Задержка — время до первого байта (DNS, рукопожатие, TLS и первый байт). Регион берётся из отчёта Cloudflare сервиса, других сервисов на том же узле или прямого выхода; скрыт, если измерить нельзя. Проверка разблокировки опрашивает каждый сервис через системную сеть (правила прокси действуют прозрачно), до 8 секунд: доступно, ограничено (например, только оригинальный контент), недоступно или ошибка с причиной; регион, сообщённый сервисом, приоритетен.
+检测解锁…|Checking unlocks…|檢測解鎖…|Проверка разблокировки…
+出口 IP|Exit IP|出口 IP|Внешний IP
+境外|Overseas|境外|Зарубежный
+境内|Domestic|境內|Внутренний
+经当前代理节点连接 Cloudflare 测速服务器（speed.cloudflare.com），依次测量延迟、下载与上传，约 20 秒，会消耗流量。|Connects to the Cloudflare speed test server (speed.cloudflare.com) through the current node and measures latency, download and upload in turn. Takes about 20 seconds and uses data.|經目前代理節點連線 Cloudflare 測速伺服器（speed.cloudflare.com），依序測量延遲、下載與上傳，約 20 秒，會消耗流量。|Подключается к серверу Cloudflare (speed.cloudflare.com) через текущий узел и измеряет задержку, загрузку и отдачу. Около 20 секунд, расходует трафик.
+正在连接测速服务器…|Connecting to the speed test server…|正在連線測速伺服器…|Подключение к серверу теста…
+正在测量延迟…|Measuring latency…|正在測量延遲…|Измерение задержки…
+正在测量下载…|Measuring download…|正在測量下載…|Измерение загрузки…
+正在测量上传…|Measuring upload…|正在測量上傳…|Измерение отдачи…
+覆写脚本|Override scripts|覆寫腳本|Скрипты переопределения
+每次启动前按顺序执行 main(config, profile)，返回修改后的配置；河图必需的端口与接管参数随后写入。任一脚本出错或超时，本次使用未修改的配置启动。未选择配置文件时，配置完全由脚本生成。|Before each start, main(config, profile) runs in order and returns the modified configuration; Hetu's required ports and takeover settings are written afterwards. If any script fails or times out, this start uses the unmodified configuration. With no configuration file selected, the scripts generate the whole configuration.|每次啟動前依序執行 main(config, profile)，傳回修改後的設定；河圖必需的連接埠與接管參數隨後寫入。任一腳本出錯或逾時，本次使用未修改的設定啟動。未選擇設定檔時，設定完全由腳本產生。|Перед каждым запуском по порядку выполняется main(config, profile), возвращающая изменённую конфигурацию; затем Hetu записывает обязательные порты и параметры перехвата. Если скрипт падает или превышает время, запуск идёт с неизменённой конфигурацией. Без выбранного файла конфигурацию полностью создают скрипты.
+上次启动|Last start|上次啟動|Последний запуск
+暂无覆写脚本|No override scripts|暫無覆寫腳本|Скриптов переопределения нет
+新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。|Create a script or import a .js file to add rules, set DNS or merge nodes.|新建腳本或匯入 .js 檔案，可新增規則、設定 DNS、合併節點。|Создайте скрипт или импортируйте .js, чтобы добавить правила, настроить DNS или объединить узлы.
+覆写脚本运行结果|Override script results|覆寫腳本執行結果|Результаты скриптов переопределения
+脚本名称|Script name|腳本名稱|Имя скрипта
+尚无该核心的原生配置|No native configuration for this core yet|尚無該核心的原生設定|Для этого ядра нет собственной конфигурации
+启动时自动转换 Mihomo 当前配置；也可在 工具 › 配置管理 导入原生配置|The current Mihomo configuration is converted at start; you can also import a native one in Tools › Configurations|啟動時自動轉換 Mihomo 目前設定；也可在 工具 › 設定管理 匯入原生設定|При запуске текущая конфигурация Mihomo конвертируется; можно также импортировать собственную в «Инструменты › Конфигурации»
+启动诊断|Startup diagnostics|啟動診斷|Диагностика запуска
+测速历史|Speed test history|測速歷史|История тестов скорости
+还没有测速记录：策略组测速和网速测试完成后会保存在这里|No speed tests yet: group latency tests and speed tests are saved here when they finish|還沒有測速紀錄：策略組測速和網速測試完成後會儲存在這裡|Тестов пока нет: проверки задержки групп и тесты скорости сохраняются здесь после завершения
+最多保留最近 %s 次。节点测速的流量按探测次数估算；网速测试的流量为实测值，未完成或样本过少时标注“估算”。|Keeps the latest %s runs. Node test data use is estimated from the probe count; speed test data use is measured, marked “estimated” when unfinished or with too few samples.|最多保留最近 %s 次。節點測速的流量依探測次數估算；網速測試的流量為實測值，未完成或樣本過少時標註「估算」。|Хранится до %s последних запусков. Трафик проверки узлов оценивается по числу запросов; трафик теста скорости измерен и помечен «оценка», если тест не завершён или выборка мала.
+另有 %s 个节点未显示|%s more nodes not shown|另有 %s 個節點未顯示|Ещё %s узлов не показано
+删除这条记录|Delete this record|刪除這筆紀錄|Удалить эту запись
+已随核心启动|Started with the core|已隨核心啟動|Запущено вместе с ядром
+广告域名在 %s 中按规则拦截；\n该核心不支持实时验证。|Ad domains are blocked by rules in %s;\nthis core cannot verify it live.|廣告網域在 %s 中依規則攔截；\n該核心不支援即時驗證。|Рекламные домены блокируются правилами в %s;\nэто ядро не поддерживает живую проверку.
+当前为%s模式|Current mode: %s|目前為%s模式|Текущий режим: %s
+非规则|non-rule|非規則|не «Правила»
+DNS 路径|DNS path|DNS 路徑|Путь DNS
+拦截实测|Block test|攔截實測|Проверка блокировки
+正在向广告域名发送一次请求…|Sending one request to an ad domain…|正在向廣告網域傳送一次請求…|Отправка запроса к рекламному домену…
+向已拦截域名发一次请求，读取核心的实际判定|Send one request to a blocked domain and read the core's verdict|向已攔截網域傳送一次請求，讀取核心的實際判定|Отправить запрос к заблокированному домену и прочитать решение ядра
+代理启动后可实测|Available once the proxy is running|代理啟動後可實測|Доступно после запуска прокси
+DNS 接管实测|DNS takeover test|DNS 接管實測|Проверка перехвата DNS
+用系统解析器解析一个已拦截域名…|Resolving a blocked domain with the system resolver…|用系統解析器解析一個已攔截網域…|Разрешение заблокированного домена системным резолвером…
+%s 次|%s times|%s 次|%s раз
+已检查 %s 个连接|%s connections checked|已檢查 %s 個連線|Проверено соединений: %s
+日志计数|Log count|日誌計數|Подсчёт по журналу
+未指定接口时兼容旧行为：接管所有转发入口。建议勾选实际的共享接口。|With no interface selected, the old behaviour applies: all forwarding ingress is taken over. Selecting the actual sharing interfaces is recommended.|未指定介面時相容舊行為：接管所有轉送入口。建議勾選實際的共用介面。|Без выбранного интерфейса работает старое поведение: перехватывается весь пересылаемый трафик. Рекомендуется выбрать реальные общие интерфейсы.
+内核状态|Kernel state|核心狀態|Состояние ядра ОС
+gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，内核集合随之热更新|gaoyifan/china-operator-ip (MIT) · bundled offline snapshot + daily core updates; kernel sets update live|gaoyifan/china-operator-ip（MIT）· 內建離線快照 + 核心每日更新，核心集合隨之熱更新|gaoyifan/china-operator-ip (MIT) · встроенный офлайн-снимок + ежедневное обновление ядром; наборы ядра ОС обновляются на лету
+代理已启动|Proxy started|代理已啟動|Прокси запущен
+已重启，设置已生效|Restarted, settings applied|已重新啟動，設定已生效|Перезапущено, настройки применены
+名单已通过 eBPF 热更新，无需重启|Lists updated live via eBPF; no restart needed|名單已透過 eBPF 熱更新，無需重新啟動|Списки обновлены через eBPF без перезапуска
+切换模式失败|Failed to switch mode|切換模式失敗|Не удалось сменить режим
+已断开全部连接|All connections closed|已中斷全部連線|Все соединения закрыты
+开机自启设置失败|Failed to set start on boot|開機自啟設定失敗|Не удалось настроить автозапуск
+当前配置没有在线订阅（proxy-providers）|The current configuration has no online subscriptions (proxy-providers)|目前設定沒有線上訂閱（proxy-providers）|В текущей конфигурации нет онлайн-подписок (proxy-providers)
+操作失败|Operation failed|操作失敗|Операция не удалась
+断开失败|Failed to disconnect|中斷失敗|Не удалось отключить
+日志读取失败|Failed to read logs|日誌讀取失敗|Не удалось прочитать журнал
+未知错误|Unknown error|未知錯誤|Неизвестная ошибка
+正在停止…|Stopping…|正在停止…|Остановка…
+正在启动…|Starting…|正在啟動…|Запуск…
+正在读取核心最新状态，请稍候|Reading the latest core state, please wait|正在讀取核心最新狀態，請稍候|Чтение текущего состояния ядра, подождите
+正在重启…|Restarting…|正在重新啟動…|Перезапуск…
+正在重载配置…|Reloading configuration…|正在重新載入設定…|Перезагрузка конфигурации…
+确认最终运行状态…|Confirming final state…|確認最終執行狀態…|Проверка итогового состояния…
+没有可在线更新的规则集（本地/内联规则集无需更新）|No rule sets to update online (local/inline rule sets need no update)|沒有可線上更新的規則集（本機/內嵌規則集無需更新）|Нет наборов правил для онлайн-обновления (локальные/встроенные не обновляются)
+测速未取得有效结果，已保留上次读数，请检查控制接口后重试|The test returned no valid results; previous readings kept. Check the controller and try again|測速未取得有效結果，已保留上次讀數，請檢查控制介面後重試|Тест не дал результатов; прежние значения сохранены. Проверьте контроллер и повторите
+站点测速失败，请检查网络|Site latency test failed; check the network|站點測速失敗，請檢查網路|Проверка сайтов не удалась; проверьте сеть
+策略组测速失败|Group latency test failed|策略組測速失敗|Проверка группы не удалась
+节点测速请求失败|Node latency request failed|節點測速請求失敗|Запрос проверки узла не удался
+规则读取失败|Failed to read rules|規則讀取失敗|Не удалось прочитать правила
+规则集更新失败|Failed to update rule sets|規則集更新失敗|Не удалось обновить наборы правил
+规则集读取失败|Failed to read rule sets|規則集讀取失敗|Не удалось прочитать наборы правил
+订阅更新失败|Failed to update subscriptions|訂閱更新失敗|Не удалось обновить подписки
+订阅读取失败|Failed to read subscriptions|訂閱讀取失敗|Не удалось прочитать подписки
+重启失败|Restart failed|重新啟動失敗|Перезапуск не удался
+重载失败|Reload failed|重新載入失敗|Перезагрузка не удалась
+配置导入失败|Failed to import configuration|設定匯入失敗|Не удалось импортировать конфигурацию
+导出失败|Export failed|匯出失敗|Экспорт не удался
+无法解析服务器地址，请检查网络或 DNS|Cannot resolve the server address; check the network or DNS|無法解析伺服器位址，請檢查網路或 DNS|Не удаётся разрешить адрес сервера; проверьте сеть или DNS
+连接超时，请检查网络后重试|Connection timed out; check the network and try again|連線逾時，請檢查網路後重試|Время соединения истекло; проверьте сеть и повторите
+无法连接服务器，请确认地址和端口|Cannot connect to the server; check the address and port|無法連線伺服器，請確認位址和連接埠|Не удаётся подключиться; проверьте адрес и порт
+网络不可达，请检查网络连接|Network unreachable; check the connection|網路無法連線，請檢查網路連線|Сеть недоступна; проверьте подключение
+安全连接失败，请检查系统时间或证书|Secure connection failed; check the system time or certificate|安全連線失敗，請檢查系統時間或憑證|Сбой защищённого соединения; проверьте время или сертификат
+文件不存在或无法访问|File not found or not accessible|檔案不存在或無法存取|Файл не найден или недоступен
+没有访问权限|Permission denied|沒有存取權限|Нет доступа
+请求被拒绝，请检查链接或访问令牌（HTTP %s）|Request rejected; check the link or token (HTTP %s)|請求被拒絕，請檢查連結或存取權杖（HTTP %s）|Запрос отклонён; проверьте ссылку или токен (HTTP %s)
+地址不存在，请检查链接（HTTP 404）|Address not found; check the link (HTTP 404)|位址不存在，請檢查連結（HTTP 404）|Адрес не найден; проверьте ссылку (HTTP 404)
+请求过于频繁，请稍后再试（HTTP 429）|Too many requests; try again later (HTTP 429)|請求過於頻繁，請稍後再試（HTTP 429）|Слишком много запросов; повторите позже (HTTP 429)
+服务器出错，请稍后再试（HTTP %s）|Server error; try again later (HTTP %s)|伺服器出錯，請稍後再試（HTTP %s）|Ошибка сервера; повторите позже (HTTP %s)
+读写失败，请重试|Read or write failed; try again|讀寫失敗，請重試|Ошибка чтения или записи; повторите
+其他可管理核心|Other manageable cores|其他可管理核心|Другие управляемые ядра
+不改变正在运行的代理|Does not change the running proxy|不改變正在執行的代理|Не меняет работающий прокси
+""".trimIndent()
+
+private val vocabularyPolish2 = """
+测试中断|Test interrupted|測試中斷|Тест прерван
+等待流量数据|Waiting for traffic data|等待流量資料|Ожидание данных трафика
+已隐藏上行与下行|Upload and download are hidden|已隱藏上行與下行|Отдача и загрузка скрыты
+查看完整原因|Show full reason|查看完整原因|Показать причину полностью
+切换节点需要代理运行中|Switching nodes requires the proxy to be running|切換節點需要代理執行中|Для смены узла прокси должен работать
+测速需要代理运行中|Latency tests require the proxy to be running|測速需要代理執行中|Для теста задержки прокси должен работать
+订阅更新需要代理运行中|Updating subscriptions requires the proxy to be running|訂閱更新需要代理執行中|Для обновления подписок прокси должен работать
+规则集更新需要代理运行中|Updating rule sets requires the proxy to be running|規則集更新需要代理執行中|Для обновления наборов правил прокси должен работать
+请等待当前操作完成|Please wait for the current operation to finish|請等待目前操作完成|Дождитесь завершения текущей операции
+流量分布|Traffic distribution|流量分布|Распределение трафика
+每 5 分钟|Every 5 minutes|每 5 分鐘|Каждые 5 минут
+每小时|Hourly|每小時|Каждый час
+每 6 小时|Every 6 hours|每 6 小時|Каждые 6 часов
+每天|Daily|每天|Ежедневно
+峰值 %s|Peak %s|峰值 %s|Пик %s
+↓ 下行|↓ Download|↓ 下行|↓ Загрузка
+↑ 上行|↑ Upload|↑ 上行|↑ Отдача
+日志导出失败|Log export failed|日誌匯出失敗|Не удалось экспортировать журнал
+日志清空失败|Failed to clear log|日誌清空失敗|Не удалось очистить журнал
+导入失败|Import failed|匯入失敗|Ошибка импорта
+"""
+
+// 2026-10-13 WeChat message latency: kernel-bypass switch and the battery hint on 诊断与维护.
+private val vocabularyWechat = """
+消息|Messaging|訊息|Сообщения
+微信直连（绕过核心）|WeChat direct (bypass the core)|微信直連（繞過核心）|WeChat напрямую (в обход ядра)
+仅所选应用模式下由应用名单决定微信是否代理|In selected-apps-only mode the app list decides whether WeChat is proxied|僅所選應用模式下由應用名單決定微信是否代理|В режиме «только выбранные приложения» проксирование WeChat определяет список приложений
+微信流量在内核直接放行，不经过核心与代理节点，避免长连接被节点或 NAT 静默断开导致消息延迟。默认关闭，重启代理后生效|WeChat traffic is passed in the kernel without the core or a proxy node, so its long connection is not silently dropped by a node or NAT and messages are not delayed. Off by default; takes effect after a proxy restart|微信流量在核心層直接放行，不經過核心與代理節點，避免長連線被節點或 NAT 靜默中斷導致訊息延遲。預設關閉，重新啟動代理後生效|Трафик WeChat пропускается в ядре ОС мимо ядра прокси и узла, поэтому долгое соединение не обрывается узлом или NAT и сообщения не задерживаются. По умолчанию выключено; действует после перезапуска прокси
+微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动|WeChat is not exempt from battery optimization: the system may freeze it while the screen is off and messages arrive only at the next wake-up. In WeChat's app settings set battery to Unrestricted and allow auto-start|微信未加入電池最佳化白名單：鎖定螢幕後系統可能凍結微信，訊息會在下次喚醒時才到達。請在微信的應用程式設定把電池改為「不受限制」並允許自動啟動|WeChat не исключён из оптимизации батареи: при выключенном экране система может заморозить его, и сообщения придут только при следующем пробуждении. В настройках WeChat выберите «Без ограничений» для батареи и разрешите автозапуск
+打开微信设置|Open WeChat settings|開啟微信設定|Открыть настройки WeChat
+""".trimIndent()
+
+// 2026-10-13 audit3 UI: config editor go-to-line from a validation error (G2).
+private val vocabularyAudit3Ui = """
+跳到第 %d 行|Go to line %d|跳至第 %d 行|К строке %d
+""".trimIndent()
+
+// 2026-10-13 audit3 settings: notification preview and unsaved-edit prompt, live 资源限制 checks (same rules as hetu-root.sh).
+private val vocabularyAudit3Settings = """
+预览|Preview|預覽|Предпросмотр
+收起预览|Hide preview|收合預覽|Скрыть предпросмотр
+预览 · 示例值|Preview · sample values|預覽 · 範例值|Предпросмотр · примерные значения
+通知设置的修改还没有保存。|Your notification settings have not been saved yet.|通知設定的修改還沒有儲存。|Изменения настроек уведомления ещё не сохранены.
+CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）|Invalid CPU affinity: enter core numbers such as 0-7 or 0,2,4-6 (0-23)|CPU 核心分配格式無效：請填寫 0-7 或 0,2,4-6 這樣的核心編號（0-23）|Неверная привязка к CPU: укажите номера ядер, например 0-7 или 0,2,4-6 (0-23)
+内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M|Invalid memory limit: enter a value such as 128M or 1G, at least 32M|記憶體限制格式無效：請填寫 128M、1G 這樣的值，且不低於 32M|Неверный лимит памяти: укажите значение вроде 128M или 1G, не меньше 32M
+内存限制不能超过 16G|The memory limit cannot exceed 16G|記憶體限制不能超過 16G|Лимит памяти не может превышать 16G
+磁盘 I/O 权重应为 0-7|Disk I/O weight must be 0-7|磁碟 I/O 權重應為 0-7|Вес дискового ввода-вывода должен быть от 0 до 7
+本机可用 %s 个 CPU（0-%s），超出的编号不会生效|This device has %s CPUs (0-%s); numbers beyond them have no effect|本機可用 %s 個 CPU（0-%s），超出的編號不會生效|На устройстве доступно CPU: %s (0-%s); номера сверх этого не действуют
+""".trimIndent()
+
+// 2026-10-13 audit G1: start from the last startable copy of the source config.
+private val vocabularyLastGood = """
+用上次可启动的版本启动|Start with the last working version|用上次可啟動的版本啟動|Запустить последнюю рабочую версию
+上次可启动：%s|Last working version: %s|上次可啟動：%s|Последняя рабочая версия: %s
+只用于这次启动，不会修改当前配置文件|Used for this start only; your current config file is not changed|只用於這次啟動，不會修改目前的設定檔|Только для этого запуска; текущий файл конфигурации не меняется
+正在运行上次可启动的版本（%s）· 源配置未修改|Running the last working version (%s) · source config unchanged|正在執行上次可啟動的版本（%s）· 來源設定未修改|Работает последняя рабочая версия (%s) · исходная конфигурация не изменена
+正在用上次可启动的版本启动…|Starting with the last working version…|正在用上次可啟動的版本啟動…|Запуск последней рабочей версии…
+已用上次可启动的版本启动，源配置未修改|Started with the last working version; source config unchanged|已用上次可啟動的版本啟動，來源設定未修改|Запущена последняя рабочая версия; исходная конфигурация не изменена
+""".trimIndent()
+
+// 2026-10-14 audit4 UI: controller-error fix button, start failure kept on 首页, stopped-state placeholders,
+// switched-off settings, Root 守护 row, theme notes and the bundled core version on 关于 (U3–U6, U10–U13).
+private val vocabularyAudit4Ui = """
+设置密钥|Set secret|設定密鑰|Задать секрет
+可改用上次可启动的版本启动|You can start with the last working version instead|可改用上次可啟動的版本啟動|Можно запустить последнюю рабочую версию
+修改配置后可重新启动|Fix the config, then start again|修改設定後可重新啟動|Исправьте конфигурацию и запустите снова
+查看原因|View reason|查看原因|Причина
+忽略启动失败|Dismiss start failure|忽略啟動失敗|Скрыть ошибку запуска
+上次启动失败|Last start failed|上次啟動失敗|Последний запуск не удался
+代理未运行，启动后查询公网 IP|Proxy not running; the public IP is looked up after it starts|代理未執行，啟動後查詢公網 IP|Прокси не запущен; публичный IP определяется после запуска
+%s · 上次|%s · last|%s · 上次|%s · прошлый
+已关闭：下面的设置仍可修改，开启后生效|Off: the settings below can still be changed and apply once it is on|已關閉：下面的設定仍可修改，開啟後生效|Выключено: настройки ниже можно менять, они применятся после включения
+需先开启模糊效果|Turn on blur effects first|需先開啟模糊效果|Сначала включите размытие
+随系统切换|Follows the system|隨系統切換|Как в системе
+始终浅色|Always light|始終淺色|Всегда светлая
+始终深色|Always dark|始終深色|Всегда тёмная
+代理运行时由 Root 守护执行匹配，App 被杀也不中断|While the proxy runs, the Root daemon does the matching, even if the app is killed|代理執行時由 Root 守護執行比對，App 被終止也不中斷|Пока прокси работает, сопоставление выполняет Root-демон, даже если приложение закрыто
+正在执行网络匹配|Running network matching|正在執行網路比對|Выполняет сопоставление сетей
+运行中（未启用网络匹配）|Running (network matching off)|執行中（未啟用網路比對）|Работает (сопоставление сетей выключено)
+未运行：由 App 前台服务执行匹配|Not running: the app's foreground service does the matching|未執行：由 App 前景服務執行比對|Не запущен: сопоставление выполняет служба приложения
+执行中|Active|執行中|Активен
+待命|Standby|待命|Ожидание
+修订 %s|Revision %s|修訂 %s|Ревизия %s
+启动后显示版本|Version shown after start|啟動後顯示版本|Версия появится после запуска
+""".trimIndent()
+
+
+// 2026-10-14 audit4 functions: stopped 本机直测, connection details actions, subscription alerts, launcher shortcuts, update check, restore undo.
+// 2026-10-15 3.3.3 polish (audit5): tools group titles (U14) and the plain copy toast.
+private val vocabularyAudit5 = """
+常用工具|Frequently used|常用工具|Часто используемые
+分流与网络|Routing & network|分流與網路|Маршрутизация и сеть
+配置与规则|Configs & rules|設定檔與規則|Конфигурации и правила
+核心与维护|Core & maintenance|核心與維護|Ядро и обслуживание
+已复制|Copied|已複製|Скопировано
+""".trimIndent()
+
+private val vocabularyFunc400 = """
+导出诊断包|Export diagnostics|匯出診斷包|Экспорт диагностики
+诊断信息、看门狗与核心日志、路由与 iptables 状态，保存为一个文本文件|Diagnostics, watchdog and core logs, routing and iptables state in one text file|診斷資訊、看門狗與核心日誌、路由與 iptables 狀態，儲存為一個文字檔|Диагностика, журналы сторожа и ядра, маршруты и iptables в одном текстовом файле
+诊断包导出失败|Could not export diagnostics|診斷包匯出失敗|Не удалось экспортировать диагностику
+诊断包已导出|Diagnostics exported|診斷包已匯出|Диагностика экспортирована
+没有可用的文件保存应用|No app available to save files|沒有可用的檔案儲存應用|Нет приложения для сохранения файлов
+下载到的是网页而不是配置，请检查链接是否正确或需要登录|The link returned a web page, not a config. Check the link or whether it needs a sign-in|下載到的是網頁而不是設定，請檢查連結是否正確或需要登入|По ссылке получена веб-страница, а не конфигурация. Проверьте ссылку или необходимость входа
+隐藏|Hide|隱藏|Скрыть
+已停止|Stopped|已停止|Остановлен
+正在重载…|Reloading…|正在重新載入…|Перезагрузка…
+正在读取代理状态…|Reading proxy status…|正在讀取代理狀態…|Чтение состояния прокси…
+暂时无法读取代理状态|Proxy status is unavailable for now|暫時無法讀取代理狀態|Состояние прокси пока недоступно
+河图 · 代理状态|Hetu · Proxy status|河圖 · 代理狀態|Hetu · Состояние прокси
+上次操作失败|Last action failed|上次操作失敗|Последнее действие не удалось
+通知栏操作失败|Notification action failed|通知列操作失敗|Действие из уведомления не удалось
+代理切换失败|Could not switch the proxy|代理切換失敗|Не удалось переключить прокси
+河图代理|Hetu proxy|河圖代理|Прокси Hetu
+切换失败|Switch failed|切換失敗|Сбой переключения
+切换中…|Switching…|切換中…|Переключение…
+未获得 Root 权限，河图无法接管网络。请在 Magisk / KernelSU / APatch 中允许河图后重试。|Root access is not granted, so Hetu cannot take over the network. Allow Hetu in Magisk / KernelSU / APatch and try again.|未取得 Root 權限，河圖無法接管網路。請在 Magisk / KernelSU / APatch 中允許河圖後重試。|Нет прав Root, Hetu не может управлять сетью. Разрешите Hetu в Magisk / KernelSU / APatch и повторите.
+""".trimIndent()
+
+private val vocabularyAudit4Func = """
+直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
+上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
+直连测速|Direct test|直連測速|Прямой тест
+复制主机|Copy host|複製主機|Копировать хост
+只看此应用|Only this app|只看此應用|Только это приложение
+查看匹配规则|Show matched rule|查看匹配規則|Показать сработавшее правило
+应用：%s|App: %s|應用：%s|Приложение: %s
+匹配规则：%s|Matched rule: %s|匹配規則：%s|Сработавшее правило: %s
+没有找到这条规则|This rule was not found|沒有找到這條規則|Правило не найдено
+规则列表可能已经变化，或这条连接由内置规则匹配|The rule list may have changed, or a built-in rule matched this connection|規則列表可能已經變化，或這條連線由內建規則匹配|Список правил мог измениться, или соединение совпало со встроенным правилом
+订阅提醒|Subscription alerts|訂閱提醒|Напоминания о подписке
+订阅到期/流量提醒|Expiry / data alerts|訂閱到期/流量提醒|Срок и трафик подписки
+到期前 3 天内或剩余流量不足 10% 时发一条通知，每个订阅每天最多一次；立即生效|Notifies within 3 days of expiry or when less than 10% of data is left, at most once a day per subscription; applies at once|到期前 3 天內或剩餘流量不足 10% 時發一則通知，每個訂閱每天最多一次；立即生效|Уведомление за 3 дня до окончания или когда осталось меньше 10% трафика, не чаще раза в день для каждой подписки; действует сразу
+没有通知权限，无法发送订阅提醒|No notification permission, so subscription alerts cannot be sent|沒有通知權限，無法傳送訂閱提醒|Нет разрешения на уведомления, напоминания о подписке не отправить
+订阅即将到期|Subscription expiring soon|訂閱即將到期|Подписка скоро закончится
+%s 已过期|%s has expired|%s 已過期|Срок %s истёк
+%s 今天到期|%s expires today|%s 今天到期|%s истекает сегодня
+%s 将在 %d 天后到期|%s expires in %d days|%s 將在 %d 天後到期|%s истекает через %d дн.
+订阅流量不足|Subscription data running low|訂閱流量不足|Заканчивается трафик подписки
+%s 剩余 %s（%d%%）|%s: %s left (%d%%)|%s 剩餘 %s（%d%%）|%s: осталось %s (%d%%)
+启动河图代理|Start the Hetu proxy|啟動河圖代理|Запустить прокси Hetu
+停止河图代理|Stop the Hetu proxy|停止河圖代理|Остановить прокси Hetu
+连通性与网速测试|Connectivity and speed test|連通性與網速測試|Проверка связи и скорости
+代理已在运行|The proxy is already running|代理已在執行|Прокси уже запущен
+正在检查…|Checking…|正在檢查…|Проверка…
+发现新版本 %s|New version %s available|發現新版本 %s|Доступна новая версия %s
+当前版本 %s|Current version %s|目前版本 %s|Текущая версия %s
+已是最新版本|You have the latest version|已是最新版本|Установлена последняя версия
+还没有发布版本|No release has been published yet|還沒有發佈版本|Релизы ещё не опубликованы
+打开发布页|Open release page|開啟發佈頁|Открыть страницу релиза
+没有可打开链接的应用|No app can open this link|沒有可開啟連結的應用程式|Нет приложения для открытия ссылки
+检查更新失败|Update check failed|檢查更新失敗|Не удалось проверить обновления
+撤销上次恢复|Undo last restore|復原上次還原|Отменить последнее восстановление
+恢复于 %s · 回到恢复前的设置，并删除恢复新增的配置副本|Restored %s · returns to the settings before it and removes the config copies it added|還原於 %s · 回到還原前的設定，並刪除還原新增的設定檔副本|Восстановлено %s · вернуть прежние настройки и удалить добавленные копии конфигураций
+撤销上次恢复？|Undo the last restore?|復原上次還原？|Отменить последнее восстановление?
+恢复之前的设置会写回；恢复之后又改过的设置保持不变。恢复时新增的配置副本会删除（已被选中或改过的除外），你原有的配置不受影响。正在运行的代理不会自动重启。|Settings from before the restore are written back; settings changed after it stay as they are. Config copies the restore added are deleted (unless selected or edited); your own configs are not affected. A running proxy is not restarted.|還原之前的設定會寫回；還原之後又改過的設定保持不變。還原時新增的設定檔副本會刪除（已被選取或改過的除外），你原有的設定檔不受影響。正在執行的代理不會自動重新啟動。|Настройки до восстановления будут возвращены; изменённые после него останутся. Добавленные копии конфигураций удаляются (кроме выбранных или изменённых); ваши конфигурации не затрагиваются. Запущенный прокси не перезапускается.
+已撤销上次恢复|Last restore undone|已復原上次還原|Последнее восстановление отменено
+撤销失败|Undo failed|復原失敗|Не удалось отменить
+""".trimIndent()
+
+
+// 2026-10-14 3.0.0 network recovery; 3.3.3: Wi-Fi reconnect driven by a real probe, on by default.
+private val vocabularyNetRecovery300 = """
+网络恢复|Network recovery|網路恢復|Восстановление сети
+Wi‑Fi 无法联网时自动重连|Reconnect Wi‑Fi when it has no internet|Wi‑Fi 無法連網時自動重新連線|Переподключать Wi‑Fi, если нет интернета
+启动、停止或重启代理后，以及守护进程发现整机断网时，会绕过河图直接访问国内的 204 检测地址并读取系统的 Wi‑Fi 验证状态；若 Wi‑Fi 仍无法联网，先刷新 DNS 并让系统重新检测，再用 Root 重连 Wi‑Fi（必要时关闭再打开）并发出通知。最多每 10 分钟一次、每小时 3 次。默认开启，立即生效|After the proxy starts, stops or restarts, and when the watchdog sees the whole phone offline, Hetu fetches a mainland China 204 check outside the proxy and reads the system's Wi‑Fi validation; if Wi‑Fi still has no internet, DNS caches are flushed and the system re-checks, then Root reconnects Wi‑Fi (off and on if needed) and posts a notification. At most once per 10 minutes and 3 times per hour. On by default; applies at once|啟動、停止或重新啟動代理後，以及守護程序發現整機斷網時，會繞過河圖直接存取國內的 204 偵測位址並讀取系統的 Wi‑Fi 驗證狀態；若 Wi‑Fi 仍無法連網，先清除 DNS 快取並讓系統重新偵測，再用 Root 重新連線 Wi‑Fi（必要時關閉再開啟）並發出通知。最多每 10 分鐘一次、每小時 3 次。預設開啟，立即生效|После запуска, остановки или перезапуска прокси, а также когда сторож видит, что весь телефон без сети, Hetu в обход прокси запрашивает 204-проверку в материковом Китае и читает статус проверки Wi‑Fi в системе; если интернета всё ещё нет, очищается кэш DNS и система заново проверяет сеть, затем Root переподключает Wi‑Fi (при необходимости выключает и включает) и показывает уведомление. Не чаще раза в 10 минут и 3 раз в час. По умолчанию включено, действует сразу
+""".trimIndent()
+
+
+// 2026-10-15 3.3.3 home: 网络延迟 card (path-true latency) and the public address seen by apps.
+private val vocabularyHomeProbe333 = """
+网络延迟|Latency|網路延遲|Задержка сети
+经代理 · 与普通应用相同的路径|Via proxy · same path as other apps|經代理 · 與一般應用程式相同的路徑|Через прокси · тот же путь, что у приложений
+直连 · 与普通应用相同的路径|Direct · same path as other apps|直連 · 與一般應用程式相同的路徑|Напрямую · тот же путь, что у приложений
+等待代理状态|Waiting for the proxy|等待代理狀態|Ожидание прокси
+上次结果|Last result|上次結果|Последний результат
+上次 %s|Last %s|上次 %s|Последний %s
+经代理查询，与普通应用看到的出口相同。|Looked up through the proxy: the same exit other apps see.|經代理查詢，與一般應用程式看到的出口相同。|Определено через прокси: тот же выход, что видят приложения.
+代理未运行，显示本机直连的公网出口。|Proxy not running: this is the device's own public address.|代理未執行，顯示本機直連的公網出口。|Прокси не запущен: это собственный публичный адрес устройства.
+%s；最新查询未成功，下拉首页或点右上角可重新查询。|%s; the latest lookup failed. Pull down on Home or tap the top-right button to try again.|%s；最新查詢未成功，下拉首頁或點右上角可重新查詢。|%s; последний запрос не удался. Потяните главный экран вниз или нажмите кнопку справа вверху.
+「未知」表示查询源未返回该字段。|"Unknown" means the lookup service did not return that field.|「未知」表示查詢來源未回傳該欄位。|«Неизвестно» означает, что сервис не вернул это поле.
+所有查询源均无响应，稍后自动重试|No lookup service answered; retrying automatically|所有查詢來源均無回應，稍後自動重試|Ни один сервис не ответил; повтор автоматически
+当前没有可用网络|No network available|目前沒有可用網路|Нет доступной сети
+""".trimIndent()
+
+
+// 2026-10 TikTok / stop fix: start refuses rules of other proxy apps that would leave the phone offline.
+private val vocabularyTiktokStop = """
+检测到其他应用的防火墙规则拦截了 fake-IP 网段，河图启动后将无法上网；请先停止或卸载该代理/防火墙应用，或重启手机后再启动|Another app's firewall rule blocks the fake-IP range, so nothing would connect once Hetu starts. Stop or uninstall that proxy/firewall app, or restart the phone, then start again|偵測到其他應用程式的防火牆規則攔截了 fake-IP 網段，河圖啟動後將無法上網；請先停止或解除安裝該代理／防火牆應用程式，或重新啟動手機後再啟動|Правило брандмауэра другого приложения блокирует диапазон fake-IP, после запуска Hetu сеть работать не будет. Остановите или удалите это прокси/брандмауэр либо перезагрузите телефон и запустите снова
+检测到其他代理应用的透明代理（TPROXY）规则仍在生效，河图与其同时运行会断网；请先在该应用中停止代理，或重启手机后再启动河图|Transparent proxy (TPROXY) rules of another proxy app are still active; running Hetu alongside them leaves the phone offline. Stop the proxy in that app, or restart the phone, then start Hetu|偵測到其他代理應用程式的透明代理（TPROXY）規則仍在生效，河圖與其同時執行會斷網；請先在該應用程式中停止代理，或重新啟動手機後再啟動河圖|Правила прозрачного прокси (TPROXY) другого приложения всё ещё действуют; вместе с ними Hetu оставит телефон без сети. Остановите прокси в том приложении или перезагрузите телефон, затем запустите Hetu
+无法移除旧版河图停止后留下的 fake-IP 拦截规则（HXFAKE_REJECT），请重试启动或重启手机|Could not remove the fake-IP block left by an older Hetu stop (HXFAKE_REJECT). Try starting again or restart the phone|無法移除舊版河圖停止後留下的 fake-IP 攔截規則（HXFAKE_REJECT），請重試啟動或重新啟動手機|Не удалось снять блокировку fake-IP, оставленную остановкой старой версии Hetu (HXFAKE_REJECT). Запустите снова или перезагрузите телефон
+""".trimIndent()
+
+
+// 2026-10 CNIP without ipset (iptables tree) and the speed test failure reasons.
+private val vocabularyCnipSpeed = """
+国内 IPv4 直接放行，不经过核心（ipset）|Domestic IPv4 goes direct without the core (ipset)|國內 IPv4 直接放行，不經過核心（ipset）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset)
+设备不支持 ipset，已降级为核心内规则|This device has no ipset; the core rules handle it instead|裝置不支援 ipset，已降級為核心內規則|На устройстве нет ipset; вместо этого работают правила ядра прокси
+国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
+内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
+内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)
+IPv4 %s 段|IPv4 %s ranges|IPv4 %s 段|IPv4: %s диапазонов
+IPv6 %s 段|IPv6 %s ranges|IPv6 %s 段|IPv6: %s диапазонов
+IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs IPv6 mode "Enable / Strict"|IPv6 未生效：需要 IPv6「啟用／嚴格」模式|IPv6 не применён: нужен режим IPv6 «Включить / Строгий»
+内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复|The kernel bypass rules are gone; the core rules handle it now. Restart the proxy to restore them|核心繞過規則已遺失，已降級為核心內規則；重新啟動代理可恢復|Правила обхода в ядре пропали, теперь работают правила ядра прокси. Перезапустите прокси, чтобы вернуть их
+设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则|This device has no ipset and no iptables connection marks; the core rules handle it instead|裝置沒有 ipset，也不支援 iptables 連線標記，已降級為核心內規則|На устройстве нет ipset и меток соединений iptables; вместо этого работают правила ядра прокси
+当前代理模式不支持内核绕过，已降级为核心内规则|The current proxy mode has no kernel bypass; the core rules handle it instead|目前代理模式不支援核心繞過，已降級為核心內規則|Текущий режим прокси не поддерживает обход в ядре; вместо этого работают правила ядра прокси
+内核 iptables 规则安装失败，已降级为核心内规则（%s）|Installing the kernel iptables rules failed; the core rules handle it instead (%s)|核心 iptables 規則安裝失敗，已降級為核心內規則（%s）|Не удалось установить правила iptables; вместо этого работают правила ядра прокси (%s)
+中国 IP 数据缺失或无效，已降级为核心内规则（%s）|China IP data is missing or invalid; the core rules handle it instead (%s)|中國 IP 資料缺失或無效，已降級為核心內規則（%s）|Данные об IP Китая отсутствуют или неверны; вместо этого работают правила ядра прокси (%s)
+设备没有 ipset：重启代理后改用 iptables 内核规则|This device has no ipset: restart the proxy to switch to kernel iptables rules|裝置沒有 ipset：重新啟動代理後改用 iptables 核心規則|На устройстве нет ipset: перезапустите прокси, чтобы перейти на правила iptables
+内核绕过未生效，已降级为核心内规则|Kernel bypass not active; the core rules handle it instead|核心繞過未生效，已降級為核心內規則|Обход в ядре не активен; вместо этого работают правила ядра прокси
+内核绕过未生效，已降级为核心内规则（%s）|Kernel bypass not active; the core rules handle it instead (%s)|核心繞過未生效，已降級為核心內規則（%s）|Обход в ядре не активен; вместо этого работают правила ядра прокси (%s)
+重启代理后生效|Takes effect after a proxy restart|重新啟動代理後生效|Вступит в силу после перезапуска прокси
+出口正常，但测速站 speed.cloudflare.com 的连接被立即关闭：通常是当前节点（机场）禁止测速，或分流规则把它拒绝（REJECT）。可换个节点再试|The exit works, but connections to speed.cloudflare.com are closed at once: usually the current node (provider) forbids speed tests, or a routing rule rejects it (REJECT). Try another node|出口正常，但測速站 speed.cloudflare.com 的連線被立即關閉：通常是目前節點（機場）禁止測速，或分流規則將其拒絕（REJECT）。可換個節點再試|Выход работает, но соединения с speed.cloudflare.com сразу закрываются: обычно текущий узел (провайдер) запрещает тесты скорости или правило маршрутизации его отклоняет (REJECT). Попробуйте другой узел
+连接被立即关闭，出口也查询不到：当前节点可能不可用，或分流规则拒绝了这些连接。请换个节点再试|Connections are closed at once and the exit cannot be looked up either: the current node may be down, or a routing rule rejects these connections. Try another node|連線被立即關閉，出口也查詢不到：目前節點可能無法使用，或分流規則拒絕了這些連線。請換個節點再試|Соединения сразу закрываются, и выход тоже не определить: текущий узел может быть недоступен или правило маршрутизации отклоняет эти соединения. Попробуйте другой узел
+无法连接河图核心的本地测速入口（127.0.0.1:%s）：代理可能刚停止或正在重启，请稍后再试|Cannot reach the core's local speed-test entry (127.0.0.1:%s): the proxy may have just stopped or be restarting. Try again shortly|無法連線河圖核心的本機測速入口（127.0.0.1:%s）：代理可能剛停止或正在重新啟動，請稍後再試|Нет связи с локальным входом теста скорости ядра (127.0.0.1:%s): прокси мог только что остановиться или перезапускается. Повторите чуть позже
+测速服务器拒绝连接|The speed test server refused the connection|測速伺服器拒絕連線|Сервер теста скорости отклонил соединение
+测速请求超时：当前节点响应太慢或不可用|The speed test timed out: the current node is too slow or unavailable|測速請求逾時：目前節點回應太慢或無法使用|Тайм-аут теста скорости: текущий узел слишком медленный или недоступен
+无法解析测速服务器域名|Cannot resolve the speed test server's name|無法解析測速伺服器網域|Не удалось разрешить имя сервера теста скорости
+与测速服务器的 TLS 握手失败（%s）|TLS handshake with the speed test server failed (%s)|與測速伺服器的 TLS 交握失敗（%s）|Сбой TLS-рукопожатия с сервером теста скорости (%s)
+测速服务器返回 HTTP %s，当前出口可能被 Cloudflare 限制|The speed test server answered HTTP %s; Cloudflare may be limiting this exit|測速伺服器回傳 HTTP %s，目前出口可能被 Cloudflare 限制|Сервер теста скорости ответил HTTP %s; Cloudflare может ограничивать этот выход
+测速连接中断（%s）|The speed test connection broke off (%s)|測速連線中斷（%s）|Соединение теста скорости прервалось (%s)
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {
     val index = when { language.startsWith("en") -> 0; language.startsWith("zh-TW") || language.startsWith("zh-HK") || language.contains("Hant") -> 1; language.startsWith("ru") -> 2; else -> return source }
-    return vocabulary[source]?.get(index) ?: source
+    vocabulary[source]?.get(index)?.let { return it }
+    // hxFriendlyError messages: "<phrase> · REASON_CODE", the phrase possibly carrying an HTTP status.
+    val coded = friendlyErrorShape.matchEntire(source) ?: return source
+    val phrase = coded.groupValues[1]
+    val translated = vocabulary[phrase]?.get(index) ?: friendlyHttpStatus.find(phrase)?.let { status ->
+        vocabulary[phrase.replaceRange(status.groups[1]!!.range, "%s")]?.get(index)?.replace("%s", status.groupValues[1])
+    } ?: return source
+    return translated + " · " + coded.groupValues[2]
 }
+
+private val friendlyErrorShape = Regex("""(.+) · ([A-Z][A-Z0-9_]+)""", RegexOption.DOT_MATCHES_ALL)
+private val friendlyHttpStatus = Regex("""（HTTP (\d{3})）""")
 
 @Composable fun ht(source: String): String {
     val setting = LocalHetuLanguage.current

@@ -510,17 +510,13 @@ private fun StrategyNodeCard(
     val delay = vm.delays[node.name] ?: node.lastDelay
     val testing = vm.testingNodes[node.name] == true
     val shape = RoundedCornerShape(15.dp)
-    val selectedLight = Color(0xFFE5ECFF)
-    val selectedDark = androidx.compose.ui.graphics.lerp(c.surfaceMuted, c.accentSoft, .42f)
-    val idleLight = Color(0xFFE7E8F3)
     val bg by animateColorAsState(
-        if (selected) { if (c.dark) selectedDark else selectedLight }
-        else { if (c.dark) c.surfaceMuted else idleLight },
+        if (selected) c.nodeSelected else c.nodeIdle,
         tween(HxMotion.Medium),
         label = "nodeCardBg",
     )
     val border by animateColorAsState(
-        if (selected) { if (c.dark) c.accent.copy(alpha = .55f) else Color(0xFF72A5FF) } else Color.Transparent,
+        if (selected) c.nodeSelectedRim else Color.Transparent,
         tween(HxMotion.Medium),
         label = "nodeCardBorder",
     )
@@ -669,96 +665,6 @@ private fun PanelFloatingControls(groupName: String, onLocate: () -> Unit, onCol
 }
 
 @Composable
-private fun StrategyNodeSheet(
-    vm: HetuViewModel,
-    group: ProxyGroupUi,
-    options: PanelOptions11,
-    onDismiss: () -> Unit,
-) {
-    val c = Hx.colors
-    var nodeQuery by rememberSaveable(group.name) { mutableStateOf("") }
-    val initialNode = remember(group.name) { group.now }
-    val pending = vm.pendingSelection[group.name]
-    val ordered = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
-    val nodes = if (nodeQuery.isBlank()) ordered else ordered.filter {
-        it.name.contains(nodeQuery, true) || it.provider.contains(nodeQuery, true) || it.type.contains(nodeQuery, true)
-    }
-
-    val listState = rememberLazyListState()
-    LaunchedEffect(group.name) {
-        // Open with the current node in view instead of always at the top.
-        val index = nodes.indexOfFirst { it.name == group.now }
-        if (index > 2) listState.scrollToItem((index - 2).coerceAtLeast(0))
-    }
-
-    HxSheet(onDismiss = onDismiss) {
-        val close = LocalHxSheetClose.current
-        LaunchedEffect(group.now, pending) {
-            // A successful switch: let the check mark land, then glide the sheet away.
-            if (pending == null && group.now.isNotBlank() && group.now != initialNode) {
-                kotlinx.coroutines.delay(260)
-                close(onDismiss)
-            }
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(group.name, style = MaterialTheme.typography.titleLarge, color = c.text, fontWeight = FontWeight.SemiBold)
-                Text(
-                    HxFormat.groupType(group.type) + " · " + group.nodes.size + " 个节点",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                )
-            }
-            if (vm.testingGroups[group.name] == true) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { HxSpinner(17.dp) }
-            else HxBarAction(Icons.Rounded.Speed, "测速本组", onClick = { vm.testGroup(group) })
-        }
-
-        if (group.nodes.size > 8) {
-            HxSearchField(
-                nodeQuery,
-                { nodeQuery = it },
-                "搜索节点",
-                Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-            )
-            Spacer(Modifier.height(4.dp))
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = c.surface,
-            border = BorderStroke(0.5.dp, c.line.copy(alpha = if (c.dark) .72f else .42f)),
-            shadowElevation = 0.dp,
-        ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 560.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 2.dp),
-            ) {
-                items(
-                    items = nodes,
-                    key = { node -> "sheet-node:" + group.name + ":" + node.name },
-                ) { node ->
-                    StrategySheetNodeRow(
-                        vm = vm,
-                        group = group,
-                        node = node,
-                        modifier = Modifier.animateItem(
-                            fadeInSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
-                            placementSpec = spring<IntOffset>(dampingRatio = .82f, stiffness = 420f),
-                            fadeOutSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
-                        ),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun StrategySheetNodeRow(
     vm: HetuViewModel,
     group: ProxyGroupUi,
@@ -836,6 +742,10 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
     val c = Hx.colors
     var draft by remember { mutableStateOf(PanelApiDraft11.read(vm.prefs)) }
     var error by remember { mutableStateOf<String?>(null) }
+    val sheetContext = androidx.compose.ui.platform.LocalContext.current
+    // History retention and database cap (ProxyApiHistoryStore prunes every table with them).
+    var retentionDays by remember { mutableStateOf(vm.prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90)) }
+    var maxMb by remember { mutableStateOf(vm.prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256)) }
 
     HxSheet(onDismiss = onDismiss, containerColor = c.canvas) {
         Column(
@@ -876,10 +786,28 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
             ApiSettingCard(
                 icon = Icons.Rounded.Hub,
                 title = "流量与连接历史",
-                subtitle = "保存最近 24 小时排行所需的数据",
+                subtitle = if (draft.history) "Root 守护按应用 / 域名 / 目标 IP / 出站 / 规则统计，App 被杀也不中断" else "保存最近 24 小时排行所需的数据",
                 checked = draft.history,
                 onCheckedChange = { draft = draft.copy(history = it); error = null },
-            )
+            ) {
+                if (draft.history) {
+                    Text("保留天数", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                    Spacer(Modifier.height(6.dp))
+                    HxSegmented(
+                        options = listOf("1" to "1 天", "7" to "7 天", "30" to "30 天", "90" to "90 天"),
+                        selected = retentionDays.toString(),
+                        onSelect = { retentionDays = it.toInt() },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("数据库上限", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                    Spacer(Modifier.height(6.dp))
+                    HxSegmented(
+                        options = listOf("16" to "16 MB", "64" to "64 MB", "128" to "128 MB", "256" to "256 MB"),
+                        selected = maxMb.toString(),
+                        onSelect = { maxMb = it.toInt() },
+                    )
+                }
+            }
 
             ApiSettingCard(
                 icon = Icons.Rounded.Settings,
@@ -949,6 +877,9 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
                         val problem = draft.validationError()
                         if (problem != null) error = problem else {
                             draft.save(vm.prefs)
+                            vm.prefs.edit().putInt("proxyApiHistoryRetentionDays", retentionDays).putInt("proxyApiHistoryMaxMb", maxMb).apply()
+                            // A running session's Root monitor picks the change up (start/stop collecting).
+                            DaemonMonitorBridge.exportAsync(sheetContext)
                             vm.toast("已保存")
                             onDismiss()
                         }

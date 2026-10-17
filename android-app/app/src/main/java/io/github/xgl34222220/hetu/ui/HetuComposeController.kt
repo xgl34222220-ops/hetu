@@ -196,6 +196,9 @@ internal class HetuComposeController(private val context: Context) {
         items.toList().also { appCache = it }
     }
 
+    /** Memory-cache hit only; never touches PackageManager, safe to call during composition. */
+    fun cachedAppIcon(packageName: String): Bitmap? = iconCache.get(packageName)
+
     suspend fun appIcon(packageName: String): Bitmap? = withContext(Dispatchers.IO) {
         iconCache.get(packageName)?.let { return@withContext it }
         try {

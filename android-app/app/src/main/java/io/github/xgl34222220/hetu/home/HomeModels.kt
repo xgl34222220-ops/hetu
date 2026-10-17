@@ -97,6 +97,8 @@ internal data class HomeWan(
     val state: HomeWanState = HomeWanState.Idle,
     /** Why the last lookup failed; shown only while [state] is [HomeWanState.Failed]. */
     val error: String? = null,
+    /** Wall-clock ms the shown address was obtained; 0 = unknown. Labels a kept (stale) answer. */
+    val checkedAt: Long = 0L,
 )
 
 internal data class HomeLan(val ip: String? = null, val iface: String? = null)
@@ -195,7 +197,23 @@ internal data class HomeUiState(
     val downloadBytesPerSecond: Long? = null,
     val subscription: HomeSubscription? = null,
     val resource: HomeResource = HomeResource(),
+    /** Audit G1: the current core's 「上次可启动」 copy; the start-failure sheet offers it when present. */
+    val lastGood: HomeLastGood? = null,
+    /** Audit G1: set while the running session was started from that copy (its config name). */
+    val lastGoodRunning: String? = null,
+    /** Audit4 G5: where [probes] come from while the proxy is not live (fresh direct test or last result). */
+    val probeSource: HomeProbeSource = HomeProbeSource.Live,
 )
+
+/** Origin of the 网络延迟 values: Live = through the running proxy, Direct = the device's own route (stopped). Last is unused. */
+internal enum class HomeProbeSource { Live, Direct, Last }
+
+/** Audit G1: what the 「上次可启动」 copy is: the config it came from and when it was kept (epoch ms). */
+internal data class HomeLastGood(val config: String, val savedAt: Long) {
+    /** 10-13 21:05 in the device time zone; empty when unknown. */
+    val savedText: String get() = if (savedAt <= 0L) "" else
+        java.text.SimpleDateFormat("MM-dd HH:mm", Locale.ROOT).format(java.util.Date(savedAt))
+}
 
 /* ------------------------------------------------------------------ */
 /*  Direct-probe targets form                                           */
@@ -224,7 +242,7 @@ internal object HomeTargets {
     val defaults = listOf(
         HomeTarget("Baidu", "https://www.baidu.com/"),
         HomeTarget("Cloudflare", "https://cp.cloudflare.com/generate_204"),
-        HomeTarget("Google", "https://www.gstatic.com/generate_204"),
+        HomeTarget("Google", "https://www.google.com/generate_204"),
     )
 
     fun autoRefreshLabel(seconds: Int): String = if (seconds <= 0) "关闭" else "$seconds 秒"
@@ -273,6 +291,10 @@ internal class HomeActions(
     val onOpenBasicSettings: () -> Unit = {},
     /** Config tag: opens 工具 › 配置管理. */
     val onOpenConfigs: () -> Unit = {},
+    /** WebUI shortcut under 启动: the existing 工具 › WebUI page (external panels / built-in dashboard). */
+    val onOpenWebUi: () -> Unit = {},
+    /** 日志 shortcut under 启动: the existing log viewer (工具 › 日志文件). */
+    val onOpenLogs: () -> Unit = {},
     /** “查看配置” in the start-failure sheet: opens the YAML editor at the reported line when known. */
     val onViewConfig: () -> Unit = {},
     val onDismissStartFailure: () -> Unit = {},
@@ -280,7 +302,36 @@ internal class HomeActions(
     val loadTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
     val saveTargets: (HomeTargetsConfig) -> Unit = {},
     val resetTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
+    /** Long press on the 订阅 card: 更新全部订阅 (the ViewModel explains when it cannot run). */
+    val onUpdateProviders: () -> Unit = {},
+    /** Audit G1: 「用上次可启动的版本启动」 in the start-failure sheet. */
+    val onStartLastGood: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 设置密钥 — 面板 › 策略 with the 测速与 API sheet open. */
+    val onOpenControllerKey: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 诊断工具 (the local credential does not match the running core). */
+    val onOpenDiagnostics: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 重试 — read the controller again now. */
+    val onRetryController: () -> Unit = {},
 )
+
+/**
+ * Audit4 U3: what the 控制接口异常 banner offers, read from the controller error the shell composes
+ * (ProxyComposeController / MihomoControllerClient wording). A custom API answering 401, or any 403,
+ * is fixed in 测速与 API (address, port, secret); a local 401 means the app credential does not match
+ * the running core, which 诊断工具 explains; anything else (timeout, refused, 5xx) is worth a retry.
+ */
+internal enum class HomeControllerFix(val label: String) {
+    ApiSettings("设置密钥"),
+    Diagnostics("诊断工具"),
+    Retry("重试"),
+}
+
+internal fun homeControllerFix(error: String): HomeControllerFix = when {
+    "403" in error -> HomeControllerFix.ApiSettings
+    "401" in error && "自定义" in error -> HomeControllerFix.ApiSettings
+    "401" in error -> HomeControllerFix.Diagnostics
+    else -> HomeControllerFix.Retry
+}
 
 /* ------------------------------------------------------------------ */
 /*  Formatting                                                          */

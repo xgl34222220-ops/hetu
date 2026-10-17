@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -290,7 +291,9 @@ internal fun HetuHomeTheme(
     customAccent: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    val colors = homeColors(dark, customAccent ?: accent.color(dark), pureBlack)
+    val accentColor = customAccent ?: accent.color(dark)
+    // Built once per appearance, not on every poll-driven recomposition of the host.
+    val colors = remember(dark, accentColor, pureBlack) { homeColors(dark, accentColor, pureBlack) }
     CompositionLocalProvider(
         LocalHomeColors provides colors,
         LocalHomeMotionEnabled provides homeMotionEnabled(),

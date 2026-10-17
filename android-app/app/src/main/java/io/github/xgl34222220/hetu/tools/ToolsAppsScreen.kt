@@ -228,7 +228,7 @@ private fun AppRow(
         }
         if (app.uid >= 0) {
             Spacer(Modifier.width(10.dp))
-            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1)
+            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(12.dp))
         ToolsCheckCircle(checked)

@@ -1,0 +1,33 @@
+# Hetu: Hysteria 2 client generated from Clash/Mihomo node "KR Hy2"
+server: "hy2.example.com:8443"
+auth: "hpw"
+tls:
+  sni: "hy2.example.com"
+  insecure: false
+obfs:
+  type: "salamander"
+  salamander:
+    password: "opw"
+bandwidth:
+  up: 50 mbps
+  down: 200 mbps
+# --- Hetu runtime isolation ---
+resolver:
+  type: udp
+  udp:
+    addr: 223.5.5.5:53
+    timeout: 4s
+tcpTProxy:
+  listen: :19898
+udpTProxy:
+  listen: :19898
+  timeout: 60s
+http:
+  listen: 127.0.0.1:29150
+tcpForwarding:
+  - listen: :11053
+    remote: 1.1.1.1:53
+udpForwarding:
+  - listen: :11053
+    remote: 1.1.1.1:53
+    timeout: 20s

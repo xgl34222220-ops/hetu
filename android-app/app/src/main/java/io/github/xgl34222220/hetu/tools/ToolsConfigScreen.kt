@@ -24,6 +24,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.rememberHomeStagger
 import io.github.xgl34222220.hetu.home.warnText
+import io.github.xgl34222220.hetu.maskUrl
 import io.github.xgl34222220.hetu.ui.ht
 
 /**
@@ -157,7 +158,8 @@ private fun SubscriptionCard(
             ToolsRow(
                 title = AnnotatedString(item.name),
                 icon = ToolsIcons.Link,
-                subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
+                // The full link (usually carrying a token) is shown only on 编辑订阅; the list is screenshot-safe.
+                subtitle = if (item.placeholder) ht("尚未填写订阅链接") else maskUrl(item.url),
                 subtitleMaxLines = 1,
                 subtitleStyle = if (item.placeholder) HomeRowSubStyle else ToolsType.url,
                 subtitleColor = if (item.placeholder) c.warnText else c.t2,

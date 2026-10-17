@@ -18,6 +18,13 @@ import java.util.concurrent.TimeUnit;
 /** Explicitly opted-in updates; Android chooses the time once conditions allow. */
 public final class UpdateJobService extends JobService {
     public static final int JOB_ID = 0x42494348;
+    /**
+     * Audit5 G7: the opt-in 订阅到期/流量提醒 also checks in the background, twice a day, through
+     * this already-declared job service (no manifest change). It only reads the running core's
+     * subscription list; nothing is downloaded or changed.
+     */
+    public static final int SUBSCRIPTION_ALERT_JOB_ID = 0x42494349;
+    private volatile Thread alertThread;
     private final Object jobLock = new Object();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private Run active;
@@ -61,7 +68,38 @@ public final class UpdateJobService extends JobService {
         }
     }
 
+    /** Safe on the UI thread; failures are silent (the foreground check still runs on every read). */
+    public static void scheduleSubscriptionAlerts(Context context, boolean enabled) {
+        Context app=context.getApplicationContext();
+        try {
+            JobScheduler scheduler=(JobScheduler)app.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            if(scheduler==null) return;
+            if(!enabled) { scheduler.cancel(SUBSCRIPTION_ALERT_JOB_ID); return; }
+            if(scheduler.getPendingJob(SUBSCRIPTION_ALERT_JOB_ID)!=null) return;
+            scheduler.schedule(new JobInfo.Builder(SUBSCRIPTION_ALERT_JOB_ID,new ComponentName(app,UpdateJobService.class))
+                    .setPeriodic(TimeUnit.HOURS.toMillis(12))
+                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                    .setPersisted(true)
+                    .build());
+        } catch(Exception ignored) { }
+    }
+
+    private boolean startSubscriptionAlertJob(final JobParameters parameters) {
+        if(!HxSubscriptionAlerts.INSTANCE.enabled(getSharedPreferences("hetu",MODE_PRIVATE))) return false;
+        Thread thread=new Thread(new Runnable() { @Override public void run() {
+            try { HxSubscriptionAlerts.INSTANCE.checkInBackground(getApplicationContext(),System.currentTimeMillis()); }
+            catch(Throwable ignored) { }
+            finally {
+                if(alertThread==Thread.currentThread()) { alertThread=null; jobFinished(parameters,false); }
+            }
+        } },"hetu-subscription-alerts");
+        alertThread=thread;
+        thread.start();
+        return true;
+    }
+
     @Override public boolean onStartJob(JobParameters parameters) {
+        if(parameters.getJobId()==SUBSCRIPTION_ALERT_JOB_ID) return startSubscriptionAlertJob(parameters);
         SharedPreferences prefs=getSharedPreferences("hetu",MODE_PRIVATE);
         if(!prefs.getBoolean("dailyUpdateEnabled",false)) return false;
         synchronized(jobLock) {
@@ -105,6 +143,11 @@ public final class UpdateJobService extends JobService {
     }
 
     @Override public boolean onStopJob(JobParameters parameters) {
+        if(parameters.getJobId()==SUBSCRIPTION_ALERT_JOB_ID) {
+            Thread thread=alertThread; alertThread=null;
+            if(thread!=null) thread.interrupt();
+            return false;
+        }
         SharedPreferences prefs=getSharedPreferences("hetu",MODE_PRIVATE);
         boolean enabled=prefs.getBoolean("dailyUpdateEnabled",false);
         synchronized(jobLock) {

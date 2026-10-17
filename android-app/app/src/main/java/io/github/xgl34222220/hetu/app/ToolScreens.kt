@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.panel.panelHorizontalEdgeFade
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -54,12 +55,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.home.HomeButton
@@ -207,7 +210,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             }
         }
         item(key = "error") {
-            AnimatedVisibility(error != null) {
+            HxVisibility(error != null) {
                 HxBanner(error.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter))
             }
         }
@@ -238,12 +241,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
-    var ifaceBypass by remember { mutableStateOf(prefs.getStringSet("proxyBypassInterfaces", emptySet()).orEmpty().toSortedSet()) }
+    // Shared (scoped) interfaces have their own key; 绕过规则 (proxyBypassInterfaces) is not written here.
+    var ifaceShared by remember { mutableStateOf(prefs.getStringSet("proxySharedInterfaces", emptySet()).orEmpty().toSortedSet()) }
     val macOriginal = remember { prefs.getStringSet("proxySharedBypassMacs", emptySet()).orEmpty().map { it.lowercase() }.sorted() }
     var macSaved by remember { mutableStateOf(macOriginal) }
     val macs = remember { hxEntries(macOriginal) }
     var macError by remember { mutableStateOf<String?>(null) }
     val macDirty = macs.values().map { it.lowercase() }.sorted() != macSaved
+    // Switches apply at once; the MAC list waits for 保存. Leaving with unsaved MAC edits asks first.
+    var confirmLeave by remember { mutableStateOf(false) }
+    BackHandler(enabled = macDirty) { confirmLeave = true }
 
     LaunchedEffect(refresh) {
         loading = true
@@ -263,9 +270,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
 
     fun saveIfaces(next: Set<String>) {
-        ifaceBypass = next.toSortedSet()
-        prefs.edit().putStringSet("proxyBypassInterfaces", ifaceBypass).apply()
-        changed("proxyBypassInterfaces")
+        ifaceShared = next.toSortedSet()
+        prefs.edit().putStringSet("proxySharedInterfaces", ifaceShared).putBoolean("proxyRootSettingsDirty", true).apply()
+        vm.bumpSettings()
     }
 
     fun saveMacs(values: List<String>): Boolean {
@@ -286,21 +293,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         return true
     }
 
+    fun saveMacList() {
+        if (saveMacs(macs.values())) {
+            haptics.perform(HetuHaptic.Confirm)
+            vm.toast("MAC 直连规则已保存，重启代理后生效")
+        }
+    }
+
     HxPage(
         title = ht("共享网络"),
         largeTitle = false,
         subtitle = ht("热点、USB 与局域网转发流量"),
-        onBack = onBack,
-        refreshing = loading,
+        onBack = { if (macDirty) confirmLeave = true else onBack() },
+        refreshing = loading && snapshot.interfaces.isNotEmpty(),
         onRefresh = { refresh++ },
         actions = {
             HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ }, busy = loading)
-            HxBarAction(Icons.Rounded.Check, "保存 MAC", onClick = {
-                if (saveMacs(macs.values())) {
-                    haptics.perform(HetuHaptic.Confirm)
-                    vm.toast("MAC 直连规则已保存，重启代理后生效")
-                }
-            }, enabled = macDirty)
+            HxBarAction(Icons.Rounded.Check, "保存 MAC", onClick = ::saveMacList, enabled = macDirty)
         },
     ) {
         item(key = "note") { HxNote("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root PREROUTING / FORWARD 层生效，修改后重启代理。") }
@@ -321,14 +330,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     when {
                         loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
                         snapshot.interfaces.isEmpty() -> SettingsRow(snapshot.error.ifBlank { "没有读取到活动接口" }, icon = Icons.Rounded.Cable)
-                        else -> snapshot.interfaces.forEachIndexed { index, item ->
+                        else -> snapshot.interfaces.filter { (it.tether && !it.upstream) || it.name in ifaceShared }.forEachIndexed { index, item ->
                             if (index > 0) SettingsDivider()
-                            val direct = item.name in ifaceBypass
+                            val scoped = item.name in ifaceShared
                             SettingsSwitchRow(
                                 item.name,
-                                direct,
-                                { on -> saveIfaces(if (on) ifaceBypass + item.name else ifaceBypass - item.name) },
-                                subtitle = (if (direct) "直连 · " else "接管 · ") + "状态 " + item.state,
+                                scoped,
+                                { on -> saveIfaces(if (on) ifaceShared + item.name else ifaceShared - item.name) },
+                                subtitle = (if (item.upstream) "上行网络 · " else if (scoped) "接管 · " else "不接管 · ") + "状态 " + item.state,
                                 icon = Icons.Rounded.Router,
                             )
                         }
@@ -364,11 +373,25 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "macs") {
             SettingsSection {
                 HxEditableList("MAC 列表", "MAC 地址", "aa:bb:cc:dd:ee:ff", macs, onEdited = { macError = null })
-                AnimatedVisibility(macError != null) {
+                HxVisibility(macError != null) {
                     HxBanner(macError.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(top = 10.dp))
+                }
+                HxVisibility(macDirty && macError == null) {
+                    HxBanner("MAC 列表有未保存的修改", tone = HxTone.Warn, actionLabel = "保存", onAction = ::saveMacList, modifier = Modifier.padding(top = 10.dp))
                 }
             }
         }
+    }
+
+    if (confirmLeave) {
+        HxConfirmDialog(
+            title = "放弃修改？",
+            message = "MAC 列表的修改还没有保存。",
+            confirmLabel = "放弃",
+            danger = true,
+            onConfirm = { confirmLeave = false; onBack() },
+            onDismiss = { confirmLeave = false },
+        )
     }
 }
 
@@ -464,14 +487,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
         path = parent.takeIf { it == root || it.startsWith("$root/") } ?: root
     }
     BackHandler(enabled = path != root) { goUp() }
-    // Folders slide in from the right when going deeper and from the left when going up.
+    // Folders slide in from the right when going deeper and from the left when going up
+    // (instant with motion off).
+    val folderMotion = hxMotion()
     AnimatedContent(
         targetState = path,
-        transitionSpec = {
-            val deeper = targetState.length > initialState.length
-            (slideInHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) w / 3 else -w / 3 } + fadeIn(tween(HxMotion.Medium)))
-                .togetherWith(slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) -w / 6 else w / 6 } + fadeOut(tween(HxMotion.Short)))
-        },
+        transitionSpec = { hxHierarchyTransition(targetState.length > initialState.length, folderMotion) },
         label = "folder",
     ) { shown ->
         FileFolderPage(vm, shown, onOpen = { path = it }, onBack = { if (shown == root) onBack() else goUp() })
@@ -599,8 +620,9 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
         },
     ) {
         item(key = "breadcrumbs") {
+            val crumbScroll = rememberScrollState()
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                Modifier.fillMaxWidth().panelHorizontalEdgeFade(crumbScroll).horizontalScroll(crumbScroll)
                     .padding(horizontal = HomeDims.gutter + 4.dp).padding(bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -615,7 +637,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
                             .padding(horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(label, color = if (active) c.accent else c.t2, maxLines = 1,
+                        Text(label, color = if (active) c.accent else c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             style = HomeType.label.copy(fontWeight = if (active) FontWeight.Bold else FontWeight.Medium))
                     }
                     if (index < breadcrumb.lastIndex) {
@@ -820,6 +842,18 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var preflight by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmRecover by remember { mutableStateOf(false) }
+    // WeChat installed but battery-optimized: the most common cause of late WeChat pushes on its own.
+    fun wechatBatteryHintNow(): Boolean {
+        val installed = runCatching { context.packageManager.getApplicationInfo(WechatTransport.PACKAGE, 0) }.isSuccess
+        val power = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+        return WechatTransport.batteryHint(installed, power?.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE)) != null
+    }
+    var wechatBatteryHint by remember { mutableStateOf(wechatBatteryHintNow()) }
+    // Audit4 G10: re-read on every return to the page, so the hint goes away once WeChat's battery
+    // setting was changed to Unrestricted from 打开微信设置 (it was computed only once before).
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        wechatBatteryHint = wechatBatteryHintNow()
+    }
 
     fun task(key: String, block: suspend () -> Unit) {
         if (busy != null) return
@@ -869,6 +903,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+        }
+        if (wechatBatteryHint) item(key = "wechat-battery") {
+            HxBanner(
+                ht("微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动"),
+                tone = HxTone.Warn,
+                modifier = Modifier.padding(horizontal = HomeDims.gutter, vertical = 6.dp),
+                actionLabel = ht("打开微信设置"),
+                onAction = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", WechatTransport.PACKAGE, null))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
+            )
         }
         item(key = "inspect") {
             SettingsSection {
@@ -976,6 +1026,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
         actions.toList() != initialActions || labels.toList() != initialLabels
+    // Leaving with an edited switch, template or quick button asks first. The refresh and target
+    // menus stay plain drafts that 返回 discards, as notificationMenusAreDraftsAndBackDiscards pins.
+    val unsavedEdits = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate ||
+        actions.toList() != initialActions || labels.toList() != initialLabels
+    var confirmLeave by remember { mutableStateOf(false) }
+    val previewValues = remember { hxNotificationPreviewValues() }
+    // The preview opens by itself once a template is edited, or from the 预览 chip. Closed it adds no
+    // height, so the quick buttons stay where the PDF frames and their pickers expect them.
+    var previewOpen by rememberSaveable { mutableStateOf(false) }
+    val showPreview = previewOpen || titleTemplate != initialTitle || template != initialTemplate
 
     val targetOptions = listOf(
         "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
@@ -993,6 +1053,19 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
     }
 
+    // Audit4 G7: applied at once (not part of the ✓ draft), so it never triggers 「放弃修改？」.
+    var subscriptionAlerts by remember { mutableStateOf(HxSubscriptionAlerts.enabled(prefs)) }
+    fun setSubscriptionAlerts(on: Boolean) {
+        subscriptionAlerts = on
+        prefs.edit().putBoolean(HxSubscriptionAlerts.PREF_ENABLED, on).apply()
+        if (on) HxSubscriptionAlerts.check(context, vm.providers)
+        // Audit5 G7: the background check follows the switch (scheduled on, cancelled off).
+        UpdateJobService.scheduleSubscriptionAlerts(context, on)
+    }
+    val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) setSubscriptionAlerts(true) else vm.toast("没有通知权限，无法发送订阅提醒")
+    }
+
     fun save() {
         val edit = prefs.edit()
             .putString(ProxyStatusNotificationService.PREF_TITLE_TEMPLATE, titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE })
@@ -1008,11 +1081,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         vm.toast("通知设置已保存")
         onBack()
     }
+    BackHandler(enabled = unsavedEdits) { confirmLeave = true }
+    // Audit4 U6: with the notification off, what it would show recedes. It stays editable on purpose:
+    // the frozen menu tests pick actions with the switch off, and saved values apply once it is on.
+    val offDim = Modifier.alpha(if (enabled) 1f else .5f)
 
     HxPage(
         title = ht("通知详细设置"),
         largeTitle = false,
-        onBack = onBack,
+        onBack = { if (unsavedEdits) confirmLeave = true else onBack() },
         actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
     ) {
         item(key = "master") {
@@ -1027,7 +1104,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         } else {
                             enabled = on
                         }
-                    }, subtitle = ht("常驻显示运行状态、网速与快捷控制"), icon = HxIcons.BellRing)
+                    }, subtitle = ht(if (enabled) "常驻显示运行状态、网速与快捷控制" else "已关闭：下面的设置仍可修改，开启后生效"), icon = HxIcons.BellRing)
                     SettingsDivider()
                     SettingsNavRow(ht("刷新频率"), icon = HomeIcons.RefreshCw, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
                     SettingsDivider()
@@ -1042,7 +1119,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 SettingsGroup(title = ht("通知标题")) {
                     SettingsInput(
                         value = titleTemplate, onValueChange = { titleTemplate = it.take(96) }, label = "标题模板",
-                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
                     )
                 }
             }
@@ -1050,21 +1127,41 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "template") {
             SettingsSection {
                 SettingsGroup(title = ht("通知内容")) {
-                    Column(Modifier.padding(start = 18.dp, end = 18.dp)) {
+                    Column(Modifier.padding(start = 18.dp, end = 18.dp).then(offDim)) {
                         SettingsInput(value = template, onValueChange = { template = it.take(320) }, label = "模板", singleLine = false)
                         Text(ht("可用变量：点一下，加到模板末尾"), Modifier.padding(top = 12.dp, bottom = 8.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
                     }
                     // Every variable the service understands, one tap away from the template. One
                     // line that slides under the card's edges, so the buttons below stay close.
+                    val variableScroll = rememberScrollState()
                     Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+                        Modifier.fillMaxWidth().panelHorizontalEdgeFade(variableScroll).horizontalScroll(variableScroll).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        HomePill(
+                            ht(if (showPreview) "收起预览" else "预览"), tone = HomeTone.Accent, height = 28.dp,
+                            style = HomeType.badge.copy(fontWeight = FontWeight.Medium),
+                            onClick = { previewOpen = !showPreview },
+                        )
                         NotificationVariables.forEach { variable ->
                             HomePill(
                                 variable, tone = HomeTone.Neutral, height = 28.dp,
                                 style = HomeType.badge.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium),
                                 onClick = { template = (if (template.isBlank() || template.endsWith(" ") || template.endsWith("\n")) template + variable else "$template $variable").take(320) },
+                            )
+                        }
+                    }
+                    // The notification as the service would render the two templates, with stand-in values.
+                    HxVisibility(showPreview) {
+                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim)) {
+                            Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
+                            Text(
+                                hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
+                                color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
+                                Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
                             )
                         }
                     }
@@ -1075,15 +1172,31 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
             item(key = "action$index") {
                 SettingsSection {
                     SettingsGroup(title = "快捷按钮 ${index + 1}") {
-                        SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true) {
+                        SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true, modifier = offDim) {
                             picker = "action" to index
                         }
                         SettingsInput(
                             value = labels[index], onValueChange = { labels[index] = it.take(12) },
                             label = "按钮文字（可空，最多 12 字）", placeholder = actionOptions.firstOrNull { it.first == actions[index] }?.second.orEmpty(),
-                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp),
+                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp).then(offDim),
                         )
                     }
+                }
+            }
+        }
+        item(key = "subscription-alerts") {
+            SettingsSection {
+                SettingsGroup(title = ht("订阅提醒")) {
+                    SettingsSwitchRow(ht("订阅到期/流量提醒"), subscriptionAlerts, { on ->
+                        if (on && android.os.Build.VERSION.SDK_INT >= 33 &&
+                            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) !=
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            alertPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            setSubscriptionAlerts(on)
+                        }
+                    }, subtitle = ht("到期前 3 天内或剩余流量不足 10% 时发一条通知，每个订阅每天最多一次；立即生效"), icon = HxIcons.Bell)
                 }
             }
         }
@@ -1117,5 +1230,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 onDismiss = { picker = null },
             )
         }
+    }
+
+    if (confirmLeave) {
+        HxConfirmDialog(
+            title = "放弃修改？",
+            message = "通知设置的修改还没有保存。",
+            confirmLabel = "放弃",
+            danger = true,
+            onConfirm = { confirmLeave = false; onBack() },
+            onDismiss = { confirmLeave = false },
+        )
     }
 }

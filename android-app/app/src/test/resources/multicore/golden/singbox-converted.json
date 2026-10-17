@@ -1,0 +1,403 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "dns-direct",
+        "server": "223.5.5.5"
+      },
+      {
+        "type": "https",
+        "tag": "dns-remote",
+        "server": "1.1.1.1",
+        "detour": "Proxy"
+      },
+      {
+        "type": "fakeip",
+        "tag": "dns-fake",
+        "inet4_range": "198.18.0.0/16"
+      }
+    ],
+    "rules": [
+      {
+        "domain": ["time.android.com"],
+        "domain_suffix": ["lan"],
+        "action": "route",
+        "server": "dns-remote"
+      },
+      {
+        "query_type": ["A", "AAAA"],
+        "action": "route",
+        "server": "dns-fake"
+      }
+    ],
+    "final": "dns-remote"
+  },
+  "inbounds": [
+    {
+      "type": "tproxy",
+      "tag": "hetu-tproxy",
+      "listen": "::",
+      "listen_port": 19898
+    },
+    {
+      "type": "direct",
+      "tag": "hetu-dns-in",
+      "listen": "::",
+      "listen_port": 11053
+    },
+    {
+      "type": "http",
+      "tag": "hetu-egress-probe",
+      "listen": "127.0.0.1",
+      "listen_port": 29150
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "shadowsocks",
+      "tag": "HK SS",
+      "server": "ss.example.com",
+      "server_port": 8388,
+      "method": "aes-128-gcm",
+      "password": "pw1"
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "HK SS2022",
+      "server": "203.0.113.10",
+      "server_port": 8389,
+      "method": "2022-blake3-aes-128-gcm",
+      "password": "AAAAAAAAAAAAAAAAAAAAAA=="
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "HK SS obfs",
+      "server": "obfs.example.com",
+      "server_port": 8390,
+      "method": "chacha20-ietf-poly1305",
+      "password": "pw",
+      "plugin": "obfs-local",
+      "plugin_opts": "obfs=http;obfs-host=bing.com"
+    },
+    {
+      "type": "vmess",
+      "tag": "JP VMess WS",
+      "server": "vmess.example.com",
+      "server_port": 443,
+      "uuid": "2b4a8a52-6f1e-4c4f-9b8a-1d3a2b4c5d6e",
+      "security": "auto",
+      "alter_id": 0,
+      "tls": {
+        "enabled": true,
+        "server_name": "vmess.example.com"
+      },
+      "transport": {
+        "type": "ws",
+        "path": "/ws",
+        "headers": {
+          "Host": "vmess.example.com"
+        }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "US VLESS Reality",
+      "server": "198.51.100.7",
+      "server_port": 443,
+      "uuid": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3",
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.microsoft.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "iGs2kqIGPj4a8Qw0bJ7XyKm6E3p0vN5rT9uS1cD4fHg",
+          "short_id": "6ba85179e30d4fc2"
+        }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "SG VLESS gRPC",
+      "server": "grpc.example.com",
+      "server_port": 443,
+      "uuid": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b4",
+      "tls": {
+        "enabled": true,
+        "server_name": "grpc.example.com"
+      },
+      "transport": {
+        "type": "grpc",
+        "service_name": "gun"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "TW Trojan",
+      "server": "trojan.example.com",
+      "server_port": 443,
+      "password": "tpw",
+      "tls": {
+        "enabled": true,
+        "server_name": "trojan.example.com"
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "KR Hy2",
+      "server": "hy2.example.com",
+      "server_port": 8443,
+      "password": "hpw",
+      "up_mbps": 50,
+      "down_mbps": 200,
+      "obfs": {
+        "type": "salamander",
+        "password": "opw"
+      },
+      "tls": {
+        "enabled": true,
+        "server_name": "hy2.example.com"
+      }
+    },
+    {
+      "type": "tuic",
+      "tag": "DE TUIC",
+      "server": "tuic.example.com",
+      "server_port": 8443,
+      "uuid": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b5",
+      "password": "tupw",
+      "congestion_control": "bbr",
+      "udp_relay_mode": "native",
+      "tls": {
+        "enabled": true,
+        "server_name": "tuic.example.com",
+        "alpn": ["h3"]
+      }
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto",
+      "outbounds": ["HK SS", "JP VMess WS", "TW Trojan"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "300s",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "Proxy",
+      "outbounds": [
+        "Auto",
+        "HK SS",
+        "JP VMess WS",
+        "US VLESS Reality",
+        "SG VLESS gRPC",
+        "TW Trojan",
+        "KR Hy2",
+        "DE TUIC",
+        "DIRECT"
+      ],
+      "default": "Auto"
+    },
+    {
+      "type": "selector",
+      "tag": "Streaming",
+      "outbounds": ["Proxy", "DIRECT"],
+      "default": "Proxy"
+    },
+    {
+      "type": "direct",
+      "tag": "DIRECT"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in"],
+        "action": "sniff"
+      },
+      {
+        "inbound": ["hetu-dns-in"],
+        "action": "hijack-dns"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": ["hetu-adblock"]
+          },
+          {
+            "rule_set": ["hetu-adblock-allow"],
+            "invert": true
+          }
+        ],
+        "action": "reject"
+      },
+      {
+        "rule_set": ["rp-ads"],
+        "action": "reject"
+      },
+      {
+        "domain": ["api.example.com"],
+        "action": "route",
+        "outbound": "Proxy"
+      },
+      {
+        "domain_suffix": ["google.com"],
+        "action": "route",
+        "outbound": "Proxy"
+      },
+      {
+        "domain_keyword": ["youtube"],
+        "action": "route",
+        "outbound": "Streaming"
+      },
+      {
+        "domain_regex": ["^.*\\.netflix\\.com$"],
+        "action": "route",
+        "outbound": "Streaming"
+      },
+      {
+        "rule_set": ["geosite-cn"],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "rule_set": ["rp-lan-ips"],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "ip_cidr": ["10.0.0.0/8"],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "ip_cidr": ["fd00::/8"],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "port": [123],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "network": ["udp"]
+          },
+          {
+            "port": [443]
+          }
+        ],
+        "action": "reject"
+      },
+      {
+        "package_name": ["com.tencent.mm"],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "rule_set": ["geoip-cn"],
+        "action": "route",
+        "outbound": "DIRECT"
+      },
+      {
+        "source_ip_cidr": ["192.168.50.0/24"],
+        "action": "route",
+        "outbound": "DIRECT"
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "inline",
+        "tag": "hetu-adblock",
+        "rules": [
+          {
+            "domain_suffix": ["ads.example.net", "tracker.example.org"]
+          }
+        ]
+      },
+      {
+        "type": "inline",
+        "tag": "hetu-adblock-allow",
+        "rules": [
+          {
+            "domain_suffix": ["ok.tracker.example.org"]
+          }
+        ]
+      },
+      {
+        "type": "inline",
+        "tag": "rp-ads",
+        "rules": [
+          {
+            "domain": ["ads.example.org"],
+            "domain_suffix": ["doubleclick.net"]
+          }
+        ]
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+        "download_detour": "Proxy",
+        "update_interval": "72h"
+      },
+      {
+        "type": "inline",
+        "tag": "rp-lan-ips",
+        "rules": [
+          {
+            "ip_cidr": ["192.168.0.0/16"]
+          }
+        ]
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+        "download_detour": "Proxy",
+        "update_interval": "72h"
+      }
+    ],
+    "final": "Proxy",
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-direct"
+  },
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:29090",
+      "secret": "fixture-secret",
+      "default_mode": "rule"
+    },
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "store_fakeip": true
+    }
+  }
+}
