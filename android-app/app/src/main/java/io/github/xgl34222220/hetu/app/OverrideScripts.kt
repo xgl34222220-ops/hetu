@@ -8,7 +8,6 @@ import org.yaml.snakeyaml.error.YAMLException
 import org.yaml.snakeyaml.representer.Representer
 import java.io.File
 import java.io.IOException
-import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
@@ -156,7 +155,8 @@ internal object OverrideScriptPipeline {
                     maxAliasesForCollections = 4096
                     nestingDepthLimit = 60
                 }
-                Yaml(SafeConstructor(options)).load<Any?>(StringReader(source))
+                // Same SnakeYAML 2.3 chunk-edge workaround as every runtime parse (RuntimeYaml15.reader).
+                Yaml(SafeConstructor(options)).load<Any?>(RuntimeYaml15.reader(source))
             } catch (invalid: YAMLException) {
                 throw IOException("YAML 语法或结构解析失败")
             }

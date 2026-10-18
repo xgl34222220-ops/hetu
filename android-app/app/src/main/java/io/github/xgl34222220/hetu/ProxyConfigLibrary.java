@@ -29,7 +29,8 @@ final class ProxyConfigLibrary {
     }
 
     static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
-    static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER);}}
+    /** placeholder: an unfilled slot. Any URL on the reserved example.invalid host is one: the shipped Mihomo built-in's slot is https://example.invalid/bichen-subscription-1. */
+    static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER)||u.contains("://"+BundledCoreTemplates.PLACEHOLDER_HOST+"/");}}
     private static final class CollatorHolder {static final java.text.Collator ORDER=java.text.Collator.getInstance(Locale.CHINA);}
 
     private File dir(ProxyRuntimeProfile.Core core){return new File(root,core.id);}
@@ -70,6 +71,22 @@ final class ProxyConfigLibrary {
         try{select(core,name);return name;}catch(IOException e){return null;}
     }
     static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
+
+    /**
+     * The non-Mihomo built-in template still on its placeholder node (example.invalid) cannot reach any server, so a
+     * start of that core follows Mihomo's built-in instead: 河图内置-TPROXY.yaml with the user's subscription, its
+     * groups and rules, converted for the core at start (ProxyCoreConfig). Returns that Mihomo entry, or null when
+     * {@code e} is anything else (the user's own file, or a template the user filled with a server).
+     */
+    Entry followedBuiltin(Entry e){
+        if(e==null||e.core==ProxyRuntimeProfile.Core.MIHOMO||e.core==ProxyRuntimeProfile.Core.MIHOMO_SMART||!BundledCoreTemplates.isBundledName(e.name))return null;
+        try{if(!BundledCoreTemplates.hasPlaceholderNode(read(e)))return null;}catch(IOException unreadable){return null;}
+        ensureBundled(ProxyRuntimeProfile.Core.MIHOMO);
+        File f=new File(dir(ProxyRuntimeProfile.Core.MIHOMO),BUNDLED_NAME);
+        return f.isFile()?new Entry(ProxyRuntimeProfile.Core.MIHOMO,BUNDLED_NAME,f):null;
+    }
+    /** The config a start of {@code core} reads its nodes, subscriptions, groups and rules from: the selection, or the built-in it follows. */
+    Entry source(ProxyRuntimeProfile.Core core){Entry s=selected(core);Entry f=followedBuiltin(s);return f!=null?f:s;}
 
     List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
     Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}

@@ -2834,7 +2834,7 @@ wd_selfheal_init(){
   # uid 0: the uid 0-9999 RETURN rules let it go direct unless owner_return added `! -d <fake range>`,
   # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
   # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
-  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0
+  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BAD_NAMES=""
   WD_OFF_N=0; WD_OFF_NEXT=0
   WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
   WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
@@ -2989,7 +2989,7 @@ wd_egress_tick(){
   wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
   case "$WET_RC" in
     0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
+       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; return 0;;
     2) WD_EG_TARGET=""; return 0;;
   esac
   # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
@@ -3005,23 +3005,9 @@ wd_egress_tick(){
   if [ "$WD_NOW" -lt "$WD_EG_NEXT_ACTION" ]; then wd_log "proxy egress still down; next self-heal action in $((WD_EG_NEXT_ACTION-WD_NOW))s (backoff)"; return 0; fi
   WD_EG_LEVEL=$((WD_EG_LEVEL+1))
   WD_EG_NEXT_ACTION=$((WD_NOW+WD_EG_BACKOFF)); WD_EG_BACKOFF=$((WD_EG_BACKOFF*2)); [ "$WD_EG_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_EG_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
-  WD_HTTP_TIMEOUT=4
-  if [ "$WD_EG_LEVEL" = 1 ]; then
-    wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
-    wd_log "self-heal: proxy egress down; closed all core connections (HTTP $WD_CODE)"
-  elif [ "$WD_EG_LEVEL" = 2 ] && [ "$WD_KIND" = mihomo ]; then
-    wd_http POST /restart "$WD_TMP.act"; rm -f "$WD_TMP.act"
-    wd_log "self-heal: proxy egress still down; core reloaded in place (POST /restart, HTTP $WD_CODE)"
-    WD_EG_TARGET=""; WD_LIVE_AT=$((WD_NOW+WD_LIVE_GRACE))
-  else
-    WD_EG_LEVEL=3
-    if wd_restart_allowed; then
-      wd_log "self-heal: proxy egress still down; restarting the core"
-      if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
-    else
-      wd_log "self-heal: proxy egress still down; restart limit reached, waiting (backoff ${WD_EG_BACKOFF}s)"
-    fi
-  fi
+  # Direct works and the controller answers: only the connections through the failing group are closed.
+  rm -f "$WD_TMP.groups"
+  wd_node_heal "$WD_EG_TARGET$WD_TAB" "$WD_EG_TARGET"
 }
 wd_selfheal_tick(){
   wd_now
@@ -3125,7 +3111,7 @@ wd_groups(){
 # Delay of each group's current choice through the core (no TPROXY involved). WD_DP_BAD lists the groups
 # that fail ("group→node"), WD_DP_SCANNED how many were measured.
 wd_scan_groups(){
-  WD_DP_BAD=""; WD_DP_SCANNED=0; WSG_N=0
+  WD_DP_BAD=""; WD_DP_BAD_NAMES=""; WD_DP_SCANNED=0; WSG_N=0
   wd_groups || return 0
   wd_budget_start
   while IFS= read -r WSG_L; do
@@ -3135,7 +3121,7 @@ wd_scan_groups(){
     wd_delay "$WSG_G" "$WD_PROXY_URL" </dev/null; WSG_RC=$?
     [ "$WSG_RC" != 2 ] || continue
     WD_DP_SCANNED=$((WD_DP_SCANNED+1))
-    if [ "$WSG_RC" = 1 ]; then WD_DP_BAD="${WD_DP_BAD:+$WD_DP_BAD, }$WSG_G${WSG_NOW:+→$WSG_NOW}"; WSG_N=$((WSG_N+1)); [ "$WSG_N" -lt 3 ] || break; fi
+    if [ "$WSG_RC" = 1 ]; then WD_DP_BAD="${WD_DP_BAD:+$WD_DP_BAD, }$WSG_G${WSG_NOW:+→$WSG_NOW}"; WD_DP_BAD_NAMES="$WD_DP_BAD_NAMES$WSG_G$WD_TAB${WSG_NOW:+$WSG_NOW$WD_TAB}"; WSG_N=$((WSG_N+1)); [ "$WSG_N" -lt 3 ] || break; fi
   done < "$WD_TMP.groups"
   return 0
 }
@@ -3152,7 +3138,7 @@ wd_budget_left(){
 wd_uptime(){ read -r WD_UP WD_UP_REST < /proc/uptime 2>/dev/null || WD_UP=0; WD_UP=${WD_UP%%.*}; case "$WD_UP" in ''|*[!0-9]*) WD_UP=0;; esac; }
 # One probe. WD_DP_CLASS: ok | proxy-down | dataplane-down | offline | skip (no verdict) | unavailable.
 wd_dp_probe(){
-  WD_DP_CLASS=skip; WD_DP_DETAIL=""; WD_DP_WHY=""; WD_DP_BAD=""; WD_DP_SCANNED=0
+  WD_DP_CLASS=skip; WD_DP_DETAIL=""; WD_DP_WHY=""; WD_DP_BAD=""; WD_DP_BAD_NAMES=""; WD_DP_SCANNED=0
   [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
   case " $WD_DNS_PROTOS " in *" tcp "*) ;; *) WD_DP_CLASS=unavailable; WD_DP_WHY=dns-without-tcp; return 0;; esac
   has nc || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-nc; return 0; }
@@ -3210,11 +3196,43 @@ wd_offline_seen(){
 }
 wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
-# Dead node: close the core's connections, let url-test/fallback/load-balance groups re-measure (and
-# switch), tell the user once per outage. The core is not restarted for this: a new core reaches the
-# same node.
-wd_proxy_heal(){
-  WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
+# Close only the core connections whose chain passes through one of the proxies/groups named in $1
+# (tab separated): a game or a domestic app on DIRECT, and other groups' connections, stay up. The
+# connection list is read once (GET /connections, Clash API: Mihomo and sing-box) and each match is
+# closed by id; when the list cannot be read nothing is closed. WD_CLOSED / WD_CLOSE_SEEN report it.
+WD_CLOSE_MAX=512
+wd_close_through(){
+  WD_CLOSED=0; WD_CLOSE_SEEN=-1
+  [ -n "$1" ] || return 1
+  WD_HTTP_TIMEOUT=4; wd_http GET /connections "$WD_TMP.cn" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.cn"; return 1; }
+  # Objects split at "{": a connection's id and its chains sit on the same or the next line.
+  WD_CLOSE_SEEN=$(tr '{' '\n' < "$WD_TMP.cn" | awk -v names="$1" -v max="$WD_CLOSE_MAX" -v ids="$WD_TMP.ids" '
+    function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); gsub(/\\"/, "\"", x); return x }
+    BEGIN { printf "" > ids; n = split(names, a, "\t"); for (i = 1; i <= n; i++) if (a[i] != "") want[a[i]] = 1 }
+    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; seen++ }
+      if (id != "" && (i = index($0, "\"chains\":[")) > 0) {
+        s = substr($0, i + 10); j = index(s, "]"); if (j) s = substr(s, 1, j - 1)
+        hit = 0; m = split(s, c, "\",\"")
+        for (k = 1; k <= m; k++) { x = c[k]; gsub(/^"|"$/, "", x); if (u(x) in want) hit = 1 }
+        if (hit && closing < max) { print id > ids; closing++ }
+        id = "" } }
+    END { print seen + 0 }')
+  rm -f "$WD_TMP.cn"
+  while IFS= read -r WCT_ID; do
+    case "$WCT_ID" in ''|*[!0-9A-Za-z-]*) continue;; esac
+    wd_http DELETE "/connections/$WCT_ID" "$WD_TMP.act" </dev/null; rm -f "$WD_TMP.act"
+    WD_CLOSED=$((WD_CLOSED+1))
+  done < "$WD_TMP.ids"
+  rm -f "$WD_TMP.ids"
+  return 0
+}
+# A proxy-side outage while the core and DIRECT work ($1 = failing groups/nodes, tab separated; $2 = what
+# was seen): let url-test/fallback/load-balance groups re-measure (and switch) first, then close only the
+# connections that went through the failing names, and tell the user once per outage. The core is never
+# reloaded or restarted for this: a new core reaches the same node, and a restart drops every connection.
+wd_node_heal(){
+  WNH_NAMES="$1"
+  [ -s "$WD_TMP.groups" ] || wd_groups || true
   WPH_N=0
   if [ -s "$WD_TMP.groups" ]; then
     wd_budget_start
@@ -3226,20 +3244,27 @@ wd_proxy_heal(){
       rm -f "$WD_TMP.act"; WPH_N=$((WPH_N+1))
     done < "$WD_TMP.groups"
   fi
-  wd_log "self-heal: proxy node not responding (${WD_DP_BAD:-$WD_DP_DETAIL}); closed core connections, re-tested $WPH_N auto-select group(s)"
-  if [ "$WD_DP_NOTIFIED" = 0 ]; then
-    WD_DP_NOTIFIED=1
-    wd_notify "proxy-down ${WD_DP_BAD:-unknown}" "代理节点无响应${WD_DP_BAD:+：$WD_DP_BAD}。已断开旧连接并让自动选择的节点组重新测速切换；手动选择的节点请在河图中更换。"
+  # Nothing named (every group answered the controller): the rules' final group is what the probe used.
+  if [ -z "$WNH_NAMES" ] && wd_egress_target; then WNH_NAMES="$WD_EG_TARGET$WD_TAB"; fi
+  if wd_close_through "$WNH_NAMES"; then WNH_CLOSED="closed $WD_CLOSED of $WD_CLOSE_SEEN core connection(s) through $(printf '%s' "$WNH_NAMES" | tr '\t' ' ' | sed 's/ $//')"
+  elif [ -n "$WNH_NAMES" ]; then WNH_CLOSED="closed no connection (connection list unreadable)"
+  else WNH_CLOSED="closed no connection (no failing group named)"; fi
+  wd_log "self-heal: proxy node not responding ($2); re-tested $WPH_N auto-select group(s), $WNH_CLOSED"
+  if [ "$WD_NODE_NOTIFIED" = 0 ]; then
+    WD_NODE_NOTIFIED=1
+    wd_notify "proxy-down ${2:-unknown}" "代理节点无响应${2:+：$2}。已让自动选择的节点组重新测速切换，并只断开了经过该节点的连接，直连与其他节点的连接不受影响；手动选择的节点请在河图中更换。"
   fi
 }
+# Dead node seen by the data-plane probe.
+wd_proxy_heal(){ wd_node_heal "$WD_DP_BAD_NAMES" "${WD_DP_BAD:-$WD_DP_DETAIL}"; }
 # Broken data plane (core alive, its outbounds fine, captured requests go nowhere): re-check the capture
 # rules first, then the existing restart path with its budget.
 wd_dataplane_heal(){
   WD_DP_LEVEL=$((WD_DP_LEVEL+1))
   if [ "$WD_DP_LEVEL" = 1 ]; then
+    # No node is at fault here; working connections are left alone while the rules are re-checked.
     wd_repair_rules
-    WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
-    wd_log "self-heal: data plane down ($WD_DP_DETAIL); re-checked the capture rules and closed core connections"
+    wd_log "self-heal: data plane down ($WD_DP_DETAIL); re-checked the capture rules"
     return 0
   fi
   if wd_restart_allowed; then
@@ -3259,7 +3284,7 @@ wd_dataplane_tick(){
     skip) return 0;;
     ok)
       if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
-      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
+      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
       wd_egress_state ok; return 0;;
     offline)
       [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"

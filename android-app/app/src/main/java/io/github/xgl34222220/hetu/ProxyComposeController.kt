@@ -184,7 +184,7 @@ internal class ProxyComposeController(context: Context) {
             return@withContext emptyList()
         val profile = ProxyRuntimeProfile.load(prefs)
         val iconMap = try {
-            configs.selected(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
+            configs.source(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
         } catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) { emptyMap() }
         val snapshot = controllerSnapshotOperation {
@@ -197,7 +197,8 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val selected = configs.selected(profile.core)
+        // An unedited built-in template follows Mihomo's built-in, whose groups carry the icons.
+        val selected = configs.source(profile.core)
         val iconMap = try {
             if (selected == null) emptyMap() else groupIconsFor(selected)
         } catch (cancel: CancellationException) { throw cancel }
@@ -505,8 +506,10 @@ internal class ProxyComposeController(context: Context) {
             prefs.edit().putString("proxyBaseCore", "mihomo").apply()
             profile = ProxyRuntimeProfile.load(prefs)
         }
-        val selected = configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
-        if (!configs.hasConfiguredSubscription(selected)) throw ProxyStartProblem.PlaceholderConfig()
+        configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
+        // The subscription is checked where the start reads it: an unedited built-in template follows Mihomo's built-in.
+        val source = configs.source(profile.core) ?: throw ProxyStartProblem.NoConfig()
+        if (!configs.hasConfiguredSubscription(source)) throw ProxyStartProblem.PlaceholderConfig()
         // The pre-start hook runs inside the single Root start invocation (no extra su when
         // no hook exists); a failing hook still refuses the start before the network changes.
         // Audit G1: a completed start also keeps its effective source as 「上次可启动」 (never fails the start).
@@ -604,7 +607,7 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: return@withContext 0
+        val entry = configs.source(profile.core) ?: return@withContext 0
         val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
         var downloaded = 0
         for (chunk in urls.chunked(6)) {
@@ -684,8 +687,10 @@ internal class ProxyComposeController(context: Context) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core)
         val name = entry?.name ?: "尚未选择配置"
-        val items = if (entry == null) emptyList() else
-            configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+        // A built-in template that follows Mihomo's built-in lists (and edits) that file's subscriptions.
+        val source = configs.source(profile.core)
+        val items = if (source == null) emptyList() else
+            configs.subscriptions(source).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
         name to items
     }
 
@@ -696,25 +701,25 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: return@withContext emptyList()
+        val entry = configs.source(profile.core) ?: return@withContext emptyList()
         configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
     }
 
     suspend fun updateSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        val entry = configs.source(profile.core) ?: error("尚未选择配置")
         configs.updateSubscription(entry, name, url)
     }
 
     suspend fun addSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        val entry = configs.source(profile.core) ?: error("尚未选择配置")
         configs.addSubscription(entry, name, url)
     }
 
     suspend fun deleteSubscription(name: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        val entry = configs.source(profile.core) ?: error("尚未选择配置")
         configs.deleteSubscription(entry, name)
     }
 

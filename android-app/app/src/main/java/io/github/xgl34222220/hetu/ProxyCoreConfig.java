@@ -1,11 +1,15 @@
 package io.github.xgl34222220.hetu;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.StringReader;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -46,6 +50,16 @@ final class ProxyCoreConfig {
     static final String SING_GEOSITE = "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-%s.srs";
     static final String SING_GEOIP = "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-%s.srs";
     static final int MAX_PROVIDER_BYTES = 8 * 1024 * 1024;
+    /**
+     * MetaCubeX meta-rules-dat publishes every geosite / geoip category three ways: Mihomo mrs (meta branch),
+     * sing-box srs (sing branch) and text (.list next to the mrs). Any mirror of the repository keeps the layout
+     * (jsDelivr {@code …/meta-rules-dat@meta/…}, raw.githubusercontent.com {@code …/meta-rules-dat/meta/…}).
+     */
+    static final Pattern META_RULES_DAT = Pattern.compile("^(https?://.+/MetaCubeX/meta-rules-dat)([@/])meta/geo/(geosite|geoip)/([^/?#]+)\\.mrs$");
+    /** 217heidai/adblockfilters ships its list as sing-box srs next to the mrs; its text form is too large to inline. */
+    static final Pattern ADBLOCKFILTERS_MRS = Pattern.compile("/217heidai/adblockfilters[@/][^/]+/rules/adblockmihomo\\.mrs$");
+    /** A text rule-set larger than this is not written into a converted config (it is skipped with a warning). */
+    static final int MAX_INLINE_RULES = 50_000;
     /** Same names as the Mihomo adblock providers (ProxyAdblockRules.PROVIDER_NAME / ALLOW_PROVIDER_NAME). */
     static final String ADBLOCK_TAG = "hetu-adblock", ADBLOCK_ALLOW_TAG = "hetu-adblock-allow";
 
@@ -105,6 +119,8 @@ final class ProxyCoreConfig {
         boolean ipv6 = true, tcp = true, udp = true;
         /** Xray/V2Fly geoip.dat + geosite.dat were extracted next to the binary. */
         boolean geoAssets = true;
+        /** Category names (lower case) in that geosite.dat / geoip.dat; null when they could not be read (taken as present). */
+        Set<String> geositeNames, geoipNames;
         boolean cnIpDirect;
         List<String> adblock = Collections.emptyList(), adblockAllow = Collections.emptyList();
         /**
@@ -164,7 +180,7 @@ final class ProxyCoreConfig {
     static String singBoxYamlToJson(String text) throws IOException {
         Object root;
         try {
-            root = ConfigReferenceCleaner.loader().load(text);
+            root = ConfigReferenceCleaner.loader().load(RuntimeYaml15.reader(text));
         } catch (YAMLException invalid) {
             throw new IOException("sing-box YAML 无法解析：" + invalid.getMessage());
         }
@@ -340,6 +356,16 @@ final class ProxyCoreConfig {
 
     static final class RuleProvider {
         final String name, behavior; final List<String> payload;
+        /**
+         * An mrs provider (Mihomo's binary format, readable by no other core) keeps its payload empty and names the
+         * same list in each core's own form instead: a geosite / geoip category ({@code geoKind} + {@code geoName}),
+         * a sing-box rule-set ({@code singUrl}) and a text twin ({@code textUrl}, read on first use). Any may be null.
+         */
+        String geoKind, geoName, singUrl, textUrl;
+        /** The mrs payload is not read yet ({@link Profile#payload}). */
+        boolean pending;
+        /** The provider downloads with {@code proxy: DIRECT}, as the converted rule-set download does then. */
+        boolean direct;
         RuleProvider(String name, String behavior, List<String> payload) { this.name = name; this.behavior = behavior; this.payload = payload; }
     }
 
@@ -351,7 +377,13 @@ final class ProxyCoreConfig {
         String matchTarget = TAG_DIRECT;
         boolean fakeIp; String fakeIpRange = DEFAULT_FAKE_IP_V4;
         final List<String> fakeIpFilter = new ArrayList<>();
+        /** fake-ip-filter {@code rule-set:} entries, and the nameserver-policy rule-sets answered by a DIRECT server. */
+        final List<String> fakeIpFilterSets = new ArrayList<>(), directDnsSets = new ArrayList<>();
         final List<String> directDns = new ArrayList<>(), remoteDns = new ArrayList<>();
+        /** Mihomo's named exits ({@code type: direct} / {@code reject} proxies) → DIRECT / REJECT / REJECT-DROP. */
+        final Map<String, String> exitAliases = new HashMap<>();
+        /** Reads mrs text twins on demand; null in a profile built for a nested rule-provider line. */
+        Fetcher fetcher;
         int skippedNodes;
 
         static Map<String, Object> loadYaml(String text) throws IOException {
@@ -360,7 +392,7 @@ final class ProxyCoreConfig {
             options.setMaxAliasesForCollections(4096);
             options.setNestingDepthLimit(60);
             try {
-                Object root = new Yaml(new SafeConstructor(options)).load(new StringReader(text));
+                Object root = new Yaml(new SafeConstructor(options)).load(RuntimeYaml15.reader(text));
                 Map<String, Object> m = asMap(root);
                 if (m == null) throw new IOException("YAML 根节点应为键值映射");
                 return m;
@@ -372,6 +404,7 @@ final class ProxyCoreConfig {
         static Profile parse(String text, Fetcher fetcher, List<String> warnings) throws IOException {
             Map<String, Object> root = loadYaml(text);
             Profile p = new Profile();
+            p.fetcher = fetcher;
             for (Object o : asList(root.get("proxies"))) p.addNode(asMap(o), warnings, "");
             LinkedHashMap<String, List<String>> providerNodes = new LinkedHashMap<>();
             Map<String, Object> providers = asMap(root.get("proxy-providers"));
@@ -396,13 +429,40 @@ final class ProxyCoreConfig {
             if (dns != null && bool(dns, "enable", true)) {
                 p.fakeIp = "fake-ip".equalsIgnoreCase(str(dns, "enhanced-mode"));
                 if (!str(dns, "fake-ip-range").isEmpty()) p.fakeIpRange = str(dns, "fake-ip-range");
-                for (String f : strings(dns.get("fake-ip-filter"))) if (!f.contains(":")) p.fakeIpFilter.add(f);
+                for (String f : strings(dns.get("fake-ip-filter"))) {
+                    if (f.startsWith("rule-set:")) addSetNames(p.fakeIpFilterSets, f);
+                    else if (!f.contains(":")) p.fakeIpFilter.add(f);
+                }
+                Map<String, Object> policy = asMap(dns.get("nameserver-policy"));
+                if (policy != null) for (Map.Entry<String, Object> e : policy.entrySet()) {
+                    if (!e.getKey().startsWith("rule-set:")) continue;
+                    List<String> servers = strings(e.getValue());
+                    boolean direct = !servers.isEmpty();
+                    for (String server : servers) if (!p.directDnsServer(server)) direct = false;
+                    if (direct) addSetNames(p.directDnsSets, e.getKey());
+                }
                 for (String s : strings(dns.get("default-nameserver"))) addDns(p.directDns, s);
                 for (String s : strings(dns.get("nameserver"))) addDns(p.remoteDns, s);
                 if (p.directDns.isEmpty()) for (String s : strings(dns.get("proxy-server-nameserver"))) addDns(p.directDns, s);
             }
             if (p.nodes.isEmpty()) warnings.add("没有可转换的节点");
             return p;
+        }
+
+        /** "rule-set:A,B" → A, B. */
+        private static void addSetNames(List<String> out, String entry) {
+            for (String name : entry.substring("rule-set:".length()).split(",")) {
+                String n = name.trim();
+                if (!n.isEmpty() && !out.contains(n)) out.add(n);
+            }
+        }
+
+        /** A Mihomo nameserver whose "#proxy" names DIRECT or a named direct exit ("#DIRECT&disable-ipv6=true"). */
+        boolean directDnsServer(String server) {
+            int hash = server.indexOf('#');
+            if (hash < 0) return false;
+            String via = server.substring(hash + 1).split("&", 2)[0].trim();
+            return directTarget(via) || TAG_DIRECT.equals(exitAliases.get(via));
         }
 
         private static void addDns(List<String> out, String raw) {
@@ -417,6 +477,9 @@ final class ProxyCoreConfig {
             if (m == null) return;
             String name = str(m, "name"), type = str(m, "type").toLowerCase(Locale.ROOT);
             if (name.isEmpty() || type.isEmpty()) return;
+            // A named exit is DIRECT / REJECT under another name, not a server.
+            if (type.equals("direct")) { exitAliases.put(name, TAG_DIRECT); return; }
+            if (type.equals("reject") || type.equals("reject-drop")) { exitAliases.put(name, type.equals("reject") ? TAG_BLOCK : "REJECT-DROP"); return; }
             String unique = name;
             for (int i = 2; nodes.containsKey(unique) || TAG_DIRECT.equals(unique) || TAG_BLOCK.equals(unique); i++) unique = name + " #" + i;
             nodes.put(unique, new Node(unique, type, m));
@@ -471,7 +534,7 @@ final class ProxyCoreConfig {
             String name = str(g, "name"), type = str(g, "type").toLowerCase(Locale.ROOT);
             List<String> members = new ArrayList<>();
             Pattern include = regex(str(g, "filter"), warnings), exclude = regex(str(g, "exclude-filter"), warnings);
-            for (String m : strings(g.get("proxies"))) members.add(m);
+            for (String m : strings(g.get("proxies"))) { String x = exitAliases.getOrDefault(m, m); if (!members.contains(x)) members.add(x); }
             List<String> candidates = new ArrayList<>();
             boolean all = bool(g, "include-all", false);
             if (all || bool(g, "include-all-proxies", false)) {
@@ -506,7 +569,7 @@ final class ProxyCoreConfig {
             if (m == null) return;
             String type = str(m, "type").toLowerCase(Locale.ROOT), behavior = str(m, "behavior").toLowerCase(Locale.ROOT);
             String format = str(m, "format").toLowerCase(Locale.ROOT);
-            if (format.equals("mrs")) { warnings.add("规则集 " + name + " 为 mrs 二进制格式，无法转换，相关规则已跳过"); return; }
+            if (format.equals("mrs")) { ruleProviders.put(name, mrsProvider(name, behavior, "http".equals(type) ? str(m, "url") : "", str(m, "proxy"))); return; }
             List<String> payload = new ArrayList<>();
             try {
                 String body;
@@ -515,13 +578,61 @@ final class ProxyCoreConfig {
                     body = fetcher == null ? null : fetcher.fetch(str(m, "url"));
                     if (body == null) { warnings.add("规则集 " + name + " 无法下载，相关规则已跳过"); return; }
                 } else { warnings.add("规则集 " + name + " 为本地文件类型，相关规则已跳过"); return; }
-                if (body != null) {
-                    boolean yaml = format.equals("yaml") || (format.isEmpty() && body.contains("payload:"));
-                    if (yaml) payload.addAll(strings(loadYaml(body).get("payload")));
-                    else for (String line : body.split("\n")) { String t = line.trim(); if (!t.isEmpty() && !t.startsWith("#") && !t.startsWith("//")) payload.add(t); }
-                }
+                if (body != null) payload.addAll(textPayload(body, format));
             } catch (IOException error) { warnings.add("规则集 " + name + " 解析失败，相关规则已跳过"); return; }
             ruleProviders.put(name, new RuleProvider(name, behavior.isEmpty() ? "domain" : behavior, payload));
+        }
+
+        static List<String> textPayload(String body, String format) throws IOException {
+            List<String> payload = new ArrayList<>();
+            boolean yaml = format.equals("yaml") || (format.isEmpty() && body.contains("payload:"));
+            if (yaml) payload.addAll(strings(loadYaml(body).get("payload")));
+            else for (String line : body.split("\n")) { String t = line.trim(); if (!t.isEmpty() && !t.startsWith("#") && !t.startsWith("//")) payload.add(t); }
+            return payload;
+        }
+
+        /**
+         * mrs is Mihomo's own binary format. A MetaCubeX meta-rules-dat category maps to the same category in each
+         * core's data (sing-box srs, Xray / V2Fly geosite.dat / geoip.dat, its .list as the fallback); other sources
+         * fall back to a published text twin (the same path with .yaml) when a core needs the entries.
+         */
+        static RuleProvider mrsProvider(String name, String behavior, String url, String proxy) {
+            RuleProvider rp = new RuleProvider(name, behavior.isEmpty() ? "domain" : behavior, new ArrayList<>());
+            rp.pending = true;
+            rp.direct = directTarget(proxy);
+            Matcher meta = META_RULES_DAT.matcher(url);
+            if (meta.matches()) {
+                String base = meta.group(1) + meta.group(2), kind = meta.group(3), file = meta.group(4);
+                rp.geoKind = kind;
+                rp.geoName = ShareLink.decode(file).toLowerCase(Locale.ROOT);
+                rp.singUrl = base + "sing/geo/" + kind + "/" + file + ".srs";
+                rp.textUrl = base + "meta/geo/" + kind + "/" + file + ".list";
+            } else if (ADBLOCKFILTERS_MRS.matcher(url).find()) {
+                rp.singUrl = url.substring(0, url.length() - "adblockmihomo.mrs".length()) + "adblocksingbox.srs";
+            } else if (url.endsWith(".mrs")) {
+                rp.textUrl = url.substring(0, url.length() - ".mrs".length()) + ".yaml";
+            }
+            return rp;
+        }
+
+        /** The provider's entries. An mrs provider reads its text twin on first use; empty when none can be read. */
+        List<String> payload(RuleProvider rp, List<String> warnings) {
+            if (!rp.pending) return rp.payload;
+            rp.pending = false;
+            if (rp.textUrl == null) { warnings.add("规则集 " + rp.name + " 为 mrs 二进制格式，且没有当前核心可读取的版本，相关规则已跳过"); return rp.payload; }
+            try {
+                String body = fetcher == null ? null : fetcher.fetch(rp.textUrl);
+                if (body == null) { warnings.add("规则集 " + rp.name + " 为 mrs 二进制格式，其文本版本无法下载，相关规则已跳过"); return rp.payload; }
+                List<String> entries = textPayload(body, rp.textUrl.endsWith(".yaml") ? "yaml" : "text");
+                if (entries.size() > MAX_INLINE_RULES) {
+                    warnings.add("规则集 " + rp.name + " 有 " + entries.size() + " 条，超过可写入配置的 " + MAX_INLINE_RULES + " 条，相关规则已跳过");
+                    return rp.payload;
+                }
+                rp.payload.addAll(entries);
+            } catch (IOException error) {
+                warnings.add("规则集 " + rp.name + " 的文本版本解析失败，相关规则已跳过");
+            }
+            return rp.payload;
         }
 
         void addRule(String line, List<String> warnings) {
@@ -529,6 +640,8 @@ final class ProxyCoreConfig {
                 RuleParser parser = new RuleParser(line);
                 Rule r = parser.parse();
                 if (r == null) return;
+                String exit = exitAliases.get(r.target);
+                if (exit != null) r = new Rule(r.cond, exit, r.text);
                 if ("MATCH".equals(r.cond.type) || "FINAL".equals(r.cond.type)) { matchTarget = r.target; return; }
                 rules.add(r);
             } catch (IOException invalid) {
@@ -836,15 +949,25 @@ final class ProxyCoreConfig {
                 for (Group g : p.groups.values()) {
                     if (emitted.contains(g.name) || aliases.containsKey(g.name)) continue;
                     List<String> members = new ArrayList<>();
-                    boolean pending = false;
+                    boolean pending = false, rejected = false;
+                    String first = null;
                     for (String m : g.members) {
                         String r = resolveMember(m, tags, emitted, aliases, p);
                         if (r == null) { if (p.groups.containsKey(m) && !emitted.contains(m) && !aliases.containsKey(m)) pending = true; continue; }
-                        if (r.equals(TAG_BLOCK)) { warnings.add("策略组 " + g.name + " 中的 REJECT 成员已移除"); continue; }
+                        if (first == null) first = r;
+                        if (r.equals(TAG_BLOCK)) { rejected = true; continue; }
                         if (!members.contains(r)) members.add(r);
                     }
                     if (pending) continue;
                     changed = true;
+                    // A selector that rejects by default (an ad-block group) keeps doing so: sing-box has no reject
+                    // outbound to select, so rules naming it become reject rules.
+                    if (TAG_BLOCK.equals(first) && !g.type.equals("url-test") && !g.type.equals("fallback") && !g.type.equals("load-balance")) {
+                        aliases.put(g.name, TAG_BLOCK);
+                        warnings.add("策略组 " + g.name + " 默认拒绝连接：sing-box 按拒绝规则运行，面板中不可切换");
+                        continue;
+                    }
+                    if (rejected) warnings.add("策略组 " + g.name + " 中的 REJECT 成员已移除");
                     if (members.isEmpty()) { aliases.put(g.name, TAG_DIRECT); warnings.add("策略组 " + g.name + " 没有可用成员，改为直连"); continue; }
                     if (members.contains(TAG_DIRECT)) tags.add(TAG_DIRECT);
                     LinkedHashMap<String, Object> ob = new LinkedHashMap<>();
@@ -894,6 +1017,9 @@ final class ProxyCoreConfig {
                 addRemoteSet(ruleSets, ruleSetTags, "geoip-cn", String.format(Locale.ROOT, SING_GEOIP, "cn"), fin);
                 rules.add(map("rule_set", Collections.singletonList("geoip-cn"), "action", "route", "outbound", TAG_DIRECT));
             }
+            // fake-ip-filter / nameserver-policy rule-sets: real answers, from the direct DNS where the policy says DIRECT.
+            List<String> directSets = dnsRuleSets(p, p.fakeIp ? intersect(p.fakeIpFilterSets, p.directDnsSets) : p.directDnsSets, ruleSets, ruleSetTags, fin);
+            List<String> realSets = p.fakeIp ? dnsRuleSets(p, minus(p.fakeIpFilterSets, p.directDnsSets), ruleSets, ruleSetTags, fin) : Collections.<String>emptyList();
             LinkedHashMap<String, Object> route = new LinkedHashMap<>();
             route.put("rules", rules);
             if (!ruleSets.isEmpty()) route.put("rule_set", ruleSets);
@@ -901,7 +1027,7 @@ final class ProxyCoreConfig {
             route.put("auto_detect_interface", true);
             route.put("default_domain_resolver", "dns-direct");
 
-            root.put("dns", dns(p, o, fin));
+            root.put("dns", dns(p, o, fin, directSets, realSets));
             root.put("inbounds", inbounds(o));
             root.put("outbounds", outbounds);
             root.put("route", route);
@@ -997,8 +1123,13 @@ final class ProxyCoreConfig {
                     RuleProvider rp = p.ruleProviders.get(v);
                     if (rp == null) { warnings.add("规则集 " + v + " 不可用，已跳过：" + text); return null; }
                     String tag = "rp-" + v;
+                    if (rp.singUrl != null) {
+                        // The same list as a sing-box rule-set, downloaded the way the provider was (proxy: DIRECT).
+                        addRemoteSet(ruleSets, ruleSetTags, tag, rp.singUrl, rp.direct ? TAG_DIRECT : detour);
+                        return map("rule_set", Collections.singletonList(tag));
+                    }
                     if (ruleSetTags.add(tag)) {
-                        List<Object> inline = providerRules(rp, warnings);
+                        List<Object> inline = providerRules(rp, p.payload(rp, warnings), warnings);
                         if (inline.isEmpty()) { warnings.add("规则集 " + v + " 为空，已跳过"); ruleSetTags.remove(tag); return null; }
                         ruleSets.add(map("type", "inline", "tag", tag, "rules", inline));
                     }
@@ -1023,11 +1154,11 @@ final class ProxyCoreConfig {
             return m;
         }
 
-        static List<Object> providerRules(RuleProvider rp, List<String> warnings) {
+        static List<Object> providerRules(RuleProvider rp, List<String> payload, List<String> warnings) {
             List<Object> out = new ArrayList<>();
             if (rp.behavior.equals("domain")) {
                 List<String> full = new ArrayList<>(), suffix = new ArrayList<>(), regex = new ArrayList<>();
-                for (String d : rp.payload) {
+                for (String d : payload) {
                     String[] e = domainEntry(d);
                     if (e[0].equals("suffix")) suffix.add(e[1]); else if (e[0].equals("regex")) regex.add(e[1]); else full.add(e[1]);
                 }
@@ -1037,9 +1168,9 @@ final class ProxyCoreConfig {
                 if (!regex.isEmpty()) m.put("domain_regex", regex);
                 if (!m.isEmpty()) out.add(m);
             } else if (rp.behavior.equals("ipcidr")) {
-                out.add(map("ip_cidr", rp.payload));
+                if (!payload.isEmpty()) out.add(map("ip_cidr", payload));
             } else {
-                for (String line : rp.payload) {
+                for (String line : payload) {
                     Cond c = classical(line);
                     if (c == null) continue;
                     Map<String, Object> m = condition(c, new Profile(), new ArrayList<>(), new HashSet<>(), warnings, line, TAG_DIRECT);
@@ -1075,7 +1206,24 @@ final class ProxyCoreConfig {
             return m;
         }
 
-        static Map<String, Object> dns(Profile p, Options o, String fin) {
+        /** Rule-set tags of the named domain providers, defining each rule-set the route does not use yet. */
+        static List<String> dnsRuleSets(Profile p, List<String> names, List<Object> ruleSets, Set<String> ruleSetTags, String fin) {
+            List<String> out = new ArrayList<>();
+            for (String name : names) {
+                RuleProvider rp = p.ruleProviders.get(name);
+                if (rp == null || !rp.behavior.equals("domain")) continue;
+                Map<String, Object> cond = condition(new Cond("RULE-SET", name, null, false), p, ruleSets, ruleSetTags, new ArrayList<>(), name, fin);
+                if (cond != null) for (String tag : strings(cond.get("rule_set"))) if (!out.contains(tag)) out.add(tag);
+            }
+            return out;
+        }
+
+        static List<String> intersect(List<String> a, List<String> b) { List<String> out = new ArrayList<>(a); out.retainAll(b); return out; }
+        static List<String> minus(List<String> a, List<String> b) { List<String> out = new ArrayList<>(a); out.removeAll(b); return out; }
+
+        static Map<String, Object> dns(Profile p, Options o, String fin) { return dns(p, o, fin, Collections.emptyList(), Collections.emptyList()); }
+
+        static Map<String, Object> dns(Profile p, Options o, String fin, List<String> directSets, List<String> realSets) {
             List<Object> servers = new ArrayList<>();
             String direct = DEFAULT_DIRECT_DNS;
             for (String d : p.directDns) { String host = d.replaceFirst("^udp://", ""); if (isIp(host.replaceAll(":\\d+$", ""))) { direct = host; break; } }
@@ -1083,6 +1231,8 @@ final class ProxyCoreConfig {
             String remote = p.remoteDns.isEmpty() ? DEFAULT_REMOTE_DNS : p.remoteDns.get(0);
             servers.add(dnsServer(remote, "dns-remote", fin));
             List<Object> rules = new ArrayList<>();
+            if (!directSets.isEmpty()) rules.add(map("rule_set", directSets, "action", "route", "server", "dns-direct"));
+            if (!realSets.isEmpty()) rules.add(map("rule_set", realSets, "action", "route", "server", "dns-remote"));
             if (p.fakeIp) {
                 LinkedHashMap<String, Object> fake = map("type", "fakeip", "tag", "dns-fake", "inet4_range", cidrNetwork(p.fakeIpRange));
                 servers.add(fake);
@@ -1296,6 +1446,68 @@ final class ProxyCoreConfig {
         } catch (Exception invalid) { return "198.18.0.0/16"; }
     }
 
+    /** A geosite / geoip category ("microsoft@cn" names microsoft) the dat lists; unknown names (null) count as present. */
+    static boolean inDat(Set<String> names, String category) {
+        if (names == null) return true;
+        String c = category.toLowerCase(Locale.ROOT);
+        int at = c.indexOf('@');
+        return names.contains(at > 0 ? c.substring(0, at) : c);
+    }
+
+    /**
+     * Category names (lower case) of an Xray / V2Fly geosite.dat or geoip.dat, or null when the file is not one.
+     * Both are a protobuf list whose entries begin with their country_code string (field 1); only those names are
+     * read, the domain / CIDR bodies are skipped.
+     */
+    static Set<String> datNames(File file) {
+        if (file == null || !file.isFile() || file.length() == 0) return null;
+        Set<String> names = new HashSet<>();
+        long total = file.length(), at = 0;
+        try (InputStream in = new BufferedInputStream(new FileInputStream(file), 1 << 16)) {
+            while (true) {
+                int tag = in.read();
+                // A file skip can run past the end, so the whole length must add up.
+                if (tag < 0) return at == total ? names : null;
+                if (tag != 0x0a) return null;
+                long entry = varint(in);
+                if (in.read() != 0x0a) return null;
+                long length = varint(in);
+                long header = 1 + varintSize(length) + length;
+                if (length <= 0 || length > 256 || header > entry) return null;
+                at += 1 + varintSize(entry);
+                if (at + entry > total) return null;
+                byte[] name = new byte[(int) length];
+                for (int read = 0; read < name.length; ) {
+                    int n = in.read(name, read, name.length - read);
+                    if (n < 0) return null;
+                    read += n;
+                }
+                names.add(new String(name, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT));
+                for (long rest = entry - header; rest > 0; ) {
+                    long skipped = in.skip(rest);
+                    if (skipped <= 0) { if (in.read() < 0) return null; skipped = 1; }
+                    rest -= skipped;
+                }
+                at += entry;
+            }
+        } catch (IOException | RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    private static long varint(InputStream in) throws IOException {
+        long value = 0;
+        for (int shift = 0; shift < 64; shift += 7) {
+            int b = in.read();
+            if (b < 0) throw new IOException("truncated");
+            value |= (long) (b & 0x7f) << shift;
+            if (b < 0x80) return value;
+        }
+        throw new IOException("varint");
+    }
+
+    private static int varintSize(long v) { int n = 1; while ((v >>>= 7) != 0) n++; return n; }
+
     // ================================================================== Xray / V2Fly
 
     static final class XrayConv {
@@ -1490,23 +1702,32 @@ final class ProxyCoreConfig {
                 case "NETWORK": return map("network", v.toLowerCase(Locale.ROOT));
                 case "GEOSITE":
                     if (!o.geoAssets) { warnings.add("缺少 geosite.dat，已跳过：" + text); return null; }
+                    if (!inDat(o.geositeNames, v)) { warnings.add("geosite.dat 中没有 " + v + "，已跳过：" + text); return null; }
                     return map("domain", Collections.singletonList("geosite:" + v.toLowerCase(Locale.ROOT)));
                 case "GEOIP":
                     if (v.equalsIgnoreCase("LAN")) v = "private";
                     if (!o.geoAssets) { warnings.add("缺少 geoip.dat，已跳过：" + text); return null; }
+                    if (!inDat(o.geoipNames, v)) { warnings.add("geoip.dat 中没有 " + v + "，已跳过：" + text); return null; }
                     return map("ip", Collections.singletonList("geoip:" + v.toLowerCase(Locale.ROOT)));
                 case "RULE-SET": {
                     RuleProvider rp = p.ruleProviders.get(v);
                     if (rp == null) { warnings.add("规则集 " + v + " 不可用，已跳过：" + text); return null; }
+                    // An mrs category the core's own geosite.dat / geoip.dat has: the same list, nothing inlined.
+                    if (rp.geoKind != null && o.geoAssets) {
+                        boolean ip = rp.geoKind.equals("geoip");
+                        if (inDat(ip ? o.geoipNames : o.geositeNames, rp.geoName))
+                            return ip ? map("ip", Collections.singletonList("geoip:" + rp.geoName)) : map("domain", Collections.singletonList("geosite:" + rp.geoName));
+                    }
+                    List<String> payload = p.payload(rp, warnings);
                     if (rp.behavior.equals("domain")) {
                         List<String> d = new ArrayList<>();
-                        for (String entry : rp.payload) { String[] e = domainEntry(entry); d.add((e[0].equals("suffix") ? "domain:" : e[0].equals("regex") ? "regexp:" : "full:") + e[1]); }
+                        for (String entry : payload) { String[] e = domainEntry(entry); d.add((e[0].equals("suffix") ? "domain:" : e[0].equals("regex") ? "regexp:" : "full:") + e[1]); }
                         return d.isEmpty() ? null : map("domain", d);
                     }
-                    if (rp.behavior.equals("ipcidr")) return rp.payload.isEmpty() ? null : map("ip", rp.payload);
+                    if (rp.behavior.equals("ipcidr")) return payload.isEmpty() ? null : map("ip", payload);
                     // classical: only a pure domain / pure ip set fits one Xray rule.
                     List<String> domains = new ArrayList<>(), ips = new ArrayList<>();
-                    for (String line : rp.payload) {
+                    for (String line : payload) {
                         Cond cc = classical(line); if (cc == null) continue;
                         Map<String, Object> m = condition(cc, p, o, new ArrayList<>(), line, v2ray);
                         if (m == null) continue;

@@ -160,6 +160,10 @@ AUTHORIZED_FILES = frozenset((
     # stopped, shows a failed control's reason and follows the App language; the Quick Settings tile
     # follows the App language, toasts the failure reason and is re-read after an in-App start/stop.
     PACKAGE + 'ProxyStatusNotificationService.kt', PACKAGE + 'HetuProxyTileService.kt',
+    # 2026-10-18 built-in config fix (user: the non-Mihomo built-ins must work like Mihomo's): every runtime
+    # YAML parse reads through RuntimeYaml15.reader, which keeps SnakeYAML 2.3 off its chunk-edge surrogate
+    # read (IndexOutOfBoundsException for about one in thirty subscription URL lengths of the built-in).
+    PACKAGE + 'RuntimeYaml15.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

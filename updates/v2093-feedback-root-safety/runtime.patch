@@ -36148,7 +36148,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..358620c 100755
+index ae832da..4dca115 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -38260,7 +38260,7 @@ index ae832da..358620c 100755
  check_start_ports(){
    listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
    M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
-@@ -1019,20 +2701,662 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2701,687 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -38397,7 +38397,7 @@ index ae832da..358620c 100755
 +  # uid 0: the uid 0-9999 RETURN rules let it go direct unless owner_return added `! -d <fake range>`,
 +  # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
 +  # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
-+  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0
++  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BAD_NAMES=""
 +  WD_OFF_N=0; WD_OFF_NEXT=0
 +  WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
 +  WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
@@ -38552,7 +38552,7 @@ index ae832da..358620c 100755
 +  wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
 +  case "$WET_RC" in
 +    0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-+       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
++       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; return 0;;
 +    2) WD_EG_TARGET=""; return 0;;
 +  esac
 +  # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
@@ -38568,23 +38568,9 @@ index ae832da..358620c 100755
 +  if [ "$WD_NOW" -lt "$WD_EG_NEXT_ACTION" ]; then wd_log "proxy egress still down; next self-heal action in $((WD_EG_NEXT_ACTION-WD_NOW))s (backoff)"; return 0; fi
 +  WD_EG_LEVEL=$((WD_EG_LEVEL+1))
 +  WD_EG_NEXT_ACTION=$((WD_NOW+WD_EG_BACKOFF)); WD_EG_BACKOFF=$((WD_EG_BACKOFF*2)); [ "$WD_EG_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_EG_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
-+  WD_HTTP_TIMEOUT=4
-+  if [ "$WD_EG_LEVEL" = 1 ]; then
-+    wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
-+    wd_log "self-heal: proxy egress down; closed all core connections (HTTP $WD_CODE)"
-+  elif [ "$WD_EG_LEVEL" = 2 ] && [ "$WD_KIND" = mihomo ]; then
-+    wd_http POST /restart "$WD_TMP.act"; rm -f "$WD_TMP.act"
-+    wd_log "self-heal: proxy egress still down; core reloaded in place (POST /restart, HTTP $WD_CODE)"
-+    WD_EG_TARGET=""; WD_LIVE_AT=$((WD_NOW+WD_LIVE_GRACE))
-+  else
-+    WD_EG_LEVEL=3
-+    if wd_restart_allowed; then
-+      wd_log "self-heal: proxy egress still down; restarting the core"
-+      if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
-+    else
-+      wd_log "self-heal: proxy egress still down; restart limit reached, waiting (backoff ${WD_EG_BACKOFF}s)"
-+    fi
-+  fi
++  # Direct works and the controller answers: only the connections through the failing group are closed.
++  rm -f "$WD_TMP.groups"
++  wd_node_heal "$WD_EG_TARGET$WD_TAB" "$WD_EG_TARGET"
 +}
 +wd_selfheal_tick(){
 +  wd_now
@@ -38688,7 +38674,7 @@ index ae832da..358620c 100755
 +# Delay of each group's current choice through the core (no TPROXY involved). WD_DP_BAD lists the groups
 +# that fail ("group→node"), WD_DP_SCANNED how many were measured.
 +wd_scan_groups(){
-+  WD_DP_BAD=""; WD_DP_SCANNED=0; WSG_N=0
++  WD_DP_BAD=""; WD_DP_BAD_NAMES=""; WD_DP_SCANNED=0; WSG_N=0
 +  wd_groups || return 0
 +  wd_budget_start
 +  while IFS= read -r WSG_L; do
@@ -38698,7 +38684,7 @@ index ae832da..358620c 100755
 +    wd_delay "$WSG_G" "$WD_PROXY_URL" </dev/null; WSG_RC=$?
 +    [ "$WSG_RC" != 2 ] || continue
 +    WD_DP_SCANNED=$((WD_DP_SCANNED+1))
-+    if [ "$WSG_RC" = 1 ]; then WD_DP_BAD="${WD_DP_BAD:+$WD_DP_BAD, }$WSG_G${WSG_NOW:+→$WSG_NOW}"; WSG_N=$((WSG_N+1)); [ "$WSG_N" -lt 3 ] || break; fi
++    if [ "$WSG_RC" = 1 ]; then WD_DP_BAD="${WD_DP_BAD:+$WD_DP_BAD, }$WSG_G${WSG_NOW:+→$WSG_NOW}"; WD_DP_BAD_NAMES="$WD_DP_BAD_NAMES$WSG_G$WD_TAB${WSG_NOW:+$WSG_NOW$WD_TAB}"; WSG_N=$((WSG_N+1)); [ "$WSG_N" -lt 3 ] || break; fi
 +  done < "$WD_TMP.groups"
 +  return 0
 +}
@@ -38715,7 +38701,7 @@ index ae832da..358620c 100755
 +wd_uptime(){ read -r WD_UP WD_UP_REST < /proc/uptime 2>/dev/null || WD_UP=0; WD_UP=${WD_UP%%.*}; case "$WD_UP" in ''|*[!0-9]*) WD_UP=0;; esac; }
 +# One probe. WD_DP_CLASS: ok | proxy-down | dataplane-down | offline | skip (no verdict) | unavailable.
 +wd_dp_probe(){
-+  WD_DP_CLASS=skip; WD_DP_DETAIL=""; WD_DP_WHY=""; WD_DP_BAD=""; WD_DP_SCANNED=0
++  WD_DP_CLASS=skip; WD_DP_DETAIL=""; WD_DP_WHY=""; WD_DP_BAD=""; WD_DP_BAD_NAMES=""; WD_DP_SCANNED=0
 +  [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
 +  case " $WD_DNS_PROTOS " in *" tcp "*) ;; *) WD_DP_CLASS=unavailable; WD_DP_WHY=dns-without-tcp; return 0;; esac
 +  has nc || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-nc; return 0; }
@@ -38773,11 +38759,43 @@ index ae832da..358620c 100755
 +}
 +wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 +wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
-+# Dead node: close the core's connections, let url-test/fallback/load-balance groups re-measure (and
-+# switch), tell the user once per outage. The core is not restarted for this: a new core reaches the
-+# same node.
-+wd_proxy_heal(){
-+  WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
++# Close only the core connections whose chain passes through one of the proxies/groups named in $1
++# (tab separated): a game or a domestic app on DIRECT, and other groups' connections, stay up. The
++# connection list is read once (GET /connections, Clash API: Mihomo and sing-box) and each match is
++# closed by id; when the list cannot be read nothing is closed. WD_CLOSED / WD_CLOSE_SEEN report it.
++WD_CLOSE_MAX=512
++wd_close_through(){
++  WD_CLOSED=0; WD_CLOSE_SEEN=-1
++  [ -n "$1" ] || return 1
++  WD_HTTP_TIMEOUT=4; wd_http GET /connections "$WD_TMP.cn" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.cn"; return 1; }
++  # Objects split at "{": a connection's id and its chains sit on the same or the next line.
++  WD_CLOSE_SEEN=$(tr '{' '\n' < "$WD_TMP.cn" | awk -v names="$1" -v max="$WD_CLOSE_MAX" -v ids="$WD_TMP.ids" '
++    function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); gsub(/\\"/, "\"", x); return x }
++    BEGIN { printf "" > ids; n = split(names, a, "\t"); for (i = 1; i <= n; i++) if (a[i] != "") want[a[i]] = 1 }
++    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; seen++ }
++      if (id != "" && (i = index($0, "\"chains\":[")) > 0) {
++        s = substr($0, i + 10); j = index(s, "]"); if (j) s = substr(s, 1, j - 1)
++        hit = 0; m = split(s, c, "\",\"")
++        for (k = 1; k <= m; k++) { x = c[k]; gsub(/^"|"$/, "", x); if (u(x) in want) hit = 1 }
++        if (hit && closing < max) { print id > ids; closing++ }
++        id = "" } }
++    END { print seen + 0 }')
++  rm -f "$WD_TMP.cn"
++  while IFS= read -r WCT_ID; do
++    case "$WCT_ID" in ''|*[!0-9A-Za-z-]*) continue;; esac
++    wd_http DELETE "/connections/$WCT_ID" "$WD_TMP.act" </dev/null; rm -f "$WD_TMP.act"
++    WD_CLOSED=$((WD_CLOSED+1))
++  done < "$WD_TMP.ids"
++  rm -f "$WD_TMP.ids"
++  return 0
++}
++# A proxy-side outage while the core and DIRECT work ($1 = failing groups/nodes, tab separated; $2 = what
++# was seen): let url-test/fallback/load-balance groups re-measure (and switch) first, then close only the
++# connections that went through the failing names, and tell the user once per outage. The core is never
++# reloaded or restarted for this: a new core reaches the same node, and a restart drops every connection.
++wd_node_heal(){
++  WNH_NAMES="$1"
++  [ -s "$WD_TMP.groups" ] || wd_groups || true
 +  WPH_N=0
 +  if [ -s "$WD_TMP.groups" ]; then
 +    wd_budget_start
@@ -38789,20 +38807,27 @@ index ae832da..358620c 100755
 +      rm -f "$WD_TMP.act"; WPH_N=$((WPH_N+1))
 +    done < "$WD_TMP.groups"
 +  fi
-+  wd_log "self-heal: proxy node not responding (${WD_DP_BAD:-$WD_DP_DETAIL}); closed core connections, re-tested $WPH_N auto-select group(s)"
-+  if [ "$WD_DP_NOTIFIED" = 0 ]; then
-+    WD_DP_NOTIFIED=1
-+    wd_notify "proxy-down ${WD_DP_BAD:-unknown}" "代理节点无响应${WD_DP_BAD:+：$WD_DP_BAD}。已断开旧连接并让自动选择的节点组重新测速切换；手动选择的节点请在河图中更换。"
++  # Nothing named (every group answered the controller): the rules' final group is what the probe used.
++  if [ -z "$WNH_NAMES" ] && wd_egress_target; then WNH_NAMES="$WD_EG_TARGET$WD_TAB"; fi
++  if wd_close_through "$WNH_NAMES"; then WNH_CLOSED="closed $WD_CLOSED of $WD_CLOSE_SEEN core connection(s) through $(printf '%s' "$WNH_NAMES" | tr '\t' ' ' | sed 's/ $//')"
++  elif [ -n "$WNH_NAMES" ]; then WNH_CLOSED="closed no connection (connection list unreadable)"
++  else WNH_CLOSED="closed no connection (no failing group named)"; fi
++  wd_log "self-heal: proxy node not responding ($2); re-tested $WPH_N auto-select group(s), $WNH_CLOSED"
++  if [ "$WD_NODE_NOTIFIED" = 0 ]; then
++    WD_NODE_NOTIFIED=1
++    wd_notify "proxy-down ${2:-unknown}" "代理节点无响应${2:+：$2}。已让自动选择的节点组重新测速切换，并只断开了经过该节点的连接，直连与其他节点的连接不受影响；手动选择的节点请在河图中更换。"
 +  fi
 +}
++# Dead node seen by the data-plane probe.
++wd_proxy_heal(){ wd_node_heal "$WD_DP_BAD_NAMES" "${WD_DP_BAD:-$WD_DP_DETAIL}"; }
 +# Broken data plane (core alive, its outbounds fine, captured requests go nowhere): re-check the capture
 +# rules first, then the existing restart path with its budget.
 +wd_dataplane_heal(){
 +  WD_DP_LEVEL=$((WD_DP_LEVEL+1))
 +  if [ "$WD_DP_LEVEL" = 1 ]; then
++    # No node is at fault here; working connections are left alone while the rules are re-checked.
 +    wd_repair_rules
-+    WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
-+    wd_log "self-heal: data plane down ($WD_DP_DETAIL); re-checked the capture rules and closed core connections"
++    wd_log "self-heal: data plane down ($WD_DP_DETAIL); re-checked the capture rules"
 +    return 0
 +  fi
 +  if wd_restart_allowed; then
@@ -38822,7 +38847,7 @@ index ae832da..358620c 100755
 +    skip) return 0;;
 +    ok)
 +      if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
-+      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
++      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
 +      wd_egress_state ok; return 0;;
 +    offline)
 +      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
@@ -38931,7 +38956,7 @@ index ae832da..358620c 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +3369,45 @@ probe_core_owner(){
+@@ -1045,9 +3394,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -38978,7 +39003,7 @@ index ae832da..358620c 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +3418,29 @@ core_identity_prepare(){
+@@ -1058,14 +3443,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -39012,7 +39037,7 @@ index ae832da..358620c 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +3454,9 @@ core_launch(){
+@@ -1079,8 +3479,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -39024,7 +39049,7 @@ index ae832da..358620c 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +3523,21 @@ core_tune(){
+@@ -1147,6 +3548,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -39046,7 +39071,7 @@ index ae832da..358620c 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,16 +3616,90 @@ google_firewall_maintain(){ (
+@@ -1225,16 +3641,90 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -39137,7 +39162,7 @@ index ae832da..358620c 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +3707,16 @@ start(){
+@@ -1242,8 +3732,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -39147,15 +39172,15 @@ index ae832da..358620c 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +3726,96 @@ start(){
+@@ -1253,75 +3751,96 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -39290,7 +39315,7 @@ index ae832da..358620c 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +3827,92 @@ start(){
+@@ -1333,19 +3852,92 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -39388,7 +39413,7 @@ index ae832da..358620c 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +3925,8 @@ status(){
+@@ -1358,6 +3950,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -39397,7 +39422,7 @@ index ae832da..358620c 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1407,6 +3976,12 @@ status(){
+@@ -1407,6 +4001,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -39410,7 +39435,7 @@ index ae832da..358620c 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +4062,30 @@ status(){
+@@ -1487,13 +4087,30 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -39443,7 +39468,7 @@ index ae832da..358620c 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +4209,8 @@ health_collect(){
+@@ -1617,6 +4234,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -39452,7 +39477,7 @@ index ae832da..358620c 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +4260,18 @@ health_restore_table(){
+@@ -1666,16 +4285,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -39473,7 +39498,7 @@ index ae832da..358620c 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +4320,7 @@ health_repair(){ (
+@@ -1724,7 +4345,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -39482,7 +39507,7 @@ index ae832da..358620c 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +4353,481 @@ health_json(){ (
+@@ -1757,6 +4378,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -39964,7 +39989,7 @@ index ae832da..358620c 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +4845,33 @@ case "${1:-status}" in
+@@ -1774,10 +4870,33 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -51237,7 +51262,7 @@ index 0000000..c7473f3
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java
 new file mode 100644
-index 0000000..4278cbc
+index 0000000..9da308a
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java
 @@ -0,0 +1,280 @@
@@ -51287,7 +51312,7 @@ index 0000000..4278cbc
 +        if (yaml == null || !MihomoStartupConfig.hasTopLevelKey(yaml, "proxy-groups")) return new Result(yaml, notices, false);
 +        Map<String, Object> root;
 +        try {
-+            Object loaded = loader().load(yaml);
++            Object loaded = loader().load(RuntimeYaml15.reader(yaml));
 +            if (!(loaded instanceof Map)) return new Result(yaml, notices, false);
 +            @SuppressWarnings("unchecked") Map<String, Object> m = (Map<String, Object>) loaded;
 +            root = m;
@@ -53715,7 +53740,7 @@ index 738ebf5..428a4cc 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..54dbae7 100644
+index 4f004b9..de94775 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
@@ -53755,7 +53780,7 @@ index 4f004b9..54dbae7 100644
  internal class ProxyComposeController(context: Context) {
      private val app = context.applicationContext
      private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
-@@ -151,11 +172,34 @@ internal class ProxyComposeController(context: Context) {
+@@ -151,11 +172,35 @@ internal class ProxyComposeController(context: Context) {
              observation.continuityObservationTicket, observation.continuityObservationSession,
              observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
@@ -53771,7 +53796,7 @@ index 4f004b9..54dbae7 100644
 +            return@withContext emptyList()
 +        val profile = ProxyRuntimeProfile.load(prefs)
 +        val iconMap = try {
-+            configs.selected(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
++            configs.source(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
 +        } catch (cancel: CancellationException) { throw cancel }
 +        catch (_: Exception) { emptyMap() }
 +        val snapshot = controllerSnapshotOperation {
@@ -53784,14 +53809,16 @@ index 4f004b9..54dbae7 100644
 +
      suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
-         val selected = configs.selected(profile.core)
+-        val selected = configs.selected(profile.core)
++        // An unedited built-in template follows Mihomo's built-in, whose groups carry the icons.
++        val selected = configs.source(profile.core)
          val iconMap = try {
 -            if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
 +            if (selected == null) emptyMap() else groupIconsFor(selected)
          } catch (cancel: CancellationException) { throw cancel }
          catch (_: Exception) { emptyMap() }
 
-@@ -208,6 +252,16 @@ internal class ProxyComposeController(context: Context) {
+@@ -208,6 +253,16 @@ internal class ProxyComposeController(context: Context) {
                      val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                          else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                      if (observedPid > 0) live.put("pid", observedPid)
@@ -53808,7 +53835,7 @@ index 4f004b9..54dbae7 100644
                      freshStatus = true
                  }
              } catch (cancel: CancellationException) { throw cancel }
-@@ -281,9 +335,14 @@ internal class ProxyComposeController(context: Context) {
+@@ -281,9 +336,14 @@ internal class ProxyComposeController(context: Context) {
                      .putString("proxyRootCoreGroup", status.optString("coreGroup", ""))
                      .putBoolean("proxyRootDotGuard", status.optBoolean("dotGuard", false))
                      .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
@@ -53823,7 +53850,7 @@ index 4f004b9..54dbae7 100644
                      .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
                  val livePort = status.optInt("controllerPort", 0)
                  if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
-@@ -299,13 +358,39 @@ internal class ProxyComposeController(context: Context) {
+@@ -299,13 +359,39 @@ internal class ProxyComposeController(context: Context) {
          var trafficMode = ""
          var controllerReadFailed = false
          var controllerError = ""
@@ -53868,7 +53895,7 @@ index 4f004b9..54dbae7 100644
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
                  // selection or publish the absent counters as a fresh zero measurement.
-@@ -362,6 +447,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -362,6 +448,7 @@ internal class ProxyComposeController(context: Context) {
                  else -> ""
              },
              panelReady = panelReady,
@@ -53876,15 +53903,17 @@ index 4f004b9..54dbae7 100644
              controllerReadFailed = controllerReadFailed,
              controllerError = controllerError,
              groups = groups,
-@@ -419,13 +505,38 @@ internal class ProxyComposeController(context: Context) {
+@@ -419,13 +506,40 @@ internal class ProxyComposeController(context: Context) {
              prefs.edit().putString("proxyBaseCore", "mihomo").apply()
              profile = ProxyRuntimeProfile.load(prefs)
          }
 -        val selected = configs.selected(profile.core) ?: error("尚未选择配置")
 -        if (!configs.hasConfiguredSubscription(selected)) {
 -            error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
-+        val selected = configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
-+        if (!configs.hasConfiguredSubscription(selected)) throw ProxyStartProblem.PlaceholderConfig()
++        configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
++        // The subscription is checked where the start reads it: an unedited built-in template follows Mihomo's built-in.
++        val source = configs.source(profile.core) ?: throw ProxyStartProblem.NoConfig()
++        if (!configs.hasConfiguredSubscription(source)) throw ProxyStartProblem.PlaceholderConfig()
 +        // The pre-start hook runs inside the single Root start invocation (no extra su when
 +        // no hook exists); a failing hook still refuses the start before the network changes.
 +        // Audit G1: a completed start also keeps its effective source as 「上次可启动」 (never fails the start).
@@ -53921,7 +53950,7 @@ index 4f004b9..54dbae7 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -435,10 +546,22 @@ internal class ProxyComposeController(context: Context) {
+@@ -435,10 +549,22 @@ internal class ProxyComposeController(context: Context) {
      suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
          LegacyAppMigrator.migrateIfNeeded(app)
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -53945,7 +53974,16 @@ index 4f004b9..54dbae7 100644
          val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
          check(replaced) { "重启未完成，请等待当前操作结束后重试" }
          check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
-@@ -515,7 +638,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -481,7 +607,7 @@ internal class ProxyComposeController(context: Context) {
+
+     suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+-        val entry = configs.selected(profile.core) ?: return@withContext 0
++        val entry = configs.source(profile.core) ?: return@withContext 0
+         val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
+         var downloaded = 0
+         for (chunk in urls.chunked(6)) {
+@@ -515,7 +641,10 @@ internal class ProxyComposeController(context: Context) {
          "disable" to "禁用本机 IPv6",
      )
 
@@ -53957,7 +53995,7 @@ index 4f004b9..54dbae7 100644
      fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
      fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
      fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
-@@ -532,13 +658,20 @@ internal class ProxyComposeController(context: Context) {
+@@ -532,13 +661,20 @@ internal class ProxyComposeController(context: Context) {
              ProxyConfigUi(
                  name = it.name,
                  selected = it.name == selected,
@@ -53980,7 +54018,50 @@ index 4f004b9..54dbae7 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -683,6 +816,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -551,8 +687,10 @@ internal class ProxyComposeController(context: Context) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+         val entry = configs.selected(profile.core)
+         val name = entry?.name ?: "尚未选择配置"
+-        val items = if (entry == null) emptyList() else
+-            configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
++        // A built-in template that follows Mihomo's built-in lists (and edits) that file's subscriptions.
++        val source = configs.source(profile.core)
++        val items = if (source == null) emptyList() else
++            configs.subscriptions(source).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+         name to items
+     }
+
+@@ -563,25 +701,25 @@ internal class ProxyComposeController(context: Context) {
+
+     suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+-        val entry = configs.selected(profile.core) ?: return@withContext emptyList()
++        val entry = configs.source(profile.core) ?: return@withContext emptyList()
+         configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+     }
+
+     suspend fun updateSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
++        val entry = configs.source(profile.core) ?: error("尚未选择配置")
+         configs.updateSubscription(entry, name, url)
+     }
+
+     suspend fun addSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
++        val entry = configs.source(profile.core) ?: error("尚未选择配置")
+         configs.addSubscription(entry, name, url)
+     }
+
+     suspend fun deleteSubscription(name: String) = withContext(Dispatchers.IO) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
++        val entry = configs.source(profile.core) ?: error("尚未选择配置")
+         configs.deleteSubscription(entry, name)
+     }
+
+@@ -683,6 +821,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -53991,7 +54072,7 @@ index 4f004b9..54dbae7 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -789,6 +926,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +931,7 @@ internal class ProxyComposeController(context: Context) {
                  size = r.optInt("size", -1),
                  disabled = extra?.optBoolean("disabled", false) ?: false,
                  hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
@@ -53999,7 +54080,7 @@ index 4f004b9..54dbae7 100644
              )
          }
          return out
-@@ -813,6 +951,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +956,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -54018,7 +54099,7 @@ index 4f004b9..54dbae7 100644
      private var lastIconSource: String? = null
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
-@@ -824,19 +974,4 @@ internal class ProxyComposeController(context: Context) {
+@@ -824,19 +979,4 @@ internal class ProxyComposeController(context: Context) {
          return parsed
      }
 
@@ -54039,10 +54120,19 @@ index 4f004b9..54dbae7 100644
 -    }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
-index 34aa171..7fe8410 100644
+index 34aa171..5b05b44 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
-@@ -36,7 +36,7 @@ final class ProxyConfigLibrary {
+@@ -29,14 +29,15 @@ final class ProxyConfigLibrary {
+     }
+
+     static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
+-    static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER);}}
++    /** placeholder: an unfilled slot. Any URL on the reserved example.invalid host is one: the shipped Mihomo built-in's slot is https://example.invalid/bichen-subscription-1. */
++    static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER)||u.contains("://"+BundledCoreTemplates.PLACEHOLDER_HOST+"/");}}
+     private static final class CollatorHolder {static final java.text.Collator ORDER=java.text.Collator.getInstance(Locale.CHINA);}
+
+     private File dir(ProxyRuntimeProfile.Core core){return new File(root,core.id);}
      private String key(ProxyRuntimeProfile.Core core){return "proxySelectedConfig."+core.id;}
 
      private void ensureBundled(ProxyRuntimeProfile.Core core){
@@ -54051,7 +54141,7 @@ index 34aa171..7fe8410 100644
          try{
              File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
              if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
-@@ -44,6 +44,33 @@ final class ProxyConfigLibrary {
+@@ -44,6 +45,49 @@ final class ProxyConfigLibrary {
          }catch(Exception ignored){}
      }
 
@@ -54082,10 +54172,26 @@ index 34aa171..7fe8410 100644
 +    }
 +    static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
 +
++    /**
++     * The non-Mihomo built-in template still on its placeholder node (example.invalid) cannot reach any server, so a
++     * start of that core follows Mihomo's built-in instead: 河图内置-TPROXY.yaml with the user's subscription, its
++     * groups and rules, converted for the core at start (ProxyCoreConfig). Returns that Mihomo entry, or null when
++     * {@code e} is anything else (the user's own file, or a template the user filled with a server).
++     */
++    Entry followedBuiltin(Entry e){
++        if(e==null||e.core==ProxyRuntimeProfile.Core.MIHOMO||e.core==ProxyRuntimeProfile.Core.MIHOMO_SMART||!BundledCoreTemplates.isBundledName(e.name))return null;
++        try{if(!BundledCoreTemplates.hasPlaceholderNode(read(e)))return null;}catch(IOException unreadable){return null;}
++        ensureBundled(ProxyRuntimeProfile.Core.MIHOMO);
++        File f=new File(dir(ProxyRuntimeProfile.Core.MIHOMO),BUNDLED_NAME);
++        return f.isFile()?new Entry(ProxyRuntimeProfile.Core.MIHOMO,BUNDLED_NAME,f):null;
++    }
++    /** The config a start of {@code core} reads its nodes, subscriptions, groups and rules from: the selection, or the built-in it follows. */
++    Entry source(ProxyRuntimeProfile.Core core){Entry s=selected(core);Entry f=followedBuiltin(s);return f!=null?f:s;}
++
      List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
      Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}
      void select(ProxyRuntimeProfile.Core core,String name)throws IOException{ensureBundled(core);String n=safeName(name);File f=new File(dir(core),n);if(!f.isFile()||!coreAccepts(core,n))throw new IOException("配置不存在或格式不属于当前核心");prefs.edit().putString(key(core),n).apply();}
-@@ -64,14 +91,14 @@ final class ProxyConfigLibrary {
+@@ -64,14 +108,14 @@ final class ProxyConfigLibrary {
      void write(Entry e,String text)throws IOException{if(e==null)throw new IOException("尚未选择配置");if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");byte[] b=text.getBytes(StandardCharsets.UTF_8);if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");File d=e.file.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,e.file.getName()+".new");try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(b);out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}replaceAtomic(tmp,e.file);}
      void delete(Entry e)throws IOException{
          if(e==null)return;
@@ -54141,18 +54247,22 @@ index 76318e4..618767e 100644
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
 new file mode 100644
-index 0000000..276b420
+index 0000000..1e89747
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
-@@ -0,0 +1,1932 @@
+@@ -0,0 +1,2153 @@
 +package io.github.xgl34222220.hetu;
 +
++import java.io.BufferedInputStream;
++import java.io.File;
++import java.io.FileInputStream;
 +import java.io.IOException;
-+import java.io.StringReader;
++import java.io.InputStream;
 +import java.net.URI;
 +import java.net.URLDecoder;
 +import java.nio.charset.StandardCharsets;
 +import java.util.*;
++import java.util.regex.Matcher;
 +import java.util.regex.Pattern;
 +import java.util.regex.PatternSyntaxException;
 +import org.yaml.snakeyaml.LoaderOptions;
@@ -54193,6 +54303,16 @@ index 0000000..276b420
 +    static final String SING_GEOSITE = "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-%s.srs";
 +    static final String SING_GEOIP = "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-%s.srs";
 +    static final int MAX_PROVIDER_BYTES = 8 * 1024 * 1024;
++    /**
++     * MetaCubeX meta-rules-dat publishes every geosite / geoip category three ways: Mihomo mrs (meta branch),
++     * sing-box srs (sing branch) and text (.list next to the mrs). Any mirror of the repository keeps the layout
++     * (jsDelivr {@code …/meta-rules-dat@meta/…}, raw.githubusercontent.com {@code …/meta-rules-dat/meta/…}).
++     */
++    static final Pattern META_RULES_DAT = Pattern.compile("^(https?://.+/MetaCubeX/meta-rules-dat)([@/])meta/geo/(geosite|geoip)/([^/?#]+)\\.mrs$");
++    /** 217heidai/adblockfilters ships its list as sing-box srs next to the mrs; its text form is too large to inline. */
++    static final Pattern ADBLOCKFILTERS_MRS = Pattern.compile("/217heidai/adblockfilters[@/][^/]+/rules/adblockmihomo\\.mrs$");
++    /** A text rule-set larger than this is not written into a converted config (it is skipped with a warning). */
++    static final int MAX_INLINE_RULES = 50_000;
 +    /** Same names as the Mihomo adblock providers (ProxyAdblockRules.PROVIDER_NAME / ALLOW_PROVIDER_NAME). */
 +    static final String ADBLOCK_TAG = "hetu-adblock", ADBLOCK_ALLOW_TAG = "hetu-adblock-allow";
 +
@@ -54252,6 +54372,8 @@ index 0000000..276b420
 +        boolean ipv6 = true, tcp = true, udp = true;
 +        /** Xray/V2Fly geoip.dat + geosite.dat were extracted next to the binary. */
 +        boolean geoAssets = true;
++        /** Category names (lower case) in that geosite.dat / geoip.dat; null when they could not be read (taken as present). */
++        Set<String> geositeNames, geoipNames;
 +        boolean cnIpDirect;
 +        List<String> adblock = Collections.emptyList(), adblockAllow = Collections.emptyList();
 +        /**
@@ -54311,7 +54433,7 @@ index 0000000..276b420
 +    static String singBoxYamlToJson(String text) throws IOException {
 +        Object root;
 +        try {
-+            root = ConfigReferenceCleaner.loader().load(text);
++            root = ConfigReferenceCleaner.loader().load(RuntimeYaml15.reader(text));
 +        } catch (YAMLException invalid) {
 +            throw new IOException("sing-box YAML 无法解析：" + invalid.getMessage());
 +        }
@@ -54487,6 +54609,16 @@ index 0000000..276b420
 +
 +    static final class RuleProvider {
 +        final String name, behavior; final List<String> payload;
++        /**
++         * An mrs provider (Mihomo's binary format, readable by no other core) keeps its payload empty and names the
++         * same list in each core's own form instead: a geosite / geoip category ({@code geoKind} + {@code geoName}),
++         * a sing-box rule-set ({@code singUrl}) and a text twin ({@code textUrl}, read on first use). Any may be null.
++         */
++        String geoKind, geoName, singUrl, textUrl;
++        /** The mrs payload is not read yet ({@link Profile#payload}). */
++        boolean pending;
++        /** The provider downloads with {@code proxy: DIRECT}, as the converted rule-set download does then. */
++        boolean direct;
 +        RuleProvider(String name, String behavior, List<String> payload) { this.name = name; this.behavior = behavior; this.payload = payload; }
 +    }
 +
@@ -54498,7 +54630,13 @@ index 0000000..276b420
 +        String matchTarget = TAG_DIRECT;
 +        boolean fakeIp; String fakeIpRange = DEFAULT_FAKE_IP_V4;
 +        final List<String> fakeIpFilter = new ArrayList<>();
++        /** fake-ip-filter {@code rule-set:} entries, and the nameserver-policy rule-sets answered by a DIRECT server. */
++        final List<String> fakeIpFilterSets = new ArrayList<>(), directDnsSets = new ArrayList<>();
 +        final List<String> directDns = new ArrayList<>(), remoteDns = new ArrayList<>();
++        /** Mihomo's named exits ({@code type: direct} / {@code reject} proxies) → DIRECT / REJECT / REJECT-DROP. */
++        final Map<String, String> exitAliases = new HashMap<>();
++        /** Reads mrs text twins on demand; null in a profile built for a nested rule-provider line. */
++        Fetcher fetcher;
 +        int skippedNodes;
 +
 +        static Map<String, Object> loadYaml(String text) throws IOException {
@@ -54507,7 +54645,7 @@ index 0000000..276b420
 +            options.setMaxAliasesForCollections(4096);
 +            options.setNestingDepthLimit(60);
 +            try {
-+                Object root = new Yaml(new SafeConstructor(options)).load(new StringReader(text));
++                Object root = new Yaml(new SafeConstructor(options)).load(RuntimeYaml15.reader(text));
 +                Map<String, Object> m = asMap(root);
 +                if (m == null) throw new IOException("YAML 根节点应为键值映射");
 +                return m;
@@ -54519,6 +54657,7 @@ index 0000000..276b420
 +        static Profile parse(String text, Fetcher fetcher, List<String> warnings) throws IOException {
 +            Map<String, Object> root = loadYaml(text);
 +            Profile p = new Profile();
++            p.fetcher = fetcher;
 +            for (Object o : asList(root.get("proxies"))) p.addNode(asMap(o), warnings, "");
 +            LinkedHashMap<String, List<String>> providerNodes = new LinkedHashMap<>();
 +            Map<String, Object> providers = asMap(root.get("proxy-providers"));
@@ -54543,13 +54682,40 @@ index 0000000..276b420
 +            if (dns != null && bool(dns, "enable", true)) {
 +                p.fakeIp = "fake-ip".equalsIgnoreCase(str(dns, "enhanced-mode"));
 +                if (!str(dns, "fake-ip-range").isEmpty()) p.fakeIpRange = str(dns, "fake-ip-range");
-+                for (String f : strings(dns.get("fake-ip-filter"))) if (!f.contains(":")) p.fakeIpFilter.add(f);
++                for (String f : strings(dns.get("fake-ip-filter"))) {
++                    if (f.startsWith("rule-set:")) addSetNames(p.fakeIpFilterSets, f);
++                    else if (!f.contains(":")) p.fakeIpFilter.add(f);
++                }
++                Map<String, Object> policy = asMap(dns.get("nameserver-policy"));
++                if (policy != null) for (Map.Entry<String, Object> e : policy.entrySet()) {
++                    if (!e.getKey().startsWith("rule-set:")) continue;
++                    List<String> servers = strings(e.getValue());
++                    boolean direct = !servers.isEmpty();
++                    for (String server : servers) if (!p.directDnsServer(server)) direct = false;
++                    if (direct) addSetNames(p.directDnsSets, e.getKey());
++                }
 +                for (String s : strings(dns.get("default-nameserver"))) addDns(p.directDns, s);
 +                for (String s : strings(dns.get("nameserver"))) addDns(p.remoteDns, s);
 +                if (p.directDns.isEmpty()) for (String s : strings(dns.get("proxy-server-nameserver"))) addDns(p.directDns, s);
 +            }
 +            if (p.nodes.isEmpty()) warnings.add("没有可转换的节点");
 +            return p;
++        }
++
++        /** "rule-set:A,B" → A, B. */
++        private static void addSetNames(List<String> out, String entry) {
++            for (String name : entry.substring("rule-set:".length()).split(",")) {
++                String n = name.trim();
++                if (!n.isEmpty() && !out.contains(n)) out.add(n);
++            }
++        }
++
++        /** A Mihomo nameserver whose "#proxy" names DIRECT or a named direct exit ("#DIRECT&disable-ipv6=true"). */
++        boolean directDnsServer(String server) {
++            int hash = server.indexOf('#');
++            if (hash < 0) return false;
++            String via = server.substring(hash + 1).split("&", 2)[0].trim();
++            return directTarget(via) || TAG_DIRECT.equals(exitAliases.get(via));
 +        }
 +
 +        private static void addDns(List<String> out, String raw) {
@@ -54564,6 +54730,9 @@ index 0000000..276b420
 +            if (m == null) return;
 +            String name = str(m, "name"), type = str(m, "type").toLowerCase(Locale.ROOT);
 +            if (name.isEmpty() || type.isEmpty()) return;
++            // A named exit is DIRECT / REJECT under another name, not a server.
++            if (type.equals("direct")) { exitAliases.put(name, TAG_DIRECT); return; }
++            if (type.equals("reject") || type.equals("reject-drop")) { exitAliases.put(name, type.equals("reject") ? TAG_BLOCK : "REJECT-DROP"); return; }
 +            String unique = name;
 +            for (int i = 2; nodes.containsKey(unique) || TAG_DIRECT.equals(unique) || TAG_BLOCK.equals(unique); i++) unique = name + " #" + i;
 +            nodes.put(unique, new Node(unique, type, m));
@@ -54618,7 +54787,7 @@ index 0000000..276b420
 +            String name = str(g, "name"), type = str(g, "type").toLowerCase(Locale.ROOT);
 +            List<String> members = new ArrayList<>();
 +            Pattern include = regex(str(g, "filter"), warnings), exclude = regex(str(g, "exclude-filter"), warnings);
-+            for (String m : strings(g.get("proxies"))) members.add(m);
++            for (String m : strings(g.get("proxies"))) { String x = exitAliases.getOrDefault(m, m); if (!members.contains(x)) members.add(x); }
 +            List<String> candidates = new ArrayList<>();
 +            boolean all = bool(g, "include-all", false);
 +            if (all || bool(g, "include-all-proxies", false)) {
@@ -54653,7 +54822,7 @@ index 0000000..276b420
 +            if (m == null) return;
 +            String type = str(m, "type").toLowerCase(Locale.ROOT), behavior = str(m, "behavior").toLowerCase(Locale.ROOT);
 +            String format = str(m, "format").toLowerCase(Locale.ROOT);
-+            if (format.equals("mrs")) { warnings.add("规则集 " + name + " 为 mrs 二进制格式，无法转换，相关规则已跳过"); return; }
++            if (format.equals("mrs")) { ruleProviders.put(name, mrsProvider(name, behavior, "http".equals(type) ? str(m, "url") : "", str(m, "proxy"))); return; }
 +            List<String> payload = new ArrayList<>();
 +            try {
 +                String body;
@@ -54662,13 +54831,61 @@ index 0000000..276b420
 +                    body = fetcher == null ? null : fetcher.fetch(str(m, "url"));
 +                    if (body == null) { warnings.add("规则集 " + name + " 无法下载，相关规则已跳过"); return; }
 +                } else { warnings.add("规则集 " + name + " 为本地文件类型，相关规则已跳过"); return; }
-+                if (body != null) {
-+                    boolean yaml = format.equals("yaml") || (format.isEmpty() && body.contains("payload:"));
-+                    if (yaml) payload.addAll(strings(loadYaml(body).get("payload")));
-+                    else for (String line : body.split("\n")) { String t = line.trim(); if (!t.isEmpty() && !t.startsWith("#") && !t.startsWith("//")) payload.add(t); }
-+                }
++                if (body != null) payload.addAll(textPayload(body, format));
 +            } catch (IOException error) { warnings.add("规则集 " + name + " 解析失败，相关规则已跳过"); return; }
 +            ruleProviders.put(name, new RuleProvider(name, behavior.isEmpty() ? "domain" : behavior, payload));
++        }
++
++        static List<String> textPayload(String body, String format) throws IOException {
++            List<String> payload = new ArrayList<>();
++            boolean yaml = format.equals("yaml") || (format.isEmpty() && body.contains("payload:"));
++            if (yaml) payload.addAll(strings(loadYaml(body).get("payload")));
++            else for (String line : body.split("\n")) { String t = line.trim(); if (!t.isEmpty() && !t.startsWith("#") && !t.startsWith("//")) payload.add(t); }
++            return payload;
++        }
++
++        /**
++         * mrs is Mihomo's own binary format. A MetaCubeX meta-rules-dat category maps to the same category in each
++         * core's data (sing-box srs, Xray / V2Fly geosite.dat / geoip.dat, its .list as the fallback); other sources
++         * fall back to a published text twin (the same path with .yaml) when a core needs the entries.
++         */
++        static RuleProvider mrsProvider(String name, String behavior, String url, String proxy) {
++            RuleProvider rp = new RuleProvider(name, behavior.isEmpty() ? "domain" : behavior, new ArrayList<>());
++            rp.pending = true;
++            rp.direct = directTarget(proxy);
++            Matcher meta = META_RULES_DAT.matcher(url);
++            if (meta.matches()) {
++                String base = meta.group(1) + meta.group(2), kind = meta.group(3), file = meta.group(4);
++                rp.geoKind = kind;
++                rp.geoName = ShareLink.decode(file).toLowerCase(Locale.ROOT);
++                rp.singUrl = base + "sing/geo/" + kind + "/" + file + ".srs";
++                rp.textUrl = base + "meta/geo/" + kind + "/" + file + ".list";
++            } else if (ADBLOCKFILTERS_MRS.matcher(url).find()) {
++                rp.singUrl = url.substring(0, url.length() - "adblockmihomo.mrs".length()) + "adblocksingbox.srs";
++            } else if (url.endsWith(".mrs")) {
++                rp.textUrl = url.substring(0, url.length() - ".mrs".length()) + ".yaml";
++            }
++            return rp;
++        }
++
++        /** The provider's entries. An mrs provider reads its text twin on first use; empty when none can be read. */
++        List<String> payload(RuleProvider rp, List<String> warnings) {
++            if (!rp.pending) return rp.payload;
++            rp.pending = false;
++            if (rp.textUrl == null) { warnings.add("规则集 " + rp.name + " 为 mrs 二进制格式，且没有当前核心可读取的版本，相关规则已跳过"); return rp.payload; }
++            try {
++                String body = fetcher == null ? null : fetcher.fetch(rp.textUrl);
++                if (body == null) { warnings.add("规则集 " + rp.name + " 为 mrs 二进制格式，其文本版本无法下载，相关规则已跳过"); return rp.payload; }
++                List<String> entries = textPayload(body, rp.textUrl.endsWith(".yaml") ? "yaml" : "text");
++                if (entries.size() > MAX_INLINE_RULES) {
++                    warnings.add("规则集 " + rp.name + " 有 " + entries.size() + " 条，超过可写入配置的 " + MAX_INLINE_RULES + " 条，相关规则已跳过");
++                    return rp.payload;
++                }
++                rp.payload.addAll(entries);
++            } catch (IOException error) {
++                warnings.add("规则集 " + rp.name + " 的文本版本解析失败，相关规则已跳过");
++            }
++            return rp.payload;
 +        }
 +
 +        void addRule(String line, List<String> warnings) {
@@ -54676,6 +54893,8 @@ index 0000000..276b420
 +                RuleParser parser = new RuleParser(line);
 +                Rule r = parser.parse();
 +                if (r == null) return;
++                String exit = exitAliases.get(r.target);
++                if (exit != null) r = new Rule(r.cond, exit, r.text);
 +                if ("MATCH".equals(r.cond.type) || "FINAL".equals(r.cond.type)) { matchTarget = r.target; return; }
 +                rules.add(r);
 +            } catch (IOException invalid) {
@@ -54983,15 +55202,25 @@ index 0000000..276b420
 +                for (Group g : p.groups.values()) {
 +                    if (emitted.contains(g.name) || aliases.containsKey(g.name)) continue;
 +                    List<String> members = new ArrayList<>();
-+                    boolean pending = false;
++                    boolean pending = false, rejected = false;
++                    String first = null;
 +                    for (String m : g.members) {
 +                        String r = resolveMember(m, tags, emitted, aliases, p);
 +                        if (r == null) { if (p.groups.containsKey(m) && !emitted.contains(m) && !aliases.containsKey(m)) pending = true; continue; }
-+                        if (r.equals(TAG_BLOCK)) { warnings.add("策略组 " + g.name + " 中的 REJECT 成员已移除"); continue; }
++                        if (first == null) first = r;
++                        if (r.equals(TAG_BLOCK)) { rejected = true; continue; }
 +                        if (!members.contains(r)) members.add(r);
 +                    }
 +                    if (pending) continue;
 +                    changed = true;
++                    // A selector that rejects by default (an ad-block group) keeps doing so: sing-box has no reject
++                    // outbound to select, so rules naming it become reject rules.
++                    if (TAG_BLOCK.equals(first) && !g.type.equals("url-test") && !g.type.equals("fallback") && !g.type.equals("load-balance")) {
++                        aliases.put(g.name, TAG_BLOCK);
++                        warnings.add("策略组 " + g.name + " 默认拒绝连接：sing-box 按拒绝规则运行，面板中不可切换");
++                        continue;
++                    }
++                    if (rejected) warnings.add("策略组 " + g.name + " 中的 REJECT 成员已移除");
 +                    if (members.isEmpty()) { aliases.put(g.name, TAG_DIRECT); warnings.add("策略组 " + g.name + " 没有可用成员，改为直连"); continue; }
 +                    if (members.contains(TAG_DIRECT)) tags.add(TAG_DIRECT);
 +                    LinkedHashMap<String, Object> ob = new LinkedHashMap<>();
@@ -55041,6 +55270,9 @@ index 0000000..276b420
 +                addRemoteSet(ruleSets, ruleSetTags, "geoip-cn", String.format(Locale.ROOT, SING_GEOIP, "cn"), fin);
 +                rules.add(map("rule_set", Collections.singletonList("geoip-cn"), "action", "route", "outbound", TAG_DIRECT));
 +            }
++            // fake-ip-filter / nameserver-policy rule-sets: real answers, from the direct DNS where the policy says DIRECT.
++            List<String> directSets = dnsRuleSets(p, p.fakeIp ? intersect(p.fakeIpFilterSets, p.directDnsSets) : p.directDnsSets, ruleSets, ruleSetTags, fin);
++            List<String> realSets = p.fakeIp ? dnsRuleSets(p, minus(p.fakeIpFilterSets, p.directDnsSets), ruleSets, ruleSetTags, fin) : Collections.<String>emptyList();
 +            LinkedHashMap<String, Object> route = new LinkedHashMap<>();
 +            route.put("rules", rules);
 +            if (!ruleSets.isEmpty()) route.put("rule_set", ruleSets);
@@ -55048,7 +55280,7 @@ index 0000000..276b420
 +            route.put("auto_detect_interface", true);
 +            route.put("default_domain_resolver", "dns-direct");
 +
-+            root.put("dns", dns(p, o, fin));
++            root.put("dns", dns(p, o, fin, directSets, realSets));
 +            root.put("inbounds", inbounds(o));
 +            root.put("outbounds", outbounds);
 +            root.put("route", route);
@@ -55144,8 +55376,13 @@ index 0000000..276b420
 +                    RuleProvider rp = p.ruleProviders.get(v);
 +                    if (rp == null) { warnings.add("规则集 " + v + " 不可用，已跳过：" + text); return null; }
 +                    String tag = "rp-" + v;
++                    if (rp.singUrl != null) {
++                        // The same list as a sing-box rule-set, downloaded the way the provider was (proxy: DIRECT).
++                        addRemoteSet(ruleSets, ruleSetTags, tag, rp.singUrl, rp.direct ? TAG_DIRECT : detour);
++                        return map("rule_set", Collections.singletonList(tag));
++                    }
 +                    if (ruleSetTags.add(tag)) {
-+                        List<Object> inline = providerRules(rp, warnings);
++                        List<Object> inline = providerRules(rp, p.payload(rp, warnings), warnings);
 +                        if (inline.isEmpty()) { warnings.add("规则集 " + v + " 为空，已跳过"); ruleSetTags.remove(tag); return null; }
 +                        ruleSets.add(map("type", "inline", "tag", tag, "rules", inline));
 +                    }
@@ -55170,11 +55407,11 @@ index 0000000..276b420
 +            return m;
 +        }
 +
-+        static List<Object> providerRules(RuleProvider rp, List<String> warnings) {
++        static List<Object> providerRules(RuleProvider rp, List<String> payload, List<String> warnings) {
 +            List<Object> out = new ArrayList<>();
 +            if (rp.behavior.equals("domain")) {
 +                List<String> full = new ArrayList<>(), suffix = new ArrayList<>(), regex = new ArrayList<>();
-+                for (String d : rp.payload) {
++                for (String d : payload) {
 +                    String[] e = domainEntry(d);
 +                    if (e[0].equals("suffix")) suffix.add(e[1]); else if (e[0].equals("regex")) regex.add(e[1]); else full.add(e[1]);
 +                }
@@ -55184,9 +55421,9 @@ index 0000000..276b420
 +                if (!regex.isEmpty()) m.put("domain_regex", regex);
 +                if (!m.isEmpty()) out.add(m);
 +            } else if (rp.behavior.equals("ipcidr")) {
-+                out.add(map("ip_cidr", rp.payload));
++                if (!payload.isEmpty()) out.add(map("ip_cidr", payload));
 +            } else {
-+                for (String line : rp.payload) {
++                for (String line : payload) {
 +                    Cond c = classical(line);
 +                    if (c == null) continue;
 +                    Map<String, Object> m = condition(c, new Profile(), new ArrayList<>(), new HashSet<>(), warnings, line, TAG_DIRECT);
@@ -55222,7 +55459,24 @@ index 0000000..276b420
 +            return m;
 +        }
 +
-+        static Map<String, Object> dns(Profile p, Options o, String fin) {
++        /** Rule-set tags of the named domain providers, defining each rule-set the route does not use yet. */
++        static List<String> dnsRuleSets(Profile p, List<String> names, List<Object> ruleSets, Set<String> ruleSetTags, String fin) {
++            List<String> out = new ArrayList<>();
++            for (String name : names) {
++                RuleProvider rp = p.ruleProviders.get(name);
++                if (rp == null || !rp.behavior.equals("domain")) continue;
++                Map<String, Object> cond = condition(new Cond("RULE-SET", name, null, false), p, ruleSets, ruleSetTags, new ArrayList<>(), name, fin);
++                if (cond != null) for (String tag : strings(cond.get("rule_set"))) if (!out.contains(tag)) out.add(tag);
++            }
++            return out;
++        }
++
++        static List<String> intersect(List<String> a, List<String> b) { List<String> out = new ArrayList<>(a); out.retainAll(b); return out; }
++        static List<String> minus(List<String> a, List<String> b) { List<String> out = new ArrayList<>(a); out.removeAll(b); return out; }
++
++        static Map<String, Object> dns(Profile p, Options o, String fin) { return dns(p, o, fin, Collections.emptyList(), Collections.emptyList()); }
++
++        static Map<String, Object> dns(Profile p, Options o, String fin, List<String> directSets, List<String> realSets) {
 +            List<Object> servers = new ArrayList<>();
 +            String direct = DEFAULT_DIRECT_DNS;
 +            for (String d : p.directDns) { String host = d.replaceFirst("^udp://", ""); if (isIp(host.replaceAll(":\\d+$", ""))) { direct = host; break; } }
@@ -55230,6 +55484,8 @@ index 0000000..276b420
 +            String remote = p.remoteDns.isEmpty() ? DEFAULT_REMOTE_DNS : p.remoteDns.get(0);
 +            servers.add(dnsServer(remote, "dns-remote", fin));
 +            List<Object> rules = new ArrayList<>();
++            if (!directSets.isEmpty()) rules.add(map("rule_set", directSets, "action", "route", "server", "dns-direct"));
++            if (!realSets.isEmpty()) rules.add(map("rule_set", realSets, "action", "route", "server", "dns-remote"));
 +            if (p.fakeIp) {
 +                LinkedHashMap<String, Object> fake = map("type", "fakeip", "tag", "dns-fake", "inet4_range", cidrNetwork(p.fakeIpRange));
 +                servers.add(fake);
@@ -55443,6 +55699,68 @@ index 0000000..276b420
 +        } catch (Exception invalid) { return "198.18.0.0/16"; }
 +    }
 +
++    /** A geosite / geoip category ("microsoft@cn" names microsoft) the dat lists; unknown names (null) count as present. */
++    static boolean inDat(Set<String> names, String category) {
++        if (names == null) return true;
++        String c = category.toLowerCase(Locale.ROOT);
++        int at = c.indexOf('@');
++        return names.contains(at > 0 ? c.substring(0, at) : c);
++    }
++
++    /**
++     * Category names (lower case) of an Xray / V2Fly geosite.dat or geoip.dat, or null when the file is not one.
++     * Both are a protobuf list whose entries begin with their country_code string (field 1); only those names are
++     * read, the domain / CIDR bodies are skipped.
++     */
++    static Set<String> datNames(File file) {
++        if (file == null || !file.isFile() || file.length() == 0) return null;
++        Set<String> names = new HashSet<>();
++        long total = file.length(), at = 0;
++        try (InputStream in = new BufferedInputStream(new FileInputStream(file), 1 << 16)) {
++            while (true) {
++                int tag = in.read();
++                // A file skip can run past the end, so the whole length must add up.
++                if (tag < 0) return at == total ? names : null;
++                if (tag != 0x0a) return null;
++                long entry = varint(in);
++                if (in.read() != 0x0a) return null;
++                long length = varint(in);
++                long header = 1 + varintSize(length) + length;
++                if (length <= 0 || length > 256 || header > entry) return null;
++                at += 1 + varintSize(entry);
++                if (at + entry > total) return null;
++                byte[] name = new byte[(int) length];
++                for (int read = 0; read < name.length; ) {
++                    int n = in.read(name, read, name.length - read);
++                    if (n < 0) return null;
++                    read += n;
++                }
++                names.add(new String(name, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT));
++                for (long rest = entry - header; rest > 0; ) {
++                    long skipped = in.skip(rest);
++                    if (skipped <= 0) { if (in.read() < 0) return null; skipped = 1; }
++                    rest -= skipped;
++                }
++                at += entry;
++            }
++        } catch (IOException | RuntimeException unreadable) {
++            return null;
++        }
++    }
++
++    private static long varint(InputStream in) throws IOException {
++        long value = 0;
++        for (int shift = 0; shift < 64; shift += 7) {
++            int b = in.read();
++            if (b < 0) throw new IOException("truncated");
++            value |= (long) (b & 0x7f) << shift;
++            if (b < 0x80) return value;
++        }
++        throw new IOException("varint");
++    }
++
++    private static int varintSize(long v) { int n = 1; while ((v >>>= 7) != 0) n++; return n; }
++
 +    // ================================================================== Xray / V2Fly
 +
 +    static final class XrayConv {
@@ -55637,23 +55955,32 @@ index 0000000..276b420
 +                case "NETWORK": return map("network", v.toLowerCase(Locale.ROOT));
 +                case "GEOSITE":
 +                    if (!o.geoAssets) { warnings.add("缺少 geosite.dat，已跳过：" + text); return null; }
++                    if (!inDat(o.geositeNames, v)) { warnings.add("geosite.dat 中没有 " + v + "，已跳过：" + text); return null; }
 +                    return map("domain", Collections.singletonList("geosite:" + v.toLowerCase(Locale.ROOT)));
 +                case "GEOIP":
 +                    if (v.equalsIgnoreCase("LAN")) v = "private";
 +                    if (!o.geoAssets) { warnings.add("缺少 geoip.dat，已跳过：" + text); return null; }
++                    if (!inDat(o.geoipNames, v)) { warnings.add("geoip.dat 中没有 " + v + "，已跳过：" + text); return null; }
 +                    return map("ip", Collections.singletonList("geoip:" + v.toLowerCase(Locale.ROOT)));
 +                case "RULE-SET": {
 +                    RuleProvider rp = p.ruleProviders.get(v);
 +                    if (rp == null) { warnings.add("规则集 " + v + " 不可用，已跳过：" + text); return null; }
++                    // An mrs category the core's own geosite.dat / geoip.dat has: the same list, nothing inlined.
++                    if (rp.geoKind != null && o.geoAssets) {
++                        boolean ip = rp.geoKind.equals("geoip");
++                        if (inDat(ip ? o.geoipNames : o.geositeNames, rp.geoName))
++                            return ip ? map("ip", Collections.singletonList("geoip:" + rp.geoName)) : map("domain", Collections.singletonList("geosite:" + rp.geoName));
++                    }
++                    List<String> payload = p.payload(rp, warnings);
 +                    if (rp.behavior.equals("domain")) {
 +                        List<String> d = new ArrayList<>();
-+                        for (String entry : rp.payload) { String[] e = domainEntry(entry); d.add((e[0].equals("suffix") ? "domain:" : e[0].equals("regex") ? "regexp:" : "full:") + e[1]); }
++                        for (String entry : payload) { String[] e = domainEntry(entry); d.add((e[0].equals("suffix") ? "domain:" : e[0].equals("regex") ? "regexp:" : "full:") + e[1]); }
 +                        return d.isEmpty() ? null : map("domain", d);
 +                    }
-+                    if (rp.behavior.equals("ipcidr")) return rp.payload.isEmpty() ? null : map("ip", rp.payload);
++                    if (rp.behavior.equals("ipcidr")) return payload.isEmpty() ? null : map("ip", payload);
 +                    // classical: only a pure domain / pure ip set fits one Xray rule.
 +                    List<String> domains = new ArrayList<>(), ips = new ArrayList<>();
-+                    for (String line : rp.payload) {
++                    for (String line : payload) {
 +                        Cond cc = classical(line); if (cc == null) continue;
 +                        Map<String, Object> m = condition(cc, p, o, new ArrayList<>(), line, v2ray);
 +                        if (m == null) continue;
@@ -58987,7 +59314,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..bf63667 100644
+index 9cd82da..568ad03 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,17 +21,87 @@ final class RootProxyManager {
@@ -59200,7 +59527,7 @@ index 9cd82da..bf63667 100644
      Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
          return prepare(profile,0);
      }
-@@ -309,33 +415,247 @@ final class RootProxyManager {
+@@ -309,33 +415,253 @@ final class RootProxyManager {
      private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
          RootBridge.requireWorkerThread();
          String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
@@ -59326,7 +59653,8 @@ index 9cd82da..bf63667 100644
 +     * ports, DNS port, controller/egress ports and fake-IP routing metadata as the Mihomo path.
 +     */
 +    private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
-+        ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
++        // An unedited built-in template (placeholder node) follows Mihomo's built-in: same subscription, groups and rules.
++        ProxyConfigLibrary.Entry selected=configs.source(profile.core);
 +        if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
 +        // Audit G1: a 「上次可启动」 start reads the saved effective source; the user's file is not touched.
 +        String lastGood=LAST_GOOD_SOURCE.get();
@@ -59389,6 +59717,11 @@ index 9cd82da..bf63667 100644
 +        o.cnIpDirect=profile.cnIpDirect;
 +        File geo=new File(cores.file(profile.core).getParentFile(),profile.core.id+".geosite.dat");
 +        o.geoAssets=geo.isFile()&&geo.length()>0;
++        // Categories the shipped dats hold: one a rule names but the dat lacks would stop Xray / V2Fly at start.
++        if(o.geoAssets){
++            o.geositeNames=ProxyCoreConfig.datNames(geo);
++            o.geoipNames=ProxyCoreConfig.datNames(new File(geo.getParentFile(),profile.core.id+".geoip.dat"));
++        }
 +        if(adblock!=null){
 +            o.adblock=adblockDomains(adblock.file);
 +            o.adblockAllow=adblockDomains(adblock.allowFile);
@@ -59456,7 +59789,7 @@ index 9cd82da..bf63667 100644
      }
 
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
-@@ -346,13 +666,15 @@ final class RootProxyManager {
+@@ -346,13 +672,15 @@ final class RootProxyManager {
                  +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                  +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                  +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
@@ -59473,7 +59806,7 @@ index 9cd82da..bf63667 100644
      }
 
      private void installHotReloadFiles(Prepared p)throws Exception{
-@@ -378,17 +700,75 @@ final class RootProxyManager {
+@@ -378,17 +706,75 @@ final class RootProxyManager {
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
@@ -59550,7 +59883,7 @@ index 9cd82da..bf63667 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +784,7 @@ final class RootProxyManager {
+@@ -404,7 +790,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -59559,7 +59892,7 @@ index 9cd82da..bf63667 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,10 +792,11 @@ final class RootProxyManager {
+@@ -412,10 +798,11 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -59572,7 +59905,7 @@ index 9cd82da..bf63667 100644
                      .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                      .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                      .putBoolean("proxyAdblockLastEffective",effective)
-@@ -469,29 +850,84 @@ final class RootProxyManager {
+@@ -469,29 +856,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -59665,7 +59998,7 @@ index 9cd82da..bf63667 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -501,28 +937,81 @@ final class RootProxyManager {
+@@ -501,28 +943,81 @@ final class RootProxyManager {
              return stop();
          }finally{CONTROL_LOCK.unlock();}
      }
@@ -59755,7 +60088,7 @@ index 9cd82da..bf63667 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +1024,11 @@ final class RootProxyManager {
+@@ -535,7 +1030,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -59768,7 +60101,7 @@ index 9cd82da..bf63667 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +1037,8 @@ final class RootProxyManager {
+@@ -544,7 +1043,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -59778,7 +60111,7 @@ index 9cd82da..bf63667 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +1046,7 @@ final class RootProxyManager {
+@@ -552,7 +1052,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -59787,7 +60120,7 @@ index 9cd82da..bf63667 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -563,6 +1057,7 @@ final class RootProxyManager {
+@@ -563,6 +1063,7 @@ final class RootProxyManager {
          // during the transaction remain pending; fallback health is reported
          // separately through the effective/error fields, not a restart loop.
          String requestedSettingsSignature=ProxyRuntimeSettings.captureRequest(profile,prefs);
@@ -59795,7 +60128,7 @@ index 9cd82da..bf63667 100644
          trace.next("configuration");
          Prepared p;
          try{
-@@ -575,20 +1070,32 @@ final class RootProxyManager {
+@@ -575,20 +1076,32 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -59835,7 +60168,7 @@ index 9cd82da..bf63667 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +1105,7 @@ final class RootProxyManager {
+@@ -598,7 +1111,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -59844,7 +60177,7 @@ index 9cd82da..bf63667 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +1130,6 @@ final class RootProxyManager {
+@@ -623,7 +1136,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -59852,7 +60185,7 @@ index 9cd82da..bf63667 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -649,8 +1155,8 @@ final class RootProxyManager {
+@@ -649,8 +1161,8 @@ final class RootProxyManager {
          String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
          String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
          String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
@@ -59863,7 +60196,7 @@ index 9cd82da..bf63667 100644
          String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
          JSONObject result;
          String[] bootArgs=new String[]{
-@@ -659,15 +1165,26 @@ final class RootProxyManager {
+@@ -659,15 +1171,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -59892,7 +60225,7 @@ index 9cd82da..bf63667 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,7 +1214,21 @@ final class RootProxyManager {
+@@ -697,7 +1220,21 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -59915,7 +60248,7 @@ index 9cd82da..bf63667 100644
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
                  .put("dnsHijack",profile.dnsHijack.id)
-@@ -723,10 +1254,17 @@ final class RootProxyManager {
+@@ -723,10 +1260,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -59933,7 +60266,7 @@ index 9cd82da..bf63667 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -738,6 +1276,7 @@ final class RootProxyManager {
+@@ -738,6 +1282,7 @@ final class RootProxyManager {
                  // their own effective/error fields; they must not create an endless "restart again"
                  // loop by leaving the generic settings signature permanently different.
                  .putString("proxyRootAppliedSettings",requestedSettingsSignature)
@@ -59941,7 +60274,7 @@ index 9cd82da..bf63667 100644
                  .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                  .remove(ProxyRuntimeSettings.DIRTY_KEY)
                  .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
-@@ -749,11 +1288,20 @@ final class RootProxyManager {
+@@ -749,11 +1294,20 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -59962,7 +60295,7 @@ index 9cd82da..bf63667 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1309,49 @@ final class RootProxyManager {
+@@ -761,10 +1315,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -60013,7 +60346,7 @@ index 9cd82da..bf63667 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -777,8 +1364,16 @@ final class RootProxyManager {
+@@ -777,8 +1370,16 @@ final class RootProxyManager {
                  bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                  bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                  bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
@@ -60032,7 +60365,7 @@ index 9cd82da..bf63667 100644
      }
 
      private void installAutostart(Prepared p,String[] args)throws Exception{
-@@ -789,10 +1384,12 @@ final class RootProxyManager {
+@@ -789,10 +1390,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -60047,7 +60380,7 @@ index 9cd82da..bf63667 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1399,40 @@ final class RootProxyManager {
+@@ -802,20 +1405,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -60093,7 +60426,7 @@ index 9cd82da..bf63667 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1442,26 @@ final class RootProxyManager {
+@@ -825,19 +1448,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -60124,7 +60457,7 @@ index 9cd82da..bf63667 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1469,42 @@ final class RootProxyManager {
+@@ -845,31 +1475,42 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -60183,7 +60516,7 @@ index 9cd82da..bf63667 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1514,7 @@ final class RootProxyManager {
+@@ -879,7 +1520,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -60192,7 +60525,7 @@ index 9cd82da..bf63667 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1574,7 @@ final class RootProxyManager {
+@@ -939,7 +1580,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -60201,7 +60534,7 @@ index 9cd82da..bf63667 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1015,13 +1650,14 @@ final class RootProxyManager {
+@@ -1015,13 +1656,14 @@ final class RootProxyManager {
      String diagnostics(){
          RootBridge.requireWorkerThread();
          DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
@@ -60217,7 +60550,16 @@ index 9cd82da..bf63667 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1695,7 @@ final class RootProxyManager {
+@@ -1048,7 +1690,7 @@ final class RootProxyManager {
+         report.section("最近启动耗时（毫秒）", "time="+prefs.getLong("proxyRootLastStartupAt",0L)+"\n"
+                 +prefs.getString("proxyRootLastStartupTiming","尚无启动记录"),2000);
+         try{
+-            ProxyConfigLibrary.Entry source=configs.selected(ProxyRuntimeProfile.load(prefs).core);
++            ProxyConfigLibrary.Entry source=configs.source(ProxyRuntimeProfile.load(prefs).core);
+             if(source!=null){
+                 byte[] contents=configs.read(source).getBytes(StandardCharsets.UTF_8);
+                 report.section("源配置标识", "bytes="+contents.length+"\nsha256="
+@@ -1059,7 +1701,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -60226,7 +60568,7 @@ index 9cd82da..bf63667 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1707,22 @@ final class RootProxyManager {
+@@ -1071,22 +1713,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -60254,7 +60596,7 @@ index 9cd82da..bf63667 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1735,7 @@ final class RootProxyManager {
+@@ -1099,7 +1741,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -60263,7 +60605,7 @@ index 9cd82da..bf63667 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1127,6 +1763,11 @@ final class RootProxyManager {
+@@ -1127,6 +1769,11 @@ final class RootProxyManager {
                  // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
                  if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
                  StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
@@ -60275,7 +60617,7 @@ index 9cd82da..bf63667 100644
                  int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                  destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                          .append(" uid=").append(metadata.optInt("uid",-1))
-@@ -1147,7 +1788,7 @@ final class RootProxyManager {
+@@ -1147,17 +1794,17 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -60284,7 +60626,10 @@ index 9cd82da..bf63667 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1798,7 @@ final class RootProxyManager {
+             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+-            ProxyConfigLibrary.Entry source=configs.selected(profile.core);
++            ProxyConfigLibrary.Entry source=configs.source(profile.core);
+             if(source!=null) report.section("DNS/TLS/保活配置（源文件，只含安全标量）",RuntimeCompatibility14.safeConfigSummary(configs.read(source)),2500);
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -60293,7 +60638,7 @@ index 9cd82da..bf63667 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1167,6 +1808,15 @@ final class RootProxyManager {
+@@ -1167,6 +1814,15 @@ final class RootProxyManager {
                      +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
              device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
              report.section("系统网络与消息排查线索",device,2500);
@@ -60309,7 +60654,7 @@ index 9cd82da..bf63667 100644
              MihomoControllerClient controller=new MihomoControllerClient(context);
              String mode14=controller.configs().optString("mode","unknown");
              JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
-@@ -1194,6 +1844,31 @@ final class RootProxyManager {
+@@ -1194,6 +1850,31 @@ final class RootProxyManager {
      }
      File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
 
@@ -60341,7 +60686,7 @@ index 9cd82da..bf63667 100644
      private void writeStartupCopy(String text)throws IOException{
          File target=startupFile(),dir=target.getParentFile();
          if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
-@@ -1207,10 +1882,14 @@ final class RootProxyManager {
+@@ -1207,10 +1888,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -60358,7 +60703,7 @@ index 9cd82da..bf63667 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1903,10 @@ final class RootProxyManager {
+@@ -1224,6 +1909,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -60369,7 +60714,7 @@ index 9cd82da..bf63667 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1924,7 @@ final class RootProxyManager {
+@@ -1241,7 +1930,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -60378,7 +60723,7 @@ index 9cd82da..bf63667 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1934,46 @@ final class RootProxyManager {
+@@ -1251,11 +1940,46 @@ final class RootProxyManager {
          }
      }
 
@@ -60426,7 +60771,7 @@ index 9cd82da..bf63667 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1987,155 @@ final class RootProxyManager {
+@@ -1269,14 +1993,155 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -60585,7 +60930,7 @@ index 9cd82da..bf63667 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2148,7 @@ final class RootProxyManager {
+@@ -1289,7 +2154,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -60594,7 +60939,7 @@ index 9cd82da..bf63667 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2172,7 @@ final class RootProxyManager {
+@@ -1313,7 +2178,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -60603,7 +60948,7 @@ index 9cd82da..bf63667 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2192,28 @@ final class RootProxyManager {
+@@ -1333,13 +2198,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -60633,7 +60978,7 @@ index 9cd82da..bf63667 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2240,53 @@ final class RootProxyManager {
+@@ -1366,13 +2246,53 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -60687,7 +61032,7 @@ index 9cd82da..bf63667 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2298,12 @@ final class RootProxyManager {
+@@ -1384,7 +2304,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -60701,7 +61046,7 @@ index 9cd82da..bf63667 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2312,13 @@ final class RootProxyManager {
+@@ -1393,6 +2318,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -60715,7 +61060,7 @@ index 9cd82da..bf63667 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,22 +2338,80 @@ final class RootProxyManager {
+@@ -1412,22 +2344,80 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -60805,6 +61150,57 @@ index 9cd82da..bf63667 100644
      }
      private void copyScriptAsset(File out)throws IOException{
          byte[] bytes;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java
+index 0a876fb..86a8182 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java
+@@ -1,7 +1,7 @@
+ package io.github.xgl34222220.hetu;
+
+ import java.io.IOException;
+-import java.io.StringReader;
++import java.io.Reader;
+ import java.util.*;
+ import org.yaml.snakeyaml.LoaderOptions;
+ import org.yaml.snakeyaml.Yaml;
+@@ -25,6 +25,28 @@ final class RuntimeYaml15 {
+     static final int MAX_NESTING_DEPTH = 50;
+     private RuntimeYaml15() {}
+
++    /**
++     * The text for SnakeYAML. SnakeYAML 2.3 (StreamReader.update) reads 1024 chars into a full char[1024]
++     * and, when the last one is a high surrogate (an emoji split at that edge), reads one more char into the
++     * same buffer: IndexOutOfBoundsException, for about one in thirty lengths of an emoji-rich file such as
++     * the built-in profile. This reader never ends a chunk on a high surrogate, so that read never happens.
++     */
++    static Reader reader(String text) {
++        return new Reader() {
++            private int at;
++            @Override public int read(char[] buffer, int offset, int length) {
++                if (length == 0) return 0;
++                if (at >= text.length()) return -1;
++                int n = Math.min(length, text.length() - at);
++                if (n > 1 && Character.isHighSurrogate(text.charAt(at + n - 1))) n--;
++                text.getChars(at, at + n, buffer, offset);
++                at += n;
++                return n;
++            }
++            @Override public void close() {}
++        };
++    }
++
+     static Node compose(String source) throws IOException {
+         if (source == null || source.trim().isEmpty())
+             throw failure("YAML_EMPTY", "启动配置为空", null);
+@@ -34,7 +56,7 @@ final class RuntimeYaml15 {
+             options.setNestingDepthLimit(MAX_NESTING_DEPTH);
+             options.setMaxAliasesForCollections(MAX_COLLECTION_ALIASES);
+             options.setAllowDuplicateKeys(false);
+-            Node root = new Yaml(new SafeConstructor(options)).compose(new StringReader(source));
++            Node root = new Yaml(new SafeConstructor(options)).compose(reader(source));
+             if (!(root instanceof MappingNode))
+                 throw failure("YAML_ROOT", "启动配置根节点应为键值映射", root == null ? null : root.getStartMark());
+             return root;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java
 new file mode 100644
 index 0000000..829bbef
@@ -61244,7 +61640,7 @@ index 0000000..bf80c61
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupDiagnostics.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupDiagnostics.java
 new file mode 100644
-index 0000000..18b60e4
+index 0000000..02726eb
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupDiagnostics.java
 @@ -0,0 +1,137 @@
@@ -61372,7 +61768,7 @@ index 0000000..18b60e4
 +    static Map<String, Object> dns(String yaml) {
 +        if (yaml == null || ProxyCoreConfig.looksJson(yaml) || !MihomoStartupConfig.hasTopLevelKey(yaml, "dns")) return null;
 +        try {
-+            Object root = ConfigReferenceCleaner.loader().load(yaml);
++            Object root = ConfigReferenceCleaner.loader().load(RuntimeYaml15.reader(yaml));
 +            return root instanceof Map ? ConfigReferenceCleaner.map(((Map<?, ?>) root).get("dns")) : null;
 +        } catch (YAMLException | ClassCastException invalid) {
 +            return null;
@@ -61386,7 +61782,7 @@ index 0000000..18b60e4
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
-index e4053e5..72b8798 100644
+index e4053e5..dcc502b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
 @@ -17,7 +17,39 @@ internal class ToolsAdblockChain(
@@ -61468,7 +61864,7 @@ index e4053e5..72b8798 100644
 +        val stats = if (running) quietly(AdblockRuntimeStats()) { ProxyRuntimeInspector(app).adblockRuntimeStats() } else AdblockRuntimeStats()
          val cachedRecent = prefs.getString("proxyAdblockRecentDomains", "").orEmpty().lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(8).toList()
 +        val profile = ProxyRuntimeProfile.load(prefs)
-+        val source = quietly<String?>(null) { ProxyConfigLibrary(app).let { lib -> lib.selected(profile.core)?.let { lib.read(it) } } }
++        val source = quietly<String?>(null) { ProxyConfigLibrary(app).let { lib -> lib.source(profile.core)?.let { lib.read(it) } } }
          ToolsAdblockChain(
              running = running,
              mode = mode,
@@ -70469,7 +70865,7 @@ index df92493..f724733 100644
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt
 new file mode 100644
-index 0000000..e526ede
+index 0000000..d5adefc
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt
 @@ -0,0 +1,386 @@
@@ -70483,7 +70879,6 @@ index 0000000..e526ede
 +import org.yaml.snakeyaml.representer.Representer
 +import java.io.File
 +import java.io.IOException
-+import java.io.StringReader
 +import java.nio.charset.StandardCharsets
 +import java.util.concurrent.Callable
 +import java.util.concurrent.ExecutionException
@@ -70631,7 +71026,8 @@ index 0000000..e526ede
 +                    maxAliasesForCollections = 4096
 +                    nestingDepthLimit = 60
 +                }
-+                Yaml(SafeConstructor(options)).load<Any?>(StringReader(source))
++                // Same SnakeYAML 2.3 chunk-edge workaround as every runtime parse (RuntimeYaml15.reader).
++                Yaml(SafeConstructor(options)).load<Any?>(RuntimeYaml15.reader(source))
 +            } catch (invalid: YAMLException) {
 +                throw IOException("YAML 语法或结构解析失败")
 +            }
@@ -86122,6 +86518,414 @@ index 366297a..e224bf7 100644
                      if (holdConfigs && request.path == "/configs") {
                          controllerReadEntered.countDown()
                          check(release.await(6, TimeUnit.SECONDS))
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java
+new file mode 100644
+index 0000000..6b43d4a
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java
+@@ -0,0 +1,402 @@
++package io.github.xgl34222220.hetu;
++
++import android.app.Application;
++import androidx.test.core.app.ApplicationProvider;
++import java.io.ByteArrayInputStream;
++import java.io.ByteArrayOutputStream;
++import java.io.File;
++import java.io.InputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.*;
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.annotation.Config;
++import org.yaml.snakeyaml.LoaderOptions;
++import org.yaml.snakeyaml.Yaml;
++import org.yaml.snakeyaml.constructor.SafeConstructor;
++import static org.junit.Assert.*;
++
++/**
++ * 2026-10-18 用户要求：sing-box / Xray / V2Fly / Hysteria 的内置配置要像 Mihomo 内置一样能用。
++ * 未修改的内置模板（占位节点）启动时跟随 Mihomo 内置配置（同一订阅、策略组与规则）；转换时 mrs 规则集换成各核心
++ * 自己能读的同一份数据，Mihomo 的具名直连 / 拒绝出口与 DNS 规则集照常生效；SnakeYAML 2.3 的分块边界 emoji 不再报错。
++ */
++@RunWith(RobolectricTestRunner.class)
++@Config(sdk = {35}, application = Application.class)
++public class CoreBuiltinParity446Test {
++    private static final String SUB = "https://sub.fixture.test/nodes";
++    private static final String NODES = "proxies:\n"
++            + "  - {name: HK 01, type: ss, server: 192.0.2.1, port: 8388, cipher: aes-128-gcm, password: p, udp: true}\n"
++            + "  - {name: JP 01, type: trojan, server: 192.0.2.2, port: 443, password: p, sni: a.example.com}\n"
++            + "  - {name: US 01, type: ss, server: 192.0.2.3, port: 8388, cipher: aes-128-gcm, password: p}\n";
++    private static final String META = "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/";
++    private static final String SING = "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/";
++    private static final List<ProxyRuntimeProfile.Core> NON_MIHOMO = Arrays.asList(ProxyRuntimeProfile.Core.SING_BOX,
++            ProxyRuntimeProfile.Core.SING_BOX_REF1ND, ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA);
++
++    private final List<String> fetched = new ArrayList<>();
++    private ProxyConfigLibrary library;
++
++    @Before public void reset() throws Exception {
++        Application app = ApplicationProvider.getApplicationContext();
++        app.getSharedPreferences("hetu", 0).edit().clear().commit();
++        delete(new File(app.getFilesDir(), "hetu/configs"));
++        library = new ProxyConfigLibrary(app);
++        fetched.clear();
++    }
++
++    private static void delete(File f) {
++        File[] children = f.listFiles();
++        if (children != null) for (File c : children) delete(c);
++        f.delete();
++    }
++
++    private String fetch(String url) {
++        fetched.add(url);
++        if (url.equals(SUB)) return NODES;
++        if (url.endsWith("/geoip/telegram.list")) return "91.108.4.0/22\n149.154.160.0/20\n";
++        if (url.endsWith("/geoip/netflix.list")) return "23.246.0.0/18\n";
++        if (url.endsWith("/Steam_OCD_Domain.yaml")) return "payload:\n  - '+.steamstatic.com'\n  - 'store.steampowered.com'\n";
++        return null;
++    }
++
++    private static ProxyCoreConfig.Options options() {
++        ProxyCoreConfig.Options o = new ProxyCoreConfig.Options();
++        o.tproxyPort = 19898; o.dnsPort = 11053; o.controllerPort = 29090; o.egressPort = 29150; o.secret = "fixture-secret";
++        return o;
++    }
++
++    private ProxyCoreConfig.Result build(ProxyRuntimeProfile.Core core, String source, ProxyCoreConfig.Options o) throws Exception {
++        return ProxyCoreConfig.build(core, source, o, this::fetch);
++    }
++
++    @SuppressWarnings("unchecked") private static Map<String, Object> map(Object o) { return (Map<String, Object>) o; }
++    @SuppressWarnings("unchecked") private static List<Object> list(Object o) { return (List<Object>) o; }
++
++    private static Map<String, Object> json(ProxyCoreConfig.Result r) throws Exception { return CoreJson.parseObject(r.config); }
++
++    private static Map<String, Object> ruleSet(Map<String, Object> config, String tag) {
++        for (Object o : list(map(config.get("route")).get("rule_set"))) if (tag.equals(map(o).get("tag"))) return map(o);
++        fail("rule_set " + tag + " missing");
++        return null;
++    }
++
++    private static Map<String, Object> outbound(Map<String, Object> config, String tag) {
++        for (Object o : list(config.get("outbounds"))) if (tag.equals(map(o).get("tag"))) return map(o);
++        return null;
++    }
++
++    /** The first route rule whose JSON names {@code needle}. */
++    private static Map<String, Object> ruleWith(List<Object> rules, String needle) {
++        for (Object o : rules) if (CoreJson.write(o).contains(needle)) return map(o);
++        fail("no rule names " + needle);
++        return null;
++    }
++
++    private static void noWarningMentions(ProxyCoreConfig.Result r, String... words) {
++        for (String w : r.warnings) for (String word : words) assertFalse(w, w.contains(word));
++    }
++
++    private static final String MRS_SOURCE = NODES
++            + "rule-providers:\n"
++            + "  CN: {type: http, behavior: domain, format: mrs, proxy: DIRECT, url: '" + META + "geosite/cn.mrs', path: ./r/cn.mrs}\n"
++            + "  NotCN: {type: http, behavior: domain, format: mrs, url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.mrs', path: ./r/x.mrs}\n"
++            + "  CN_IP: {type: http, behavior: ipcidr, format: mrs, proxy: DIRECT, url: '" + META + "geoip/cn.mrs', path: ./r/ip.mrs}\n"
++            + "  TG_IP: {type: http, behavior: ipcidr, format: mrs, proxy: DIRECT, url: '" + META + "geoip/telegram.mrs', path: ./r/tg.mrs}\n"
++            + "proxy-groups:\n  - {name: PROXY, type: select, proxies: [HK 01, JP 01]}\n"
++            + "rules:\n"
++            + "  - RULE-SET,CN,DIRECT\n"
++            + "  - RULE-SET,NotCN,PROXY\n"
++            + "  - AND,((DST-PORT,853),(RULE-SET,CN_IP,no-resolve)),DIRECT\n"
++            + "  - RULE-SET,TG_IP,PROXY,no-resolve\n"
++            + "  - GEOIP,netflix,PROXY\n"
++            + "  - MATCH,PROXY\n";
++
++    @Test public void metaRulesDatMrsBecomesTheSameSingBoxRuleSetOnTheSameMirror() throws Exception {
++        ProxyCoreConfig.Result r = build(ProxyRuntimeProfile.Core.SING_BOX, MRS_SOURCE, options());
++        noWarningMentions(r, "mrs", "规则集");
++        Map<String, Object> config = json(r);
++        Map<String, Object> cn = ruleSet(config, "rp-CN");
++        assertEquals("remote", cn.get("type"));
++        assertEquals("binary", cn.get("format"));
++        assertEquals(SING + "geosite/cn.srs", cn.get("url"));
++        assertEquals("proxy: DIRECT downloads direct, as in Mihomo", "DIRECT", cn.get("download_detour"));
++        Map<String, Object> notCn = ruleSet(config, "rp-NotCN");
++        assertEquals("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/geolocation-!cn.srs", notCn.get("url"));
++        assertEquals("no proxy: the final outbound, like the other remote rule-sets", "PROXY", notCn.get("download_detour"));
++        assertEquals(SING + "geoip/cn.srs", ruleSet(config, "rp-CN_IP").get("url"));
++        List<Object> rules = list(map(config.get("route")).get("rules"));
++        Map<String, Object> direct = ruleWith(rules, "\"rp-CN\"");
++        assertEquals("route", direct.get("action"));
++        assertEquals("DIRECT", direct.get("outbound"));
++        assertEquals("logical", ruleWith(rules, "rp-CN_IP").get("type"));
++        assertEquals("PROXY", ruleWith(rules, "rp-TG_IP").get("outbound"));
++        assertTrue("sing-box reads the srs itself: nothing is downloaded at conversion", fetched.isEmpty());
++    }
++
++    @Test public void xrayAndV2flyUseTheirOwnDatAndInlineOnlyWhatItLacks() throws Exception {
++        ProxyCoreConfig.Options o = options();
++        o.geositeNames = new HashSet<>(Arrays.asList("cn", "geolocation-!cn", "private"));
++        o.geoipNames = new HashSet<>(Arrays.asList("cn", "private")); // V2Fly's geoip.dat has no telegram / netflix
++        ProxyCoreConfig.Result r = build(ProxyRuntimeProfile.Core.V2FLY, MRS_SOURCE, o);
++        String config = r.config;
++        assertTrue(config.contains("\"geosite:cn\""));
++        assertTrue(config.contains("\"geosite:geolocation-!cn\""));
++        assertTrue(config.contains("\"geoip:cn\""));
++        assertTrue("telegram is not in the dat: its .list is inlined", config.contains("\"91.108.4.0/22\"") && config.contains("\"149.154.160.0/20\""));
++        assertFalse(config.contains("geoip:telegram"));
++        assertEquals(Collections.singletonList(META + "geoip/telegram.list"), fetched);
++        assertFalse("a GEOIP the dat lacks would stop V2Fly at start", config.contains("geoip:netflix"));
++        assertTrue(r.warnings.stream().anyMatch(w -> w.contains("geoip.dat 中没有 netflix")));
++        noWarningMentions(r, "mrs");
++
++        // Names that could not be read count as present (the dat is trusted, as before).
++        fetched.clear();
++        ProxyCoreConfig.Result unknown = build(ProxyRuntimeProfile.Core.XRAY, MRS_SOURCE, options());
++        assertTrue(unknown.config.contains("\"geoip:telegram\""));
++        assertTrue(unknown.config.contains("\"geoip:netflix\""));
++        assertTrue(fetched.isEmpty());
++        // Without geo assets the text twins are inlined instead.
++        fetched.clear();
++        ProxyCoreConfig.Options bare = options();
++        bare.geoAssets = false;
++        ProxyCoreConfig.Result inlined = build(ProxyRuntimeProfile.Core.XRAY, MRS_SOURCE, bare);
++        assertFalse(inlined.config.contains("geosite:"));
++        assertTrue(fetched.contains(META + "geosite/cn.list"));
++        assertTrue(fetched.contains("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.list"));
++    }
++
++    @Test public void otherMrsSourcesUseTheirPublishedTwins() throws Exception {
++        String source = NODES + "rule-providers:\n"
++                + "  Steam: {type: http, behavior: domain, format: mrs, url: 'https://testingcf.jsdelivr.net/gh/peiyingyao/Rule-for-OCD@master/rule/Clash/Steam/Steam_OCD_Domain.mrs', path: ./r/s.mrs}\n"
++                + "  Ads: {type: http, behavior: domain, format: mrs, proxy: DIRECT, url: 'https://gcore.jsdelivr.net/gh/217heidai/adblockfilters@main/rules/adblockmihomo.mrs', path: ./r/a.mrs}\n"
++                + "  Gone: {type: http, behavior: domain, format: mrs, url: 'https://rules.fixture.test/gone.mrs', path: ./r/g.mrs}\n"
++                + "proxy-groups:\n  - {name: PROXY, type: select, proxies: [HK 01]}\n"
++                + "rules:\n  - RULE-SET,Ads,REJECT\n  - RULE-SET,Steam,PROXY\n  - RULE-SET,Gone,PROXY\n  - MATCH,PROXY\n";
++        ProxyCoreConfig.Result sing = build(ProxyRuntimeProfile.Core.SING_BOX, source, options());
++        Map<String, Object> config = json(sing);
++        Map<String, Object> steam = ruleSet(config, "rp-Steam");
++        assertEquals("inline", steam.get("type"));
++        String steamJson = CoreJson.write(steam);
++        assertTrue(steamJson.contains("steamstatic.com") && steamJson.contains("store.steampowered.com"));
++        Map<String, Object> ads = ruleSet(config, "rp-Ads");
++        assertEquals("https://gcore.jsdelivr.net/gh/217heidai/adblockfilters@main/rules/adblocksingbox.srs", ads.get("url"));
++        assertEquals("DIRECT", ads.get("download_detour"));
++        assertEquals("reject", ruleWith(list(map(config.get("route")).get("rules")), "rp-Ads").get("action"));
++        assertTrue(sing.warnings.stream().anyMatch(w -> w.contains("规则集 Gone") && w.contains("无法下载")));
++        assertTrue(fetched.contains("https://testingcf.jsdelivr.net/gh/peiyingyao/Rule-for-OCD@master/rule/Clash/Steam/Steam_OCD_Domain.yaml"));
++        assertFalse("the ad-block srs is not fetched as text", fetched.stream().anyMatch(u -> u.contains("adblockfilters")));
++
++        fetched.clear();
++        ProxyCoreConfig.Result xray = build(ProxyRuntimeProfile.Core.XRAY, source, options());
++        assertTrue(xray.config.contains("\"domain:steamstatic.com\"") && xray.config.contains("\"full:store.steampowered.com\""));
++        assertTrue(xray.warnings.stream().anyMatch(w -> w.contains("规则集 Ads") && w.contains("没有当前核心可读取的版本")));
++        assertFalse("the 7 MB text list is never downloaded for Xray", fetched.stream().anyMatch(u -> u.contains("adblockfilters")));
++    }
++
++    @Test public void namedDirectAndRejectExitsKeepTheirMeaning() throws Exception {
++        String source = "proxies:\n"
++                + "  - {name: 本地直连, type: direct, udp: true}\n"
++                + "  - {name: 拒绝连接, type: reject}\n"
++                + "  - {name: HK 01, type: ss, server: 192.0.2.1, port: 8388, cipher: aes-128-gcm, password: p}\n"
++                + "proxy-groups:\n"
++                + "  - {name: PROXY, type: select, proxies: [HK 01, 本地直连]}\n"
++                + "  - {name: ADS, type: select, proxies: [拒绝连接, 本地直连]}\n"
++                + "  - {name: CN, type: select, proxies: [本地直连, PROXY]}\n"
++                + "rules:\n"
++                + "  - DOMAIN-SUFFIX,ads.example,ADS\n"
++                + "  - DOMAIN-SUFFIX,blocked.example,拒绝连接\n"
++                + "  - DOMAIN-SUFFIX,cn.example,CN\n"
++                + "  - DOMAIN-SUFFIX,home.example,本地直连\n"
++                + "  - MATCH,PROXY\n";
++        ProxyCoreConfig.Result sing = build(ProxyRuntimeProfile.Core.SING_BOX, source, options());
++        noWarningMentions(sing, "本地直连", "拒绝连接 不可用");
++        assertEquals("named exits are not servers", 1, sing.nodes);
++        Map<String, Object> config = json(sing);
++        assertEquals(Arrays.asList("HK 01", "DIRECT"), outbound(config, "PROXY").get("outbounds"));
++        assertEquals("DIRECT", outbound(config, "CN").get("default"));
++        assertNull("a selector that rejects by default becomes reject rules", outbound(config, "ADS"));
++        assertTrue(sing.warnings.stream().anyMatch(w -> w.contains("策略组 ADS 默认拒绝连接")));
++        List<Object> rules = list(map(config.get("route")).get("rules"));
++        assertEquals("reject", ruleWith(rules, "ads.example").get("action"));
++        assertEquals("reject", ruleWith(rules, "blocked.example").get("action"));
++        assertEquals("DIRECT", ruleWith(rules, "home.example").get("outbound"));
++        assertEquals("CN", ruleWith(rules, "cn.example").get("outbound"));
++
++        ProxyCoreConfig.Result xray = build(ProxyRuntimeProfile.Core.XRAY, source, options());
++        assertEquals(1, xray.nodes);
++        List<Object> xrules = list(map(CoreJson.parseObject(xray.config).get("routing")).get("rules"));
++        assertEquals(ProxyCoreConfig.TAG_BLOCK, ruleWith(xrules, "ads.example").get("outboundTag"));
++        assertEquals(ProxyCoreConfig.TAG_BLOCK, ruleWith(xrules, "blocked.example").get("outboundTag"));
++        assertEquals(ProxyCoreConfig.TAG_DIRECT, ruleWith(xrules, "cn.example").get("outboundTag"));
++        assertEquals(ProxyCoreConfig.TAG_DIRECT, ruleWith(xrules, "home.example").get("outboundTag"));
++    }
++
++    @Test public void singBoxDnsFollowsTheFakeIpFilterAndNameserverPolicyRuleSets() throws Exception {
++        String source = "proxies:\n"
++                + "  - {name: 本地直连, type: direct}\n"
++                + "  - {name: HK 01, type: ss, server: 192.0.2.1, port: 8388, cipher: aes-128-gcm, password: p}\n"
++                + "rule-providers:\n"
++                + "  CN: {type: http, behavior: domain, format: mrs, url: '" + META + "geosite/cn.mrs', path: ./r/cn.mrs}\n"
++                + "  Bank: {type: http, behavior: domain, format: mrs, url: '" + META + "geosite/category-bank-cn.mrs', path: ./r/b.mrs}\n"
++                + "  Private: {type: http, behavior: domain, format: mrs, url: '" + META + "geosite/private.mrs', path: ./r/p.mrs}\n"
++                + "  CN_IP: {type: http, behavior: ipcidr, format: mrs, url: '" + META + "geoip/cn.mrs', path: ./r/ip.mrs}\n"
++                + "proxy-groups:\n  - {name: PROXY, type: select, proxies: [HK 01]}\n"
++                + "dns:\n"
++                + "  enable: true\n"
++                + "  enhanced-mode: fake-ip\n"
++                + "  fake-ip-range: 198.18.0.1/16\n"
++                + "  fake-ip-filter: ['rule-set:CN,Private', 'rule-set:Bank', 'rule-set:CN_IP', '+.lan']\n"
++                + "  default-nameserver: [223.5.5.5]\n"
++                + "  nameserver: ['https://1.1.1.1/dns-query#PROXY']\n"
++                + "  nameserver-policy:\n"
++                + "    'rule-set:CN': ['https://223.5.5.5/dns-query#DIRECT&disable-ipv6=true', 'https://1.12.12.12/dns-query#DIRECT']\n"
++                + "    'rule-set:Bank': ['https://223.5.5.5/dns-query#本地直连']\n"
++                + "    'rule-set:Private': ['https://1.1.1.1/dns-query#PROXY']\n"
++                + "rules:\n  - RULE-SET,CN,DIRECT\n  - MATCH,PROXY\n";
++        Map<String, Object> config = json(build(ProxyRuntimeProfile.Core.SING_BOX, source, options()));
++        List<Object> rules = list(map(config.get("dns")).get("rules"));
++        assertEquals(Arrays.asList("rp-CN", "rp-Bank"), map(rules.get(0)).get("rule_set"));
++        assertEquals("dns-direct", map(rules.get(0)).get("server"));
++        assertEquals(Collections.singletonList("rp-Private"), map(rules.get(1)).get("rule_set"));
++        assertEquals("dns-remote", map(rules.get(1)).get("server"));
++        assertTrue(CoreJson.write(rules.get(2)).contains("\"lan\""));
++        assertEquals("dns-fake", map(rules.get(rules.size() - 1)).get("server"));
++        assertFalse("an IP rule-set is no DNS condition", CoreJson.write(map(config.get("dns"))).contains("rp-CN_IP"));
++        // Rule-sets only the DNS names are defined for the route as well.
++        assertEquals(SING + "geosite/category-bank-cn.srs", ruleSet(config, "rp-Bank").get("url"));
++
++        // Without fake-ip the policy alone picks the direct DNS.
++        Map<String, Object> real = json(build(ProxyRuntimeProfile.Core.SING_BOX, source.replace("enhanced-mode: fake-ip", "enhanced-mode: redir-host"), options()));
++        List<Object> realRules = list(map(real.get("dns")).get("rules"));
++        assertEquals(1, realRules.size());
++        assertEquals(Arrays.asList("rp-CN", "rp-Bank"), map(realRules.get(0)).get("rule_set"));
++    }
++
++    private static byte[] varint(int v) {
++        ByteArrayOutputStream out = new ByteArrayOutputStream();
++        while (v >= 0x80) { out.write((v & 0x7f) | 0x80); v >>>= 7; }
++        out.write(v);
++        return out.toByteArray();
++    }
++
++    /** One GeoSite / GeoIP entry: country_code (field 1) followed by a body field. */
++    private static byte[] entry(String name, int body) {
++        ByteArrayOutputStream inner = new ByteArrayOutputStream();
++        byte[] n = name.getBytes(StandardCharsets.UTF_8);
++        inner.write(0x0a); inner.writeBytes(varint(n.length)); inner.writeBytes(n);
++        inner.write(0x12); inner.writeBytes(varint(body)); inner.writeBytes(new byte[body]);
++        ByteArrayOutputStream outer = new ByteArrayOutputStream();
++        outer.write(0x0a); outer.writeBytes(varint(inner.size())); outer.writeBytes(inner.toByteArray());
++        return outer.toByteArray();
++    }
++
++    @Test public void datNamesReadOnlyTheCategoryNames() throws Exception {
++        File dir = Files.createTempDirectory("dat").toFile();
++        File dat = new File(dir, "geosite.dat");
++        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
++        bytes.writeBytes(entry("CN", 300));
++        bytes.writeBytes(entry("GEOLOCATION-!CN", 5));
++        Files.write(dat.toPath(), bytes.toByteArray());
++        assertEquals(new HashSet<>(Arrays.asList("cn", "geolocation-!cn")), ProxyCoreConfig.datNames(dat));
++        byte[] whole = bytes.toByteArray();
++        Files.write(dat.toPath(), Arrays.copyOf(whole, whole.length - 3));
++        assertNull("a truncated file is not a dat", ProxyCoreConfig.datNames(dat));
++        Files.write(dat.toPath(), "{\"not\":\"a dat\"}".getBytes(StandardCharsets.UTF_8));
++        assertNull(ProxyCoreConfig.datNames(dat));
++        Files.write(dat.toPath(), new byte[0]);
++        assertNull(ProxyCoreConfig.datNames(dat));
++        assertNull(ProxyCoreConfig.datNames(new File(dir, "missing.dat")));
++        assertTrue(ProxyCoreConfig.inDat(new HashSet<>(Collections.singletonList("microsoft")), "Microsoft@CN"));
++        assertFalse(ProxyCoreConfig.inDat(new HashSet<>(Collections.singletonList("cn")), "telegram"));
++        assertTrue("unknown names count as present", ProxyCoreConfig.inDat(null, "telegram"));
++    }
++
++    @Test public void snakeYamlChunkEdgeEmojiNoLongerBreaksParsing() throws Exception {
++        // 🎯's high surrogate is the 1024th char: SnakeYAML 2.3 then reads past its full char[1024].
++        String text = "a: '" + "x".repeat(1019) + "🎯'\nproxy-groups: []\n";
++        assertTrue(Character.isHighSurrogate(text.charAt(1023)));
++        try {
++            new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
++            fail("the fixture no longer reaches SnakeYAML's chunk edge; re-check RuntimeYaml15.reader");
++        } catch (IndexOutOfBoundsException expected) {
++            // The library defect the reader works around.
++        }
++        assertNotNull(RuntimeYaml15.compose(text));
++        assertEquals(text, ConfigReferenceCleaner.mihomo(text).text);
++        assertEquals("x".repeat(1019) + "🎯", ProxyCoreConfig.Profile.loadYaml(text).get("a"));
++        // The built-in itself, with every subscription URL length that moves its emoji across a chunk edge.
++        String builtin = builtin();
++        for (int pad = 0; pad < 1024; pad++) {
++            String url = "https://sub.fixture.test/" + "x".repeat(pad);
++            String source = builtin.replace("https://example.invalid/bichen-subscription-1", url);
++            ConfigReferenceCleaner.mihomo(source);
++            RuntimeYaml15.compose(source);
++        }
++    }
++
++    private static String builtin() throws Exception {
++        try (InputStream in = BundledProxyConfig.open()) { return new String(in.readAllBytes(), StandardCharsets.UTF_8); }
++    }
++
++    @Test public void theMihomoBuiltInConvertsWithAllItsRuleSets() throws Exception {
++        String source = builtin().replace("https://example.invalid/bichen-subscription-1", SUB);
++        ProxyCoreConfig.Result sing = build(ProxyRuntimeProfile.Core.SING_BOX, source, options());
++        noWarningMentions(sing, "mrs", "规则集", "本地直连", "拒绝连接 不可用");
++        Map<String, Object> config = json(sing);
++        assertEquals("every rule-provider of the built-in", 36, list(map(config.get("route")).get("rule_set")).size());
++        assertEquals(Arrays.asList("rp-Bank_CN", "rp-CN_域", "rp-BiliBili", "rp-DouYin"), map(list(map(config.get("dns")).get("rules")).get(0)).get("rule_set"));
++        assertEquals(3, sing.nodes);
++
++        fetched.clear();
++        ProxyCoreConfig.Options v2fly = options();
++        v2fly.geositeNames = null;
++        v2fly.geoipNames = new HashSet<>(Arrays.asList("cn", "private"));
++        ProxyCoreConfig.Result v2 = build(ProxyRuntimeProfile.Core.V2FLY, source, v2fly);
++        assertTrue(v2.config.contains("\"geosite:cn\""));
++        assertTrue(v2.config.contains("\"geosite:microsoft@cn\""));
++        assertTrue(fetched.contains(META + "geoip/telegram.list"));
++        assertTrue(fetched.contains(META + "geoip/netflix.list"));
++        // Only the ad-block list has no form Xray / V2Fly read.
++        for (String w : v2.warnings) if (w.contains("规则集")) assertTrue(w, w.startsWith("规则集 去广告 "));
++    }
++
++    @Test public void anUneditedBuiltInTemplateFollowsMihomosBuiltIn() throws Exception {
++        for (ProxyRuntimeProfile.Core core : NON_MIHOMO) {
++            String name = BundledCoreTemplates.name(core);
++            library.select(core, name);
++            assertEquals(name, library.selected(core).name);
++            ProxyConfigLibrary.Entry source = library.source(core);
++            assertEquals(ProxyRuntimeProfile.Core.MIHOMO, source.core);
++            assertEquals(ProxyConfigLibrary.BUNDLED_NAME, source.name);
++        }
++        // A template the user filled with a server stands on its own.
++        ProxyConfigLibrary.Entry xray = library.selected(ProxyRuntimeProfile.Core.XRAY);
++        library.write(xray, BundledCoreTemplates.XRAY.replace(BundledCoreTemplates.PLACEHOLDER_HOST, "node.example.com"));
++        assertEquals(BundledCoreTemplates.XRAY_NAME, library.source(ProxyRuntimeProfile.Core.XRAY).name);
++        assertEquals(ProxyRuntimeProfile.Core.XRAY, library.source(ProxyRuntimeProfile.Core.XRAY).core);
++        // So does the user's own file, and Mihomo keeps its own selection.
++        ProxyConfigLibrary.Entry own = library.importConfig(ProxyRuntimeProfile.Core.SING_BOX, "mine.json",
++                new ByteArrayInputStream("{\"outbounds\":[{\"type\":\"direct\",\"tag\":\"d\"}]}".getBytes(StandardCharsets.UTF_8)));
++        assertEquals(own.name, library.source(ProxyRuntimeProfile.Core.SING_BOX).name);
++        assertEquals(library.selected(ProxyRuntimeProfile.Core.MIHOMO).name, library.source(ProxyRuntimeProfile.Core.MIHOMO).name);
++    }
++
++    @Test public void theBuiltInSubscriptionSlotIsAPlaceholderUntilFilled() throws Exception {
++        ProxyConfigLibrary.Entry mihomo = library.selected(ProxyRuntimeProfile.Core.MIHOMO);
++        List<ProxyConfigLibrary.Subscription> slots = library.subscriptions(mihomo);
++        assertEquals(1, slots.size());
++        assertTrue("the shipped example.invalid slot is unfilled", slots.get(0).placeholder);
++        assertFalse(library.hasConfiguredSubscription(mihomo));
++        library.select(ProxyRuntimeProfile.Core.SING_BOX, BundledCoreTemplates.SING_BOX_NAME);
++        assertFalse(library.hasConfiguredSubscription(library.source(ProxyRuntimeProfile.Core.SING_BOX)));
++        // Filling it once serves Mihomo and every core whose built-in follows Mihomo's.
++        library.updateSubscription(library.source(ProxyRuntimeProfile.Core.SING_BOX), slots.get(0).name, SUB);
++        assertTrue(library.hasConfiguredSubscription(mihomo));
++        assertEquals(SUB, library.subscriptions(library.source(ProxyRuntimeProfile.Core.SING_BOX)).get(0).url);
++        assertTrue(BundledCoreTemplates.hasPlaceholderNode(library.read(library.selected(ProxyRuntimeProfile.Core.SING_BOX))));
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt
 new file mode 100644
 index 0000000..c0a9ffb
@@ -94815,10 +95619,10 @@ index 0000000..86ec97f
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt
 new file mode 100644
-index 0000000..e6be278
+index 0000000..44e20ac
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt
-@@ -0,0 +1,273 @@
+@@ -0,0 +1,274 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -94848,6 +95652,7 @@ index 0000000..e6be278
 +import androidx.compose.ui.graphics.toPixelMap
 +import androidx.compose.ui.platform.testTag
 +import androidx.compose.ui.test.assertTextEquals
++import androidx.compose.ui.test.click
 +import androidx.compose.ui.test.getUnclippedBoundsInRoot
 +import androidx.compose.ui.test.junit4.createAndroidComposeRule
 +import androidx.compose.ui.test.onNodeWithTag
