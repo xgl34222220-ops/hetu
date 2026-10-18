@@ -39,7 +39,12 @@ def load():
 
 
 def save(state):
-    path().write_text(json.dumps(state, indent=1, sort_keys=True))
+    # Whole-file replace: a reader polling the model (a test, or a concurrent fake iptables-save) never sees
+    # the truncated file a plain write_text leaves between open and write.
+    p = path()
+    tmp = p.with_name('%s.%d.tmp' % (p.name, os.getpid()))
+    tmp.write_text(json.dumps(state, indent=1, sort_keys=True))
+    os.replace(str(tmp), str(p))
 
 
 def log(entry):

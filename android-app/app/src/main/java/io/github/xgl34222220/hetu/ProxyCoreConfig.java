@@ -514,14 +514,21 @@ final class ProxyCoreConfig {
                 Map<String, Object> copy = new LinkedHashMap<>(item);
                 if (override != null) for (Map.Entry<String, Object> e : override.entrySet())
                     if (!"name".equals(e.getKey()) && !e.getKey().startsWith("additional-")) copy.put(e.getKey(), e.getValue());
-                if (override != null && !str(override, "additional-prefix").isEmpty()) copy.put("name", str(override, "additional-prefix") + str(copy, "name"));
-                if (override != null && !str(override, "additional-suffix").isEmpty()) copy.put("name", str(copy, "name") + str(override, "additional-suffix"));
+                // Untrimmed, like Mihomo: the built-in's suffix is " [订阅]" (names must match the core's own).
+                String prefix = affix(override, "additional-prefix"), suffix = affix(override, "additional-suffix");
+                if (!prefix.isEmpty()) copy.put("name", prefix + str(copy, "name"));
+                if (!suffix.isEmpty()) copy.put("name", str(copy, "name") + suffix);
                 int before = nodes.size();
                 addNode(copy, warnings, name);
                 if (nodes.size() > before) added.add(new ArrayList<>(nodes.keySet()).get(nodes.size() - 1));
             }
             if (added.isEmpty()) warnings.add("订阅 " + name + " 没有可用节点");
             return added;
+        }
+
+        static String affix(Map<String, Object> override, String key) {
+            Object v = override == null ? null : override.get(key);
+            return v == null ? "" : String.valueOf(v);
         }
 
         static Pattern regex(String text, List<String> warnings) {

@@ -343,10 +343,12 @@ public class CoreBuiltinParity446Test {
     }
 
     @Test public void theMihomoBuiltInConvertsWithAllItsRuleSets() throws Exception {
-        String source = builtin().replace("https://example.invalid/bichen-subscription-1", SUB);
+        String source = ProxyConfigLibrary.repairedBuiltin(builtin()).replace("https://example.invalid/bichen-subscription-1", SUB);
         ProxyCoreConfig.Result sing = build(ProxyRuntimeProfile.Core.SING_BOX, source, options());
-        noWarningMentions(sing, "mrs", "规则集", "本地直连", "拒绝连接 不可用");
+        noWarningMentions(sing, "mrs", "规则集", "本地直连", "拒绝连接 不可用", "节点选择 没有", "手动选择 没有", "故障转移 没有", "AI 稳定 没有");
         Map<String, Object> config = json(sing);
+        for (String group : Arrays.asList("节点选择", "手动选择", "故障转移"))
+            assertEquals(group, Arrays.asList("HK 01 [订阅]", "JP 01 [订阅]", "US 01 [订阅]"), outbound(config, group).get("outbounds"));
         assertEquals("every rule-provider of the built-in", 36, list(map(config.get("route")).get("rule_set")).size());
         assertEquals(Arrays.asList("rp-Bank_CN", "rp-CN_域", "rp-BiliBili", "rp-DouYin"), map(list(map(config.get("dns")).get("rules")).get(0)).get("rule_set"));
         assertEquals(3, sing.nodes);
@@ -398,5 +400,42 @@ public class CoreBuiltinParity446Test {
         assertTrue(library.hasConfiguredSubscription(mihomo));
         assertEquals(SUB, library.subscriptions(library.source(ProxyRuntimeProfile.Core.SING_BOX)).get(0).url);
         assertTrue(BundledCoreTemplates.hasPlaceholderNode(library.read(library.selected(ProxyRuntimeProfile.Core.SING_BOX))));
+    }
+
+    @Test public void theBuiltInNoJunkFilterNoLongerEmptiesTheMainGroups() throws Exception {
+        String shipped = builtin();
+        assertTrue("4.4.4 and earlier shipped the old line", shipped.contains(ProxyConfigLibrary.OLD_NO_JUNK_FILTER));
+        String repaired = ProxyConfigLibrary.repairedBuiltin(shipped);
+        assertFalse(repaired.contains(ProxyConfigLibrary.OLD_NO_JUNK_FILTER));
+        assertTrue(repaired.contains(ProxyConfigLibrary.NO_JUNK_FILTER));
+        assertEquals("only that line changes", shipped.replace(ProxyConfigLibrary.OLD_NO_JUNK_FILTER, ""), repaired.replace(ProxyConfigLibrary.NO_JUNK_FILTER, ""));
+        // The provider filter, which runs before the " [订阅]" suffix, still drops announcement entries.
+        String provider = shipped.substring(shipped.indexOf("BaseProvider: &BaseProvider"), shipped.indexOf("proxy-providers:"));
+        assertTrue(provider.contains("exclude-filter:") && provider.contains("订阅") && provider.contains("剩余"));
+        // Under the old line every 订阅 node is excluded from 节点选择 (Mihomo's semantics, which the converter keeps).
+        String old = shipped.replace("https://example.invalid/bichen-subscription-1", SUB);
+        ProxyCoreConfig.Result before = build(ProxyRuntimeProfile.Core.SING_BOX, old, options());
+        assertTrue(before.warnings.stream().anyMatch(w -> w.contains("策略组 节点选择 没有可用成员")));
+    }
+
+    @Test public void theLibraryWritesAndRepairsTheBuiltIn() throws Exception {
+        ProxyConfigLibrary.Entry fresh = library.selected(ProxyRuntimeProfile.Core.MIHOMO);
+        String text = library.read(fresh);
+        assertTrue(text.contains(ProxyConfigLibrary.NO_JUNK_FILTER));
+        assertFalse(text.contains(ProxyConfigLibrary.OLD_NO_JUNK_FILTER));
+        // An existing built-in from 4.4.4 with the user's subscription: only the filter line changes.
+        String user = builtin().replace("https://example.invalid/bichen-subscription-1", SUB);
+        Files.write(fresh.file.toPath(), user.getBytes(StandardCharsets.UTF_8));
+        assertTrue(fresh.file.setLastModified(fresh.file.lastModified() - 10_000));
+        ProxyConfigLibrary again = new ProxyConfigLibrary(ApplicationProvider.getApplicationContext());
+        String repaired = again.read(again.selected(ProxyRuntimeProfile.Core.MIHOMO));
+        assertEquals(ProxyConfigLibrary.repairedBuiltin(user), repaired);
+        assertEquals(SUB, again.subscriptions(again.selected(ProxyRuntimeProfile.Core.MIHOMO)).get(0).url);
+        // A filter the user rewrote is theirs.
+        String custom = user.replace(ProxyConfigLibrary.OLD_NO_JUNK_FILTER, "NoJunkFilter: &NoJunkFilter '(?i)(到期|订阅)'");
+        Files.write(fresh.file.toPath(), custom.getBytes(StandardCharsets.UTF_8));
+        assertTrue(fresh.file.setLastModified(fresh.file.lastModified() - 20_000));
+        ProxyConfigLibrary third = new ProxyConfigLibrary(ApplicationProvider.getApplicationContext());
+        assertEquals(custom, third.read(third.selected(ProxyRuntimeProfile.Core.MIHOMO)));
     }
 }

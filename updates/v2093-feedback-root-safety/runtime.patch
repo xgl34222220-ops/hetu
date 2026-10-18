@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..38c43b5 100644
+index 8a43698..e829d0d 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -8,8 +8,8 @@ index 8a43698..38c43b5 100644
          targetSdk = 35
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
-+        versionCode = 2101
-+        versionName = "4.4.4"
++        versionCode = 2102
++        versionName = "5.0.0"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -53247,6 +53247,21 @@ index 0000000..fe1a275
 +
 +    static final long STABLE_DELAY_MS = 2500L;
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java
+index d8b6925..5221074 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java
+@@ -18,7 +18,9 @@ final class ProxyAdblockCoordinator {
+     static void enter(Context context) throws Exception {
+         Context app=context.getApplicationContext();
+         SharedPreferences prefs=app.getSharedPreferences("hetu",Context.MODE_PRIVATE);
+-        if(prefs.getBoolean("proxyAdblockChainActive",false))return;
++        // The flag outlives a session that never reached a clean stop (killed App, watchdog exit, reboot): a DNS VPN
++        // running now is still paused, or it would sit next to the Root proxy for the whole session.
++        if(prefs.getBoolean("proxyAdblockChainActive",false)&&!DnsVpnService.running)return;
+
+         boolean resumeDns=DnsVpnService.running && prefs.getBoolean("vpnWanted",false);
+         prefs.edit()
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
 index 17eab36..a7bd311 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
@@ -54120,10 +54135,10 @@ index 4f004b9..de94775 100644
 -    }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
-index 34aa171..5b05b44 100644
+index 34aa171..21dc406 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
-@@ -29,14 +29,15 @@ final class ProxyConfigLibrary {
+@@ -29,21 +29,81 @@ final class ProxyConfigLibrary {
      }
 
      static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
@@ -54135,13 +54150,30 @@ index 34aa171..5b05b44 100644
      private File dir(ProxyRuntimeProfile.Core core){return new File(root,core.id);}
      private String key(ProxyRuntimeProfile.Core core){return "proxySelectedConfig."+core.id;}
 
++    /**
++     * The built-in's NoJunkFilter up to 4.4.4. Its 订阅 also matches the " [订阅]" suffix the 订阅 slot adds to every
++     * node name, and Mihomo applies a group's exclude-filter after that suffix: 节点选择 / 手动选择 / 故障转移 / AI 稳定
++     * were left without a node and fell back to COMPATIBLE, i.e. direct. Announcement entries are already dropped by the
++     * provider's own exclude-filter, which runs before the suffix, so the group filter no longer needs the word.
++     */
++    static final String OLD_NO_JUNK_FILTER="NoJunkFilter: &NoJunkFilter '(?i)(剩余|流量|到期|套餐|官网|客服|公告|频道|订阅)'";
++    static final String NO_JUNK_FILTER="NoJunkFilter: &NoJunkFilter '(?i)(剩余|流量|到期|套餐|官网|客服|公告|频道)'";
++    /** The built-in text with the 4.4.4 NoJunkFilter line (exactly as shipped) replaced; anything else is kept byte for byte. */
++    static String repairedBuiltin(String text){return text==null?null:text.replace(OLD_NO_JUNK_FILTER,NO_JUNK_FILTER);}
++    /** Built-in files already checked in this process, by path → length:mtime (a rewritten file is checked again). */
++    private static final Map<String,String> CHECKED_BUILTIN=new java.util.concurrent.ConcurrentHashMap<>();
++
      private void ensureBundled(ProxyRuntimeProfile.Core core){
 -        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)return;
 +        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART){ensureCoreTemplate(core);return;}
          try{
              File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
-             if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
-@@ -44,6 +45,49 @@ final class ProxyConfigLibrary {
+-            if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
++            if(!target.isFile()){
++                String text;try(InputStream in=BundledProxyConfig.open()){text=new String(readAll(in),StandardCharsets.UTF_8);}
++                writeStreamAtomic(target,new ByteArrayInputStream(repairedBuiltin(text).getBytes(StandardCharsets.UTF_8)));
++            }else repairBuiltin(target);
+             String selected=prefs.getString(key(core),"");if(selected.isEmpty()||!new File(d,selected).isFile())prefs.edit().putString(key(core),BUNDLED_NAME).apply();
          }catch(Exception ignored){}
      }
 
@@ -54191,7 +54223,7 @@ index 34aa171..5b05b44 100644
      List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
      Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}
      void select(ProxyRuntimeProfile.Core core,String name)throws IOException{ensureBundled(core);String n=safeName(name);File f=new File(dir(core),n);if(!f.isFile()||!coreAccepts(core,n))throw new IOException("配置不存在或格式不属于当前核心");prefs.edit().putString(key(core),n).apply();}
-@@ -64,14 +108,14 @@ final class ProxyConfigLibrary {
+@@ -64,14 +124,14 @@ final class ProxyConfigLibrary {
      void write(Entry e,String text)throws IOException{if(e==null)throw new IOException("尚未选择配置");if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");byte[] b=text.getBytes(StandardCharsets.UTF_8);if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");File d=e.file.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,e.file.getName()+".new");try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(b);out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}replaceAtomic(tmp,e.file);}
      void delete(Entry e)throws IOException{
          if(e==null)return;
@@ -54208,6 +54240,29 @@ index 34aa171..5b05b44 100644
          String n=safeName(requestedName);
          if(!coreAccepts(e.core,n))throw new IOException(e.core.label+" 不支持该配置格式");
          if(n.equals(e.name))return e;
+@@ -122,6 +182,22 @@ final class ProxyConfigLibrary {
+         write(entry,result);
+     }
+
++    /** An existing built-in (the user's subscription filled in) gets only the NoJunkFilter line repaired, once per version of the file. */
++    private void repairBuiltin(File target){
++        String signature=target.length()+":"+target.lastModified(),path=target.getAbsolutePath();
++        if(signature.equals(CHECKED_BUILTIN.get(path)))return;
++        try{
++            byte[] bytes=Files.readAllBytes(target.toPath());
++            if(bytes.length<=LIMIT){
++                String text=new String(bytes,StandardCharsets.UTF_8),fixed=repairedBuiltin(text);
++                if(!fixed.equals(text))writeStreamAtomic(target,new ByteArrayInputStream(fixed.getBytes(StandardCharsets.UTF_8)));
++            }
++            CHECKED_BUILTIN.put(path,target.length()+":"+target.lastModified());
++        }catch(IOException unreadable){/* left as it is; the next access tries again */}
++    }
++
++    private static byte[] readAll(InputStream in)throws IOException{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){out.write(b,0,n);if(out.size()>LIMIT)throw new IOException("配置超过 4 MiB");}return out.toByteArray();}
++
+     private static String uniqueName(File dir,String requested)throws IOException{
+         File direct=new File(dir,requested);if(!direct.exists())return requested;
+         int dot=requested.lastIndexOf('.');
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
 index 76318e4..618767e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
@@ -54247,10 +54302,10 @@ index 76318e4..618767e 100644
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
 new file mode 100644
-index 0000000..1e89747
+index 0000000..5851167
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
-@@ -0,0 +1,2153 @@
+@@ -0,0 +1,2160 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.BufferedInputStream;
@@ -54767,14 +54822,21 @@ index 0000000..1e89747
 +                Map<String, Object> copy = new LinkedHashMap<>(item);
 +                if (override != null) for (Map.Entry<String, Object> e : override.entrySet())
 +                    if (!"name".equals(e.getKey()) && !e.getKey().startsWith("additional-")) copy.put(e.getKey(), e.getValue());
-+                if (override != null && !str(override, "additional-prefix").isEmpty()) copy.put("name", str(override, "additional-prefix") + str(copy, "name"));
-+                if (override != null && !str(override, "additional-suffix").isEmpty()) copy.put("name", str(copy, "name") + str(override, "additional-suffix"));
++                // Untrimmed, like Mihomo: the built-in's suffix is " [订阅]" (names must match the core's own).
++                String prefix = affix(override, "additional-prefix"), suffix = affix(override, "additional-suffix");
++                if (!prefix.isEmpty()) copy.put("name", prefix + str(copy, "name"));
++                if (!suffix.isEmpty()) copy.put("name", str(copy, "name") + suffix);
 +                int before = nodes.size();
 +                addNode(copy, warnings, name);
 +                if (nodes.size() > before) added.add(new ArrayList<>(nodes.keySet()).get(nodes.size() - 1));
 +            }
 +            if (added.isEmpty()) warnings.add("订阅 " + name + " 没有可用节点");
 +            return added;
++        }
++
++        static String affix(Map<String, Object> override, String key) {
++            Object v = override == null ? null : override.get(key);
++            return v == null ? "" : String.valueOf(v);
 +        }
 +
 +        static Pattern regex(String text, List<String> warnings) {
@@ -86520,10 +86582,10 @@ index 366297a..e224bf7 100644
                          check(release.await(6, TimeUnit.SECONDS))
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java
 new file mode 100644
-index 0000000..6b43d4a
+index 0000000..8e24817
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java
-@@ -0,0 +1,402 @@
+@@ -0,0 +1,441 @@
 +package io.github.xgl34222220.hetu;
 +
 +import android.app.Application;
@@ -86869,10 +86931,12 @@ index 0000000..6b43d4a
 +    }
 +
 +    @Test public void theMihomoBuiltInConvertsWithAllItsRuleSets() throws Exception {
-+        String source = builtin().replace("https://example.invalid/bichen-subscription-1", SUB);
++        String source = ProxyConfigLibrary.repairedBuiltin(builtin()).replace("https://example.invalid/bichen-subscription-1", SUB);
 +        ProxyCoreConfig.Result sing = build(ProxyRuntimeProfile.Core.SING_BOX, source, options());
-+        noWarningMentions(sing, "mrs", "规则集", "本地直连", "拒绝连接 不可用");
++        noWarningMentions(sing, "mrs", "规则集", "本地直连", "拒绝连接 不可用", "节点选择 没有", "手动选择 没有", "故障转移 没有", "AI 稳定 没有");
 +        Map<String, Object> config = json(sing);
++        for (String group : Arrays.asList("节点选择", "手动选择", "故障转移"))
++            assertEquals(group, Arrays.asList("HK 01 [订阅]", "JP 01 [订阅]", "US 01 [订阅]"), outbound(config, group).get("outbounds"));
 +        assertEquals("every rule-provider of the built-in", 36, list(map(config.get("route")).get("rule_set")).size());
 +        assertEquals(Arrays.asList("rp-Bank_CN", "rp-CN_域", "rp-BiliBili", "rp-DouYin"), map(list(map(config.get("dns")).get("rules")).get(0)).get("rule_set"));
 +        assertEquals(3, sing.nodes);
@@ -86924,6 +86988,43 @@ index 0000000..6b43d4a
 +        assertTrue(library.hasConfiguredSubscription(mihomo));
 +        assertEquals(SUB, library.subscriptions(library.source(ProxyRuntimeProfile.Core.SING_BOX)).get(0).url);
 +        assertTrue(BundledCoreTemplates.hasPlaceholderNode(library.read(library.selected(ProxyRuntimeProfile.Core.SING_BOX))));
++    }
++
++    @Test public void theBuiltInNoJunkFilterNoLongerEmptiesTheMainGroups() throws Exception {
++        String shipped = builtin();
++        assertTrue("4.4.4 and earlier shipped the old line", shipped.contains(ProxyConfigLibrary.OLD_NO_JUNK_FILTER));
++        String repaired = ProxyConfigLibrary.repairedBuiltin(shipped);
++        assertFalse(repaired.contains(ProxyConfigLibrary.OLD_NO_JUNK_FILTER));
++        assertTrue(repaired.contains(ProxyConfigLibrary.NO_JUNK_FILTER));
++        assertEquals("only that line changes", shipped.replace(ProxyConfigLibrary.OLD_NO_JUNK_FILTER, ""), repaired.replace(ProxyConfigLibrary.NO_JUNK_FILTER, ""));
++        // The provider filter, which runs before the " [订阅]" suffix, still drops announcement entries.
++        String provider = shipped.substring(shipped.indexOf("BaseProvider: &BaseProvider"), shipped.indexOf("proxy-providers:"));
++        assertTrue(provider.contains("exclude-filter:") && provider.contains("订阅") && provider.contains("剩余"));
++        // Under the old line every 订阅 node is excluded from 节点选择 (Mihomo's semantics, which the converter keeps).
++        String old = shipped.replace("https://example.invalid/bichen-subscription-1", SUB);
++        ProxyCoreConfig.Result before = build(ProxyRuntimeProfile.Core.SING_BOX, old, options());
++        assertTrue(before.warnings.stream().anyMatch(w -> w.contains("策略组 节点选择 没有可用成员")));
++    }
++
++    @Test public void theLibraryWritesAndRepairsTheBuiltIn() throws Exception {
++        ProxyConfigLibrary.Entry fresh = library.selected(ProxyRuntimeProfile.Core.MIHOMO);
++        String text = library.read(fresh);
++        assertTrue(text.contains(ProxyConfigLibrary.NO_JUNK_FILTER));
++        assertFalse(text.contains(ProxyConfigLibrary.OLD_NO_JUNK_FILTER));
++        // An existing built-in from 4.4.4 with the user's subscription: only the filter line changes.
++        String user = builtin().replace("https://example.invalid/bichen-subscription-1", SUB);
++        Files.write(fresh.file.toPath(), user.getBytes(StandardCharsets.UTF_8));
++        assertTrue(fresh.file.setLastModified(fresh.file.lastModified() - 10_000));
++        ProxyConfigLibrary again = new ProxyConfigLibrary(ApplicationProvider.getApplicationContext());
++        String repaired = again.read(again.selected(ProxyRuntimeProfile.Core.MIHOMO));
++        assertEquals(ProxyConfigLibrary.repairedBuiltin(user), repaired);
++        assertEquals(SUB, again.subscriptions(again.selected(ProxyRuntimeProfile.Core.MIHOMO)).get(0).url);
++        // A filter the user rewrote is theirs.
++        String custom = user.replace(ProxyConfigLibrary.OLD_NO_JUNK_FILTER, "NoJunkFilter: &NoJunkFilter '(?i)(到期|订阅)'");
++        Files.write(fresh.file.toPath(), custom.getBytes(StandardCharsets.UTF_8));
++        assertTrue(fresh.file.setLastModified(fresh.file.lastModified() - 20_000));
++        ProxyConfigLibrary third = new ProxyConfigLibrary(ApplicationProvider.getApplicationContext());
++        assertEquals(custom, third.read(third.selected(ProxyRuntimeProfile.Core.MIHOMO)));
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt
@@ -91138,6 +91239,67 @@ index 0000000..cd3ad28
 +        // Every detector belongs to a row of the existing catalogue (grouped as before).
 +        val rows = setOf("chatgpt", "claude", "gemini", "tiktok", "bilibili", "disney", "hulu", "netflix", "spotify", "twitch", "youtube", "apple", "github", "steam")
 +        assertEquals(rows, NetworkUnlock.checkIds)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NoNetwork500Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NoNetwork500Test.java
+new file mode 100644
+index 0000000..808752f
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NoNetwork500Test.java
+@@ -0,0 +1,55 @@
++package io.github.xgl34222220.hetu;
++
++import android.app.Application;
++import android.content.Context;
++import android.content.SharedPreferences;
++import androidx.test.core.app.ApplicationProvider;
++import java.io.IOException;
++import org.junit.After;
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.annotation.Config;
++import static org.junit.Assert.*;
++
++/**
++ * 5.0.0「测速有网但实际没网，停止启动都一样」: a Root proxy start always pauses Hetu's own standalone DNS VPN, also
++ * when the chain flag survived a session that never reached a clean stop (killed App, watchdog exit, reboot).
++ */
++@RunWith(RobolectricTestRunner.class)
++@Config(sdk = {35}, application = Application.class)
++public class NoNetwork500Test {
++    private Application app;
++    private SharedPreferences prefs;
++    private boolean running;
++
++    @Before public void reset() {
++        app = ApplicationProvider.getApplicationContext();
++        prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE);
++        prefs.edit().clear().commit();
++        running = DnsVpnService.running;
++    }
++
++    @After public void restore() { DnsVpnService.running = running; }
++
++    @Test public void aStaleChainFlagStillPausesARunningDnsVpn() throws Exception {
++        prefs.edit().putBoolean("proxyAdblockChainActive", true).putBoolean("vpnWanted", true).commit();
++        DnsVpnService.running = true;
++        try {
++            ProxyAdblockCoordinator.enter(app);
++            fail("a running DNS VPN must be paused; it never stops here, so the start is refused instead of sharing the network");
++        } catch (IOException expected) {
++            assertTrue(expected.getMessage(), expected.getMessage().contains("未能及时暂停"));
++            assertFalse(prefs.getBoolean("proxyAdblockChainActive", true));
++        }
++        assertTrue("the DNS VPN comes back after the proxy stops", prefs.getBoolean("proxyResumeDnsAfterChain", false));
++    }
++
++    @Test public void aStaleChainFlagWithoutADnsVpnHasNothingToPause() throws Exception {
++        prefs.edit().putBoolean("proxyAdblockChainActive", true).commit();
++        DnsVpnService.running = false;
++        ProxyAdblockCoordinator.enter(app);
++        assertTrue(prefs.getBoolean("proxyAdblockChainActive", false));
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/OverrideScriptPipeline102Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/OverrideScriptPipeline102Test.kt
