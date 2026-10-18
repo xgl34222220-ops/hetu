@@ -1,7 +1,7 @@
-name: hetu-4.4.4-asset-upload
+name: hetu-5.0.0-release
 on:
   push:
-    branches: [hark/tmp-release-asset-4.4.4]
+    branches: [hark/tmp-release-asset-5.0.0]
 permissions:
   contents: write
   actions: read
@@ -12,14 +12,35 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Hetu-APK-arm64
-          run-id: 39007940081
+          run-id: 39109060656
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: xgl34222220-ops/hetu
           path: apk
-      - name: Verify and upload
+      - name: Verify, create the release and upload
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           ls -la apk
-          echo "0bb7b64efe8b8b73568ef4752cb94e85ba5ca72e61d7fc6a507510462fbd7eed  apk/Hetu-4.4.4-arm64-v8a.apk" | sha256sum -c -
-          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/vnd.android.package-archive" --data-binary @apk/Hetu-4.4.4-arm64-v8a.apk "https://uploads.github.com/repos/xgl34222220-ops/hetu/releases/415653635/assets?name=Hetu-4.4.4.apk"
+          echo "c97729870385c858e97433bfa8f53c89f7b79065a5a073484be5ce7ba4e4c292  apk/Hetu-5.0.0-arm64-v8a.apk" | sha256sum -c -
+          cp apk/Hetu-5.0.0-arm64-v8a.apk Hetu-5.0.0.apk
+          cat > notes.md <<'NOTES'
+          ## 河图 5.0.0
+
+          修复「测速有网，但实际没网」和「用着用着就没网」；sing-box / Xray / V2Fly / Hysteria 的内置配置现在跟随 Mihomo 内置配置，可以直接使用。
+
+          - **内置配置的主策略组被过滤成直连**：内置 Mihomo 配置里「节点选择 / 手动选择 / 故障转移 / AI 稳定」用来排除公告节点的过滤词包含「订阅」，而「订阅」槽位的节点名都带「 [订阅]」后缀，这四个组因此一个节点都没有，按直连处理。节点和地区组测速正常，最终兜底、Google 等默认流量却走直连，重启也不会变。已修正，升级后自动修复已有的内置配置（只改这一行，订阅链接和其他修改保留）。
+          - **看门狗只断开走失败节点的连接**：节点无响应时，先让自动选择的组重新测速，再只关闭经过该节点或策略组的连接；直连的游戏、国内应用和其他节点上的连接不受影响，也不再重载或重启核心。
+          - **其他内核的内置配置**：未修改的 sing-box / Xray / V2Fly / Hysteria 内置模板启动时转换 Mihomo 内置配置（同一订阅、策略组和规则，订阅只需填一次）。Mihomo 专用的 mrs 规则集换成各内核能读的同一份数据；🎯 本地直连 / ⛔ 拒绝连接 正确识别。
+          - **独立 DNS 过滤**：启动代理时总会先暂停独立 DNS 过滤，不再因上次异常结束而与代理同时运行。
+          - **配置解析**：修复部分订阅链接长度下 YAML 解析崩溃（SnakeYAML 分块边界遇到 emoji）。
+
+          已知限制：sing-box 首次启动需直连 testingcf.jsdelivr.net 下载规则集，下载失败时 sing-box 无法启动（之后使用缓存）；Xray / V2Fly 不转换「去广告」规则集（可用河图自带广告过滤）；Hysteria 只使用一个 hysteria2 节点，分流规则不生效。
+
+          尚未完成真机验证。
+
+          SHA-256: `c97729870385c858e97433bfa8f53c89f7b79065a5a073484be5ce7ba4e4c292`
+
+          NOTES
+          gh release create v5.0.0 Hetu-5.0.0.apk --repo xgl34222220-ops/hetu --target defa2bfe0c2819ca1fda7e090b5ddac5d50efada --title '河图 5.0.0' --notes-file notes.md
+          gh release view v5.0.0 --repo xgl34222220-ops/hetu --json tagName,targetCommitish,assets --jq '{tag: .tagName, target: .targetCommitish, assets: [.assets[] | {name, size, digest}]}'
