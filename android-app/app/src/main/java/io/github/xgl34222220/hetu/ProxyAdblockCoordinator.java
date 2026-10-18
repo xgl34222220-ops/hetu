@@ -18,7 +18,9 @@ final class ProxyAdblockCoordinator {
     static void enter(Context context) throws Exception {
         Context app=context.getApplicationContext();
         SharedPreferences prefs=app.getSharedPreferences("hetu",Context.MODE_PRIVATE);
-        if(prefs.getBoolean("proxyAdblockChainActive",false))return;
+        // The flag outlives a session that never reached a clean stop (killed App, watchdog exit, reboot): a DNS VPN
+        // running now is still paused, or it would sit next to the Root proxy for the whole session.
+        if(prefs.getBoolean("proxyAdblockChainActive",false)&&!DnsVpnService.running)return;
 
         boolean resumeDns=DnsVpnService.running && prefs.getBoolean("vpnWanted",false);
         prefs.edit()

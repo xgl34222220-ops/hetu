@@ -29,17 +29,34 @@ final class ProxyConfigLibrary {
     }
 
     static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
-    static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER);}}
+    /** placeholder: an unfilled slot. Any URL on the reserved example.invalid host is one: the shipped Mihomo built-in's slot is https://example.invalid/bichen-subscription-1. */
+    static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER)||u.contains("://"+BundledCoreTemplates.PLACEHOLDER_HOST+"/");}}
     private static final class CollatorHolder {static final java.text.Collator ORDER=java.text.Collator.getInstance(Locale.CHINA);}
 
     private File dir(ProxyRuntimeProfile.Core core){return new File(root,core.id);}
     private String key(ProxyRuntimeProfile.Core core){return "proxySelectedConfig."+core.id;}
 
+    /**
+     * The built-in's NoJunkFilter up to 4.4.4. Its 订阅 also matches the " [订阅]" suffix the 订阅 slot adds to every
+     * node name, and Mihomo applies a group's exclude-filter after that suffix: 节点选择 / 手动选择 / 故障转移 / AI 稳定
+     * were left without a node and fell back to COMPATIBLE, i.e. direct. Announcement entries are already dropped by the
+     * provider's own exclude-filter, which runs before the suffix, so the group filter no longer needs the word.
+     */
+    static final String OLD_NO_JUNK_FILTER="NoJunkFilter: &NoJunkFilter '(?i)(剩余|流量|到期|套餐|官网|客服|公告|频道|订阅)'";
+    static final String NO_JUNK_FILTER="NoJunkFilter: &NoJunkFilter '(?i)(剩余|流量|到期|套餐|官网|客服|公告|频道)'";
+    /** The built-in text with the 4.4.4 NoJunkFilter line (exactly as shipped) replaced; anything else is kept byte for byte. */
+    static String repairedBuiltin(String text){return text==null?null:text.replace(OLD_NO_JUNK_FILTER,NO_JUNK_FILTER);}
+    /** Built-in files already checked in this process, by path → length:mtime (a rewritten file is checked again). */
+    private static final Map<String,String> CHECKED_BUILTIN=new java.util.concurrent.ConcurrentHashMap<>();
+
     private void ensureBundled(ProxyRuntimeProfile.Core core){
         if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART){ensureCoreTemplate(core);return;}
         try{
             File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
-            if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
+            if(!target.isFile()){
+                String text;try(InputStream in=BundledProxyConfig.open()){text=new String(readAll(in),StandardCharsets.UTF_8);}
+                writeStreamAtomic(target,new ByteArrayInputStream(repairedBuiltin(text).getBytes(StandardCharsets.UTF_8)));
+            }else repairBuiltin(target);
             String selected=prefs.getString(key(core),"");if(selected.isEmpty()||!new File(d,selected).isFile())prefs.edit().putString(key(core),BUNDLED_NAME).apply();
         }catch(Exception ignored){}
     }
@@ -70,6 +87,22 @@ final class ProxyConfigLibrary {
         try{select(core,name);return name;}catch(IOException e){return null;}
     }
     static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
+
+    /**
+     * The non-Mihomo built-in template still on its placeholder node (example.invalid) cannot reach any server, so a
+     * start of that core follows Mihomo's built-in instead: 河图内置-TPROXY.yaml with the user's subscription, its
+     * groups and rules, converted for the core at start (ProxyCoreConfig). Returns that Mihomo entry, or null when
+     * {@code e} is anything else (the user's own file, or a template the user filled with a server).
+     */
+    Entry followedBuiltin(Entry e){
+        if(e==null||e.core==ProxyRuntimeProfile.Core.MIHOMO||e.core==ProxyRuntimeProfile.Core.MIHOMO_SMART||!BundledCoreTemplates.isBundledName(e.name))return null;
+        try{if(!BundledCoreTemplates.hasPlaceholderNode(read(e)))return null;}catch(IOException unreadable){return null;}
+        ensureBundled(ProxyRuntimeProfile.Core.MIHOMO);
+        File f=new File(dir(ProxyRuntimeProfile.Core.MIHOMO),BUNDLED_NAME);
+        return f.isFile()?new Entry(ProxyRuntimeProfile.Core.MIHOMO,BUNDLED_NAME,f):null;
+    }
+    /** The config a start of {@code core} reads its nodes, subscriptions, groups and rules from: the selection, or the built-in it follows. */
+    Entry source(ProxyRuntimeProfile.Core core){Entry s=selected(core);Entry f=followedBuiltin(s);return f!=null?f:s;}
 
     List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
     Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}
@@ -148,6 +181,22 @@ final class ProxyConfigLibrary {
         if(!read(entry).equals(yaml.source))throw new IOException("配置已变化，请重新打开后重试；未修改源文件");
         write(entry,result);
     }
+
+    /** An existing built-in (the user's subscription filled in) gets only the NoJunkFilter line repaired, once per version of the file. */
+    private void repairBuiltin(File target){
+        String signature=target.length()+":"+target.lastModified(),path=target.getAbsolutePath();
+        if(signature.equals(CHECKED_BUILTIN.get(path)))return;
+        try{
+            byte[] bytes=Files.readAllBytes(target.toPath());
+            if(bytes.length<=LIMIT){
+                String text=new String(bytes,StandardCharsets.UTF_8),fixed=repairedBuiltin(text);
+                if(!fixed.equals(text))writeStreamAtomic(target,new ByteArrayInputStream(fixed.getBytes(StandardCharsets.UTF_8)));
+            }
+            CHECKED_BUILTIN.put(path,target.length()+":"+target.lastModified());
+        }catch(IOException unreadable){/* left as it is; the next access tries again */}
+    }
+
+    private static byte[] readAll(InputStream in)throws IOException{ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){out.write(b,0,n);if(out.size()>LIMIT)throw new IOException("配置超过 4 MiB");}return out.toByteArray();}
 
     private static String uniqueName(File dir,String requested)throws IOException{
         File direct=new File(dir,requested);if(!direct.exists())return requested;

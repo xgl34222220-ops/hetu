@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -38,7 +39,9 @@ internal fun Modifier.homeDiffuseCanvas(background: Color?, washHeight: Float): 
     if (c.dark && c.bg == Color.Black && base == c.bg) return this.background(base)
     // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
     // soft light at the top. No coloured blobs; cached per size, nothing animates.
-    val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
+    // A non-default accent tints the mist too, so the wash and the canvas share one hue.
+    val neutralMist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
+    val mist = if (c.canvasTint.isSpecified) lerp(neutralMist, c.canvasTint, if (c.dark) .22f else .30f) else neutralMist
     val material = remember(c, base, washHeight) { Modifier.drawWithCache {
         val wash = Brush.verticalGradient(startY = 0f, endY = washHeight, colors = listOf(
             lerp(base, if (c.dark) Color(0xFF1B2330) else Color.White, if (c.dark) .30f else .42f),

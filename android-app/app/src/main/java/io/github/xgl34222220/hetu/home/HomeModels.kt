@@ -126,6 +126,15 @@ internal data class HomeResource(
     val hasGap: Boolean get() = cpuHistory.any { it == null } || memoryHistoryMb.any { it == null }
 }
 
+/**
+ * The last half minute of the 网速 card's own figures (one point a second, oldest first). A null
+ * entry is a second the source gave no value for, so the backdrop curve shows the gap.
+ */
+internal data class HomeSpeedHistory(
+    val upload: List<Long?> = emptyList(),
+    val download: List<Long?> = emptyList(),
+)
+
 /** Observations stay separate: a core PID, local takeover and Internet reachability differ. */
 internal data class HomeConnectionObservation(
     val controllerReady: Boolean = false,
@@ -195,6 +204,8 @@ internal data class HomeUiState(
     val speedSource: HomeSpeedSource = HomeSpeedSource.Api,
     val uploadBytesPerSecond: Long? = null,
     val downloadBytesPerSecond: Long? = null,
+    /** Recent throughput behind the 网速 figures, oldest first; drawn as a faint backdrop only. */
+    val speedHistory: HomeSpeedHistory = HomeSpeedHistory(),
     val subscription: HomeSubscription? = null,
     val resource: HomeResource = HomeResource(),
     /** Audit G1: the current core's 「上次可启动」 copy; the start-failure sheet offers it when present. */

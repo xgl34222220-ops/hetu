@@ -543,18 +543,30 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
         )
         val detailVisible = (vm.tab == HxTab.Home && homeDetail) || (vm.tab == HxTab.Tools && toolsDetail)
         androidx.compose.runtime.SideEffect { onDockOccupancyChanged(if (detailVisible || !dockVisible) 0.dp else dockHeight) }
-        if (!detailVisible) HetuGlassDock(
-            items = items,
-            selected = selectedIndex,
-            onSelect = { index ->
-                val next = dockTabs[index.coerceIn(0, dockTabs.lastIndex)]
-                if (next == vm.tab) vm.reselect++ else vm.tab = next
-            },
-            hazeState = dockHaze,
-            backdrop = null,
-            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
-            onHeightChanged = { measuredDockHeight = it },
-        )
+        val dock: @Composable (Modifier) -> Unit = { placement ->
+            HetuGlassDock(
+                items = items,
+                selected = selectedIndex,
+                onSelect = { index ->
+                    val next = dockTabs[index.coerceIn(0, dockTabs.lastIndex)]
+                    if (next == vm.tab) vm.reselect++ else vm.tab = next
+                },
+                hazeState = dockHaze,
+                backdrop = null,
+                modifier = placement.offset { IntOffset(0, dockShift.value.roundToPx()) },
+                onHeightChanged = { measuredDockHeight = it },
+            )
+        }
+        // A detail page owns the bottom edge: the dock slides down out of its way and back up on
+        // return instead of vanishing. With reduced motion it simply hides, as before.
+        if (motion) AnimatedVisibility(
+            visible = !detailVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(spring(dampingRatio = .88f, stiffness = 420f)) { it } + fadeIn(tween(160)),
+            exit = slideOutVertically(tween(220, easing = HxMotion.Exit)) { it } + fadeOut(tween(180)),
+            label = "dock-detail",
+        ) { dock(Modifier) }
+        else if (!detailVisible) dock(Modifier.align(Alignment.BottomCenter))
     }
 }
 

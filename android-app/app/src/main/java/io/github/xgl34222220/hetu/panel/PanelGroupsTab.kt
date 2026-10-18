@@ -57,6 +57,8 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.homeEnter
+import io.github.xgl34222220.hetu.home.homePressTint
+import io.github.xgl34222220.hetu.home.rememberHomeFlaggedName
 import io.github.xgl34222220.hetu.home.homeTap
 import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.ui.HetuStaggerState
@@ -182,11 +184,13 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
     val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
     val opened = ht("已展开")
     val closed = ht("已收起")
+    val press = remember { MutableInteractionSource() }
     val shell = modifier
         .testTag("panel-group:${group.name}")
         .semantics { stateDescription = if (expanded) opened else closed }
-        .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+        .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button, interactionSource = press) { haptics(HomeHaptic.Tap); onClick() }
         .homeGlassPanel(PanelDims.groupShape, fill)
+        .homePressTint(press)
         .border(1.5.dp, outline, PanelDims.groupShape)
         .padding(start = 13.dp, end = 12.dp,
             top = if (compactInline) 8.dp else if (compact) 13.dp else 17.dp,
@@ -300,7 +304,7 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
             PanelSwapFade(testing, motion) { busy ->
                 if (busy) HomeSpinner(size = 18.dp) else Icon(PanelIcons.Gauge, null, Modifier.size(20.dp), tint = c.accent)
             }
-            Text(ht(if (testing) "测速中" else "测速"), color = c.accent, style = HomeType.buttonSmall)
+            Text(ht(if (testing) "测速中" else "测速"), color = c.accentText, style = HomeType.buttonSmall)
         }
     }
 }
@@ -334,7 +338,7 @@ private fun NodeCard(
     val compact = view.layout.compactNodes
     val source = remember { MutableInteractionSource() }
     val motion = LocalHomeMotionEnabled.current
-    val rest = if (c.dark) c.sunken else c.sunken
+    val rest = c.sunken
     val fill by animateColorAsState(if (selected) lerp(rest, c.accent, if (c.dark) .20f else .09f) else rest, HomeMotion.fade(motion), label = "nodeFill")
     val outline by animateColorAsState(
         when { selected -> c.accent.copy(alpha = .62f); switching -> c.accent.copy(alpha = .28f); else -> Color.Transparent },
@@ -348,6 +352,7 @@ private fun NodeCard(
         .hetuPressScale(source, pressedScale = .975f, motion = motion)
         .clip(PanelDims.nodeShape)
         .background(fill)
+        .homePressTint(source)
         .border(1.5.dp, outline, PanelDims.nodeShape)
         .combinedClickable(
             interactionSource = source,
@@ -358,11 +363,13 @@ private fun NodeCard(
             onClick = { haptics(HomeHaptic.Confirm); onSelect() },
         )
         .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 8.dp)
+    // A leading flag emoji is drawn as the group cards' vector flag; the text itself is unchanged.
+    val (label, flag) = rememberHomeFlaggedName(node.name, PanelType.nodeName)
     val name: @Composable (Modifier) -> Unit = { m ->
         Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
-                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis,
+                label, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
+                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis, inlineContent = flag,
             )
             PanelSwapFade(switching, motion) { busy ->
                 if (busy) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)

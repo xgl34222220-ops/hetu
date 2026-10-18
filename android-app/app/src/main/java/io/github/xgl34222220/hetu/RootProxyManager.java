@@ -529,7 +529,8 @@ final class RootProxyManager {
      * ports, DNS port, controller/egress ports and fake-IP routing metadata as the Mihomo path.
      */
     private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
-        ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
+        // An unedited built-in template (placeholder node) follows Mihomo's built-in: same subscription, groups and rules.
+        ProxyConfigLibrary.Entry selected=configs.source(profile.core);
         if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
         // Audit G1: a 「上次可启动」 start reads the saved effective source; the user's file is not touched.
         String lastGood=LAST_GOOD_SOURCE.get();
@@ -592,6 +593,11 @@ final class RootProxyManager {
         o.cnIpDirect=profile.cnIpDirect;
         File geo=new File(cores.file(profile.core).getParentFile(),profile.core.id+".geosite.dat");
         o.geoAssets=geo.isFile()&&geo.length()>0;
+        // Categories the shipped dats hold: one a rule names but the dat lacks would stop Xray / V2Fly at start.
+        if(o.geoAssets){
+            o.geositeNames=ProxyCoreConfig.datNames(geo);
+            o.geoipNames=ProxyCoreConfig.datNames(new File(geo.getParentFile(),profile.core.id+".geoip.dat"));
+        }
         if(adblock!=null){
             o.adblock=adblockDomains(adblock.file);
             o.adblockAllow=adblockDomains(adblock.allowFile);
@@ -1684,7 +1690,7 @@ final class RootProxyManager {
         report.section("最近启动耗时（毫秒）", "time="+prefs.getLong("proxyRootLastStartupAt",0L)+"\n"
                 +prefs.getString("proxyRootLastStartupTiming","尚无启动记录"),2000);
         try{
-            ProxyConfigLibrary.Entry source=configs.selected(ProxyRuntimeProfile.load(prefs).core);
+            ProxyConfigLibrary.Entry source=configs.source(ProxyRuntimeProfile.load(prefs).core);
             if(source!=null){
                 byte[] contents=configs.read(source).getBytes(StandardCharsets.UTF_8);
                 report.section("源配置标识", "bytes="+contents.length+"\nsha256="
@@ -1793,7 +1799,7 @@ final class RootProxyManager {
         }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
         try {
             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
-            ProxyConfigLibrary.Entry source=configs.selected(profile.core);
+            ProxyConfigLibrary.Entry source=configs.source(profile.core);
             if(source!=null) report.section("DNS/TLS/保活配置（源文件，只含安全标量）",RuntimeCompatibility14.safeConfigSummary(configs.read(source)),2500);
             String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                     +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "

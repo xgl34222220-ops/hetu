@@ -210,7 +210,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.label.copy(fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.title, Modifier.weight(1f), color = c.accentText, style = HomeType.label.copy(fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(item.line.toString(), color = c.t2, style = HomeType.delay)
                         ToolsChevron()
                     }

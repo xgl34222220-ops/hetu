@@ -44,7 +44,7 @@ final class ConfigReferenceCleaner {
         if (yaml == null || !MihomoStartupConfig.hasTopLevelKey(yaml, "proxy-groups")) return new Result(yaml, notices, false);
         Map<String, Object> root;
         try {
-            Object loaded = loader().load(yaml);
+            Object loaded = loader().load(RuntimeYaml15.reader(yaml));
             if (!(loaded instanceof Map)) return new Result(yaml, notices, false);
             @SuppressWarnings("unchecked") Map<String, Object> m = (Map<String, Object>) loaded;
             root = m;

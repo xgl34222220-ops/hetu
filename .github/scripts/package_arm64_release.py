@@ -60,7 +60,7 @@ def main():
     parser.add_argument('output', type=Path, help='arm64-v8a-only release APK to write')
     parser.add_argument('--keystore', default=os.environ.get('HETU_TEST_KEYSTORE'))
     parser.add_argument('--runtime-manifest', default='out/verification/packaged-runtime.json')
-    parser.add_argument('--version-code', default='2101')
+    parser.add_argument('--version-code', default='2102')
     parser.add_argument('--report', default='out/verification/release-arm64-apk.json')
     parser.add_argument('--signing-sha256', default=SIGNING_SHA256, help='Expected signer (override only for local dry runs)')
     args = parser.parse_args()

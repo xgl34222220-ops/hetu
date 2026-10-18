@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--release', default='android-app/app/build/outputs/apk/release/app-release.apk')
     parser.add_argument('--debug', default='android-app/app/build/outputs/apk/debug/app-debug.apk')
-    parser.add_argument('--version-code', default='2101')
+    parser.add_argument('--version-code', default='2102')
     parser.add_argument('--output', default='out/verification/release-apk.json')
     args = parser.parse_args()
     release, debug = Path(args.release), Path(args.debug)

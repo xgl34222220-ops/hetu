@@ -152,7 +152,7 @@ internal object ToolsRuntimeBridge {
         val stats = if (running) quietly(AdblockRuntimeStats()) { ProxyRuntimeInspector(app).adblockRuntimeStats() } else AdblockRuntimeStats()
         val cachedRecent = prefs.getString("proxyAdblockRecentDomains", "").orEmpty().lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(8).toList()
         val profile = ProxyRuntimeProfile.load(prefs)
-        val source = quietly<String?>(null) { ProxyConfigLibrary(app).let { lib -> lib.selected(profile.core)?.let { lib.read(it) } } }
+        val source = quietly<String?>(null) { ProxyConfigLibrary(app).let { lib -> lib.source(profile.core)?.let { lib.read(it) } } }
         ToolsAdblockChain(
             running = running,
             mode = mode,

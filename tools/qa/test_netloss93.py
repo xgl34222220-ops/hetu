@@ -15,8 +15,11 @@ assets/hetu-root.sh and run under /bin/sh against temporary fixtures:
 * restart budget: at most WD_RESTART_MAX per window and boot; restart replays the exact arguments
   in a clean environment and gives the watchdog PID back when it fails.
 * proxy egress (partial outage): the group the rules end in is probed through the controller;
-  only failures while DIRECT works count; three of them close all connections, then reload in
-  place (Mihomo POST /restart), then restart the core, each step behind an exponential backoff.
+  only failures while DIRECT works count; three of them re-test the auto-select groups and close
+  only the connections whose chain passes through the failing group (DIRECT and other groups stay
+  up), behind an exponential backoff; the core is never reloaded or restarted for a dead node
+  (4.4.4 field report: "玩着玩着就没网" while every connection was dropped). A data-plane outage
+  re-checks the capture rules without closing connections.
 * network change: an App repair-network call leaves a kick that makes the watchdog re-probe.
 * rule shapes: preserve_existing_tcp never lets a fake-IP destination go direct, the network
   stack UID 1073 stays out of DNS takeover (captured resolver); cgroup memory limit uses memory.high (+50 % max).
@@ -73,12 +76,13 @@ SELFHEAL_VARS = ('CG_ESCAPE_GATE', 'CG_ESCAPE_V1', 'CG_ESCAPED', 'SETSID', 'SETS
                  'WD_EGRESS_LIMIT', 'WD_EGRESS_BACKOFF', 'WD_EGRESS_BACKOFF_MAX', 'WD_RESTART_MAX',
                  'WD_RESTART_WINDOW', 'WD_LOG_MAX', 'WD_PROXY_URL', 'WD_DIRECT_URLS', 'WD_HEAL_REASON',
                  'CORE_GROUP_ID', 'WIFI_HEAL_URLS', 'WIFI_HEAL_DNS', 'WIFI_HEAL_OFF', 'WIFI_HEAL_GAP', 'WIFI_HEAL_HOUR_MAX',
-                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT')
+                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT', 'WD_CLOSE_MAX')
 HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape', 'wd_log', 'wd_log_body', 'wd_now',
            'wd_notify', 'wd_http', 'wd_dns_probe', 'wd_core_frozen', 'wd_selfheal_init', 'wd_net_sig', 'wd_net_watch',
            'wd_liveness', 'wd_restart_allowed', 'wd_restart_core', 'wd_heal_notice', 'wd_recover', 'wd_egress_target',
            'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick', 'fake_range', 'wd_session_fake_range',
-           'wd_root_fake_captured', 'wd_offline_seen', 'wifi_heal_async')
+           'wd_root_fake_captured', 'wd_offline_seen', 'wifi_heal_async', 'wd_uptime', 'wd_budget_start',
+           'wd_budget_left', 'wd_groups', 'wd_close_through', 'wd_node_heal', 'wd_proxy_heal', 'wd_dataplane_heal')
 
 
 class Controller:
@@ -90,6 +94,9 @@ class Controller:
         self.proxy_ok = True
         self.direct_ok = True
         self.mode = 'rule'
+        self.connections = []
+        self.connections_code = 200
+        self.closed = []
         self.rules = ('{"rules":[{"index":0,"type":"RuleSet","payload":"ads","proxy":"REJECT","size":-1},'
                       '{"index":1,"type":"Domain","payload":"x.cn","proxy":"DIRECT"},'
                       '{"index":2,"type":"Match","payload":"","proxy":"\U0001F680 节点选择","extra":{"a":1}}]}')
@@ -114,6 +121,11 @@ class Controller:
                     name = unquote(path.split('/')[2])
                     ok = owner.direct_ok if name == 'DIRECT' else owner.proxy_ok
                     return self.reply(200, '{"delay":87}') if ok else self.reply(504, '{"message":"Timeout"}')
+                if path == '/connections' and self.command == 'GET':
+                    return self.reply(owner.connections_code, connections_json(owner.connections))
+                if path.startswith('/connections/') and self.command == 'DELETE':
+                    owner.closed.append(unquote(path.split('/')[2]))
+                    return self.reply(204, '')
                 if path in ('/connections', '/restart'):
                     return self.reply(200 if path == '/restart' else 204, '{"status":"ok"}' if path == '/restart' else '')
                 self.reply(404, '{"message":"not found"}')
@@ -136,6 +148,17 @@ class Controller:
     def close(self):
         self.server.shutdown()
         self.server.server_close()
+
+
+def connections_json(conns):
+    """Mihomo's GET /connections shape: metadata before chains, Go's \u0026-style HTML escapes."""
+    import json
+    items = [{'id': cid, 'metadata': {'network': 'tcp', 'type': 'TProxy', 'destinationIP': '203.0.113.9', 'uid': 10123,
+                                      'host': 'example.test', 'process': 'com.example'},
+              'upload': 10, 'download': 20, 'start': '2026-10-18T00:00:00Z', 'chains': chains, 'rule': 'Match', 'rulePayload': ''}
+             for cid, chains in conns]
+    body = json.dumps({'downloadTotal': 1, 'uploadTotal': 2, 'connections': items, 'memory': 1}, ensure_ascii=False, separators=(',', ':'))
+    return body.replace('&', '\\u0026')
 
 
 class Silent:
@@ -417,26 +440,76 @@ class Egress(ShellCase):
         self.assertIn('level=0 fail=0', r.stdout, r.stderr)
         self.assertFalse([1 for m, p, a in c.requests if m in ('DELETE', 'POST')])
 
-    def test_ladder_closes_connections_then_reloads_then_restarts_with_backoff(self):
+    def test_ladder_closes_only_connections_through_the_failing_group_and_never_restarts(self):
         c = self.controller()
         c.proxy_ok = False
+        c.connections = [('c-game', ['DIRECT']), ('c-proxy', ['香港 01', '\U0001F680 节点选择']),
+                         ('c-other', ['日本 02', '\U0001F3AE 游戏'])]
         r = self.run_ticks(c, 3, extra='WD_EGRESS_BACKOFF=0; WD_EG_BACKOFF=0; ')
         self.assertIn('level=1', r.stdout, r.stderr)
-        self.assertIn(('DELETE', '/connections'), [(m, p) for m, p, a in c.requests])
+        self.assertEqual(c.closed, ['c-proxy'], 'only the failing group\'s connection is closed')
         r = self.run_ticks(c, 9, extra='WD_EGRESS_BACKOFF=0; WD_EG_BACKOFF=0; ')
+        self.assertEqual(set(c.closed), {'c-proxy'}, c.closed)
         actions = [(m, p) for m, p, a in c.requests if m in ('DELETE', 'POST')]
-        self.assertEqual(actions[1:3], [('DELETE', '/connections'), ('POST', '/restart')], actions)
-        self.assertIn('level=3', r.stdout)
-        self.assertEqual((self.run_dir / 'restart.calls').read_text().split(), ['restart'])
+        self.assertNotIn(('DELETE', '/connections'), actions, 'never every connection')
+        self.assertFalse([p for m, p in actions if m == 'POST'], 'never reloaded in place')
+        self.assertFalse((self.run_dir / 'restart.calls').exists(), 'never restarted for a dead node')
         log = self.log_text()
-        for text in ('proxy egress probe failed', 'closed all core connections', 'core reloaded in place', 'restarting the core'):
+        for text in ('proxy egress probe failed', 'closed 1 of 3 core connection(s) through \U0001F680 节点选择'):
             self.assertIn(text, log)
+        self.assertNotIn('core reloaded in place', log)
+        self.assertIn('proxy-down \U0001F680 节点选择', (self.run_dir / 'selfheal-state').read_text())
         # With the default backoff a second sustained failure waits instead of acting again.
-        c.requests.clear()
+        c.requests.clear(); c.closed.clear()
         r = self.run_ticks(c, 6)
-        actions = [(m, p) for m, p, a in c.requests if m in ('DELETE', 'POST')]
-        self.assertEqual(actions, [('DELETE', '/connections')], actions)
+        self.assertEqual(c.closed, ['c-proxy'], c.closed)
         self.assertIn('next self-heal action in', self.log_text())
+
+    def test_unreadable_connection_list_closes_nothing(self):
+        c = self.controller()
+        c.proxy_ok = False
+        c.connections = [('c-proxy', ['香港 01', '\U0001F680 节点选择'])]
+        c.connections_code = 500
+        r = self.run_ticks(c, 3, extra='WD_EGRESS_BACKOFF=0; WD_EG_BACKOFF=0; ')
+        self.assertIn('level=1', r.stdout, r.stderr)
+        self.assertEqual(c.closed, [])
+        self.assertFalse([1 for m, p, a in c.requests if m == 'DELETE'])
+        self.assertIn('closed no connection (connection list unreadable)', self.log_text())
+
+    def test_close_through_matches_escaped_and_nested_names_only(self):
+        c = self.controller()
+        self.session(cp=c.port)
+        c.connections = [('a', ['节点 A&B', '组 1']), ('b', ['DIRECT']), ('c', ['节点 C', '子组', '组 2']), ('d', []),
+                         ('e', ['REJECT'])]
+        r = self.sh('COREPID=$$; wd_selfheal_init; wd_close_through "$(printf \'节点 A&B\\t子组\\t\')"; '
+                    'echo "rc=$? closed=$WD_CLOSED seen=$WD_CLOSE_SEEN"')
+        self.assertIn('rc=0 closed=2 seen=5', r.stdout, r.stderr)
+        self.assertEqual(sorted(c.closed), ['a', 'c'])
+        r = self.sh('COREPID=$$; wd_selfheal_init; wd_close_through ""; echo "rc=$? closed=$WD_CLOSED"')
+        self.assertIn('rc=1 closed=0', r.stdout)
+
+    def test_data_plane_node_heal_closes_the_bad_nodes_connections_and_notifies_once(self):
+        c = self.controller()
+        self.session(cp=c.port)
+        c.connections = [('hk', ['香港 01', '\U0001F41F 漏网之鱼']), ('jp', ['日本 02', '\U0001F3AE 游戏']), ('cn', ['DIRECT'])]
+        body = ('COREPID=$$; wd_selfheal_init; WD_DP_BAD_NAMES="$(printf \'\U0001F41F 漏网之鱼\\t香港 01\\t\')"; '
+                'WD_DP_BAD="\U0001F41F 漏网之鱼→香港 01"; wd_proxy_heal; wd_proxy_heal; echo "notified=$WD_NODE_NOTIFIED"')
+        r = self.sh(body)
+        self.assertIn('notified=1', r.stdout, r.stderr)
+        self.assertEqual(c.closed, ['hk', 'hk'])
+        self.assertNotIn(('DELETE', '/connections'), [(m, p) for m, p, a in c.requests])
+        self.assertIn('closed 1 of 3 core connection(s) through \U0001F41F 漏网之鱼 香港 01', self.log_text())
+
+    def test_data_plane_outage_rechecks_rules_without_closing_connections(self):
+        c = self.controller()
+        self.session(cp=c.port)
+        c.connections = [('x', ['DIRECT'])]
+        r = self.sh('COREPID=$$; wd_selfheal_init; WD_DP_LEVEL=0; WD_DP_DETAIL=probe; wd_dataplane_heal; echo "level=$WD_DP_LEVEL"',
+                    extra='wd_repair_rules(){ echo repair >> "$RUN/repair.calls"; }\n')
+        self.assertIn('level=1', r.stdout, r.stderr)
+        self.assertEqual((self.run_dir / 'repair.calls').read_text().split(), ['repair'])
+        self.assertFalse([1 for m, p, a in c.requests if m == 'DELETE'])
+        self.assertIn('re-checked the capture rules', self.log_text())
 
     def test_recovery_resets_the_ladder_and_refused_secret_turns_the_check_off(self):
         c = self.controller()
@@ -446,6 +519,17 @@ class Egress(ShellCase):
         c.secret = 'rotated'
         r = self.run_ticks(c, 1)
         self.assertIn('on=0', r.stdout)
+
+
+class TargetedCloseGuards(unittest.TestCase):
+    def test_no_self_heal_path_closes_every_connection_or_reloads_for_a_dead_node(self):
+        self.assertNotIn('DELETE /connections "', TEXT)
+        self.assertNotIn('POST /restart', function('wd_egress_tick'))
+        self.assertNotIn('wd_restart_core', function('wd_egress_tick'))
+        self.assertIn('wd_node_heal "$WD_EG_TARGET$WD_TAB" "$WD_EG_TARGET"', function('wd_egress_tick'))
+        self.assertIn('wd_node_heal "$WD_DP_BAD_NAMES"', function('wd_proxy_heal'))
+        heal = function('wd_node_heal')
+        self.assertLess(heal.index('/group/'), heal.index('wd_close_through'), 're-test first, then close')
 
 
 class NetworkChange(ShellCase):

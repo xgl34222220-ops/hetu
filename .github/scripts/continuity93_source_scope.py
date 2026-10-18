@@ -22,7 +22,9 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-15: 3.3.3 release (versionCode 2099) = 3.0.0 + real-probe Wi-Fi heal, home latency/public IP, audit5 polish.
 # 2026-10-17: 4.0.0 release (versionCode 2100) = 3.3.3 + stop no longer blocks fake-IP, foreign-rule start check, store-fake-ip, UI/func 400.
 # 2026-10-17: 4.4.4 (versionCode 2101) = 4.0.0 + iptables CNIP tree opt-in only, robust tree cleanup.
-VERSION_CODE, VERSION_NAME = 2101, '4.4.4'
+# 2026-10-18: 5.0.0 (versionCode 2102) = 4.4.4 + watchdog closes only the failing node's connections, non-Mihomo
+# built-ins follow Mihomo's built-in, built-in NoJunkFilter repair, SnakeYAML chunk-edge fix.
+VERSION_CODE, VERSION_NAME = 2102, '5.0.0'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -160,6 +162,13 @@ AUTHORIZED_FILES = frozenset((
     # stopped, shows a failed control's reason and follows the App language; the Quick Settings tile
     # follows the App language, toasts the failure reason and is re-read after an in-App start/stop.
     PACKAGE + 'ProxyStatusNotificationService.kt', PACKAGE + 'HetuProxyTileService.kt',
+    # 2026-10-18 built-in config fix (user: the non-Mihomo built-ins must work like Mihomo's): every runtime
+    # YAML parse reads through RuntimeYaml15.reader, which keeps SnakeYAML 2.3 off its chunk-edge surrogate
+    # read (IndexOutOfBoundsException for about one in thirty subscription URL lengths of the built-in).
+    PACKAGE + 'RuntimeYaml15.java',
+    # 2026-10-18 5.0.0 no-network fix (user: 测速有网但实际没网，停止启动都一样): a proxy start pauses the standalone
+    # DNS VPN even when the chain flag survived a session that never reached a clean stop.
+    PACKAGE + 'ProxyAdblockCoordinator.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
@@ -410,8 +419,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2101', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "4.4.4"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2102', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "5.0.0"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'

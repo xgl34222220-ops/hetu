@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -73,6 +74,7 @@ import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.homeColors
 import io.github.xgl34222220.hetu.panel.PanelIcons
 import io.github.xgl34222220.hetu.tools.ToolsIcons
 import io.github.xgl34222220.hetu.ui.ht
@@ -684,7 +686,8 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
             ) {
                 Box(Modifier.fillMaxWidth().height(58.dp)) {
                     val accent = c.accent
-                    Box(Modifier.fillMaxWidth().height(58.dp).drawBehind { drawThemePreview(value, accent) })
+                    val tint = c.canvasTint
+                    Box(Modifier.fillMaxWidth().height(58.dp).drawBehind { drawThemePreview(value, accent, tint) })
                     HomePop(active, Modifier.align(Alignment.TopEnd).padding(5.dp)) {
                         Box(Modifier.size(20.dp).background(c.accent, CircleShape), contentAlignment = Alignment.Center) {
                             Icon(HomeIcons.Check, null, Modifier.size(13.dp), tint = c.onAccent)
@@ -700,11 +703,14 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
     }
 }
 
-/** A thumbnail of the app in one theme: canvas, a bar, a card with two lines and the accent. */
-private fun DrawScope.drawThemePreview(mode: String, accent: Color) {
+/**
+ * A thumbnail of the app in one theme: canvas, a bar, a card with two lines and the accent.
+ * [tint] is the live palette's canvas tint, so a non-default accent previews its washed canvas.
+ */
+private fun DrawScope.drawThemePreview(mode: String, accent: Color, tint: Color) {
     val radius = CornerRadius(12.dp.toPx())
     fun half(dark: Boolean) {
-        val canvas = if (dark) Color(0xFF0E0F13) else Color(0xFFECEEFB)
+        val canvas = if (tint.isSpecified) homeColors(dark, tint).bg else if (dark) Color(0xFF0E0F13) else Color(0xFFECEEFB)
         val card = if (dark) Color(0xFF20232B) else Color(0xFFFFFFFF)
         val ink = if (dark) Color(0xFFEBEDF2) else Color(0xFF12161A)
         drawRoundRect(canvas, cornerRadius = radius)

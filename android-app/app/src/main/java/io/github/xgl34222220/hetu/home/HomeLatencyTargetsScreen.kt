@@ -109,7 +109,7 @@ private fun AutoRefreshRow(seconds: Int, onChange: (Int) -> Unit, modifier: Modi
                     HomeTargets.autoRefreshChoices.forEach { choice ->
                         val selected = choice == seconds
                         DropdownMenuItem(
-                            text = { Text(homeAutoRefreshLabel(choice), color = if (selected) c.accent else c.t1, style = HomeType.body) },
+                            text = { Text(homeAutoRefreshLabel(choice), color = if (selected) c.accentText else c.t1, style = HomeType.body) },
                             onClick = { haptics(HomeHaptic.Tick); open = false; onChange(choice) },
                             trailingIcon = if (selected) { { Icon(HomeIcons.Check, null, Modifier.size(20.dp), tint = c.accent) } } else null,
                         )

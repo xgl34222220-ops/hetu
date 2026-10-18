@@ -122,7 +122,7 @@ final class StartupDiagnostics {
     static Map<String, Object> dns(String yaml) {
         if (yaml == null || ProxyCoreConfig.looksJson(yaml) || !MihomoStartupConfig.hasTopLevelKey(yaml, "dns")) return null;
         try {
-            Object root = ConfigReferenceCleaner.loader().load(yaml);
+            Object root = ConfigReferenceCleaner.loader().load(RuntimeYaml15.reader(yaml));
             return root instanceof Map ? ConfigReferenceCleaner.map(((Map<?, ?>) root).get("dns")) : null;
         } catch (YAMLException | ClassCastException invalid) {
             return null;
