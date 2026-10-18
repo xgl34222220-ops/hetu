@@ -168,7 +168,11 @@ class UiPolish445Test {
             Column {
                 Spacer(Modifier.height(40.dp))
                 Row(Modifier.testTag("expanded-row")) {
-                    Text("LAN", Modifier.homeTouchExpand(6.dp, 9.dp).clickable { clicks.intValue++ }.padding(horizontal = 6.dp, vertical = 9.dp).testTag("lan"))
+                    // The slot is what the parent lays out. (A tag on the Text itself would report the bounds of its
+                    // outermost semantics modifier, the clickable, i.e. the enlarged touch box.)
+                    Box(Modifier.testTag("lan")) {
+                        Text("LAN", Modifier.homeTouchExpand(6.dp, 9.dp).clickable { clicks.intValue++ }.padding(horizontal = 6.dp, vertical = 9.dp))
+                    }
                     Text("next", Modifier.testTag("next"))
                 }
                 Row(Modifier.testTag("plain-row")) {

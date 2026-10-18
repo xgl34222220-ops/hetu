@@ -14,9 +14,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 import static org.junit.Assert.*;
 
 /**
@@ -316,15 +313,19 @@ public class CoreBuiltinParity446Test {
     }
 
     @Test public void snakeYamlChunkEdgeEmojiNoLongerBreaksParsing() throws Exception {
-        // 🎯's high surrogate is the 1024th char: SnakeYAML 2.3 then reads past its full char[1024].
+        // 🎯's high surrogate is the 1024th char. SnakeYAML 2.3 (the APK's version) reads 1024 chars into a full
+        // char[1024] and then one more when the last is a high surrogate. The unit-test classpath resolves a newer
+        // SnakeYAML (2.4+ reads 1023), so the guard is checked on the reader itself: no chunk ends on a high surrogate.
         String text = "a: '" + "x".repeat(1019) + "🎯'\nproxy-groups: []\n";
         assertTrue(Character.isHighSurrogate(text.charAt(1023)));
-        try {
-            new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
-            fail("the fixture no longer reaches SnakeYAML's chunk edge; re-check RuntimeYaml15.reader");
-        } catch (IndexOutOfBoundsException expected) {
-            // The library defect the reader works around.
+        java.io.Reader reader = RuntimeYaml15.reader(text);
+        char[] chunk = new char[1024];
+        StringBuilder back = new StringBuilder();
+        for (int n; (n = reader.read(chunk, 0, chunk.length)) > 0; ) {
+            assertFalse("a chunk ends on a high surrogate", n > 1 && Character.isHighSurrogate(chunk[n - 1]));
+            back.append(chunk, 0, n);
         }
+        assertEquals(text, back.toString());
         assertNotNull(RuntimeYaml15.compose(text));
         assertEquals(text, ConfigReferenceCleaner.mihomo(text).text);
         assertEquals("x".repeat(1019) + "🎯", ProxyCoreConfig.Profile.loadYaml(text).get("a"));

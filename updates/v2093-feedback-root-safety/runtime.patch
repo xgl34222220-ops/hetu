@@ -86582,10 +86582,10 @@ index 366297a..e224bf7 100644
                          check(release.await(6, TimeUnit.SECONDS))
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java
 new file mode 100644
-index 0000000..8e24817
+index 0000000..29696d5
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreBuiltinParity446Test.java
-@@ -0,0 +1,441 @@
+@@ -0,0 +1,442 @@
 +package io.github.xgl34222220.hetu;
 +
 +import android.app.Application;
@@ -86602,9 +86602,6 @@ index 0000000..8e24817
 +import org.junit.runner.RunWith;
 +import org.robolectric.RobolectricTestRunner;
 +import org.robolectric.annotation.Config;
-+import org.yaml.snakeyaml.LoaderOptions;
-+import org.yaml.snakeyaml.Yaml;
-+import org.yaml.snakeyaml.constructor.SafeConstructor;
 +import static org.junit.Assert.*;
 +
 +/**
@@ -86904,15 +86901,19 @@ index 0000000..8e24817
 +    }
 +
 +    @Test public void snakeYamlChunkEdgeEmojiNoLongerBreaksParsing() throws Exception {
-+        // 🎯's high surrogate is the 1024th char: SnakeYAML 2.3 then reads past its full char[1024].
++        // 🎯's high surrogate is the 1024th char. SnakeYAML 2.3 (the APK's version) reads 1024 chars into a full
++        // char[1024] and then one more when the last is a high surrogate. The unit-test classpath resolves a newer
++        // SnakeYAML (2.4+ reads 1023), so the guard is checked on the reader itself: no chunk ends on a high surrogate.
 +        String text = "a: '" + "x".repeat(1019) + "🎯'\nproxy-groups: []\n";
 +        assertTrue(Character.isHighSurrogate(text.charAt(1023)));
-+        try {
-+            new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
-+            fail("the fixture no longer reaches SnakeYAML's chunk edge; re-check RuntimeYaml15.reader");
-+        } catch (IndexOutOfBoundsException expected) {
-+            // The library defect the reader works around.
++        java.io.Reader reader = RuntimeYaml15.reader(text);
++        char[] chunk = new char[1024];
++        StringBuilder back = new StringBuilder();
++        for (int n; (n = reader.read(chunk, 0, chunk.length)) > 0; ) {
++            assertFalse("a chunk ends on a high surrogate", n > 1 && Character.isHighSurrogate(chunk[n - 1]));
++            back.append(chunk, 0, n);
 +        }
++        assertEquals(text, back.toString());
 +        assertNotNull(RuntimeYaml15.compose(text));
 +        assertEquals(text, ConfigReferenceCleaner.mihomo(text).text);
 +        assertEquals("x".repeat(1019) + "🎯", ProxyCoreConfig.Profile.loadYaml(text).get("a"));
@@ -95781,10 +95782,10 @@ index 0000000..86ec97f
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt
 new file mode 100644
-index 0000000..44e20ac
+index 0000000..b873409
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt
-@@ -0,0 +1,274 @@
+@@ -0,0 +1,278 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -95955,7 +95956,11 @@ index 0000000..44e20ac
 +            Column {
 +                Spacer(Modifier.height(40.dp))
 +                Row(Modifier.testTag("expanded-row")) {
-+                    Text("LAN", Modifier.homeTouchExpand(6.dp, 9.dp).clickable { clicks.intValue++ }.padding(horizontal = 6.dp, vertical = 9.dp).testTag("lan"))
++                    // The slot is what the parent lays out. (A tag on the Text itself would report the bounds of its
++                    // outermost semantics modifier, the clickable, i.e. the enlarged touch box.)
++                    Box(Modifier.testTag("lan")) {
++                        Text("LAN", Modifier.homeTouchExpand(6.dp, 9.dp).clickable { clicks.intValue++ }.padding(horizontal = 6.dp, vertical = 9.dp))
++                    }
 +                    Text("next", Modifier.testTag("next"))
 +                }
 +                Row(Modifier.testTag("plain-row")) {
