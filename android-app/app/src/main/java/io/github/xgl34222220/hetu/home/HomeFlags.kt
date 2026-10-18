@@ -4,6 +4,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.unit.em
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,6 +76,40 @@ internal fun HomeFlag(code: String, modifier: Modifier = Modifier, height: Dp = 
 
 /** True when [code] has a drawing (callers may want a different fallback than the code chip). */
 internal fun homeFlagAvailable(code: String): Boolean = FlagPainters.containsKey(code.trim().uppercase(Locale.ROOT))
+
+/** Flag height in a [rememberHomeFlaggedName] line, relative to the text size, and the gap after it. */
+private const val InlineFlagEm = .8f
+private const val InlineFlagGapEm = .3f
+
+/**
+ * [name] for a Text, with a leading flag emoji drawn as the same vector flag the group cards use,
+ * so node tiles show one flag style on every ROM. The original characters stay in the text as
+ * the placeholder's alternate text, so search, copy and TalkBack still read the name as it is.
+ * A name without a leading flag, or with one there is no drawing for, comes back unchanged.
+ * The placeholder is about as wide as the emoji and its space, so lines wrap as before.
+ */
+@Composable
+internal fun rememberHomeFlaggedName(name: String, style: TextStyle): Pair<AnnotatedString, Map<String, InlineTextContent>> {
+    val density = LocalDensity.current
+    return remember(name, style.fontSize, density) {
+        val rest = HomeRegions.withoutFlag(name)
+        val code = if (rest == name) "" else HomeRegions.codeOf(name)
+        if (code.isEmpty() || !homeFlagAvailable(code) || !style.fontSize.isSp) return@remember AnnotatedString(name) to emptyMap()
+        val text = buildAnnotatedString {
+            appendInlineContent(InlineFlagId, name.removeSuffix(rest))
+            append(rest)
+        }
+        val flagHeight = with(density) { (style.fontSize * InlineFlagEm).toDp() }
+        val content = InlineTextContent(
+            Placeholder((InlineFlagEm * 1.42f + InlineFlagGapEm).em, InlineFlagEm.em, PlaceholderVerticalAlign.TextCenter),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { HomeFlag(code, height = flagHeight) }
+        }
+        text to mapOf(InlineFlagId to content)
+    }
+}
+
+private const val InlineFlagId = "home-flag"
 
 /* ------------------------------------------------------------------ */
 /*  Drawing helpers                                                     */

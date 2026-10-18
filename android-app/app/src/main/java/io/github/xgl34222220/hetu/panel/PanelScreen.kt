@@ -472,6 +472,6 @@ private fun PanelSyncChip() {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
-        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht("同步中"), color = c.accentText, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

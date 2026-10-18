@@ -135,7 +135,9 @@ internal fun HetuHomeV2(
             memoryHistoryMb = resourceSamples?.map { it.memoryBytes?.div(1024f * 1024f) } ?: history.second,
         ),
     )
+    val speedHistory = rememberSpeedHistory(sampling, speedSource, mapped.uploadBytesPerSecond, mapped.downloadBytesPerSecond)
     val state = mapped.copy(
+        speedHistory = speedHistory,
         connection = connection,
         lastGood = lastGood,
         lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
@@ -379,6 +381,32 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes: 
         }
     }
     return cpuPoints.toList() to memoryPoints.toList()
+}
+
+/**
+ * Rolling window (30 points, one a second) of the figures the 网速 card shows, for its faint
+ * backdrop curve. Switching the source starts a fresh window, so API and local rates never mix.
+ */
+@Composable
+private fun rememberSpeedHistory(sampling: Boolean, source: HomeSpeedSource, up: Long?, down: Long?): HomeSpeedHistory {
+    val upPoints = remember { mutableStateListOf<Long?>() }
+    val downPoints = remember { mutableStateListOf<Long?>() }
+    val latestUp by rememberUpdatedState(up)
+    val latestDown by rememberUpdatedState(down)
+    val visible = rememberScreenVisible()
+    LaunchedEffect(source) { upPoints.clear(); downPoints.clear() }
+    LaunchedEffect(sampling, visible) {
+        if (!sampling) { upPoints.clear(); downPoints.clear(); return@LaunchedEffect }
+        // Keep the window while the screen is off, but do not wake every second to extend it.
+        if (!visible) return@LaunchedEffect
+        while (true) {
+            upPoints.add(latestUp)
+            downPoints.add(latestDown)
+            while (upPoints.size > 30) { upPoints.removeAt(0); downPoints.removeAt(0) }
+            delay(1000L)
+        }
+    }
+    return HomeSpeedHistory(upPoints.toList(), downPoints.toList())
 }
 
 private fun loadTargets(prefs: SharedPreferences): HomeTargetsConfig = HomeTargetsConfig(

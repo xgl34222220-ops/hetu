@@ -317,7 +317,7 @@ internal fun ColumnScope.ToolsListEditor(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
             Icon(ToolsIcons.Plus, null, Modifier.size(20.dp), tint = c.accent)
-            Text(ht("添加一项"), color = c.accent, style = HomeType.button)
+            Text(ht("添加一项"), color = c.accentText, style = HomeType.button)
         }
     }
 }

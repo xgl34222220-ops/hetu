@@ -54,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -254,6 +255,7 @@ internal fun HomeUiState.withoutLiveSamples(): HomeUiState = copy(
     },
     uploadBytesPerSecond = null,
     downloadBytesPerSecond = null,
+    speedHistory = HomeSpeedHistory(),
     resource = HomeResource(),
 )
 
@@ -553,9 +555,10 @@ private fun MetricCard(
     header: @Composable RowScope.() -> Unit,
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String? = null,
+    backdrop: (DrawScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel, onLongClick = onLongClick, longClickLabel = longClickLabel) {
+    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel, onLongClick = onLongClick, longClickLabel = longClickLabel, backdrop = backdrop) {
         Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
             content()
@@ -600,6 +603,10 @@ private fun addressStyle(text: String?): TextStyle = when {
     else -> HomeType.value.copy(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
 }
 
+/** Extra touch room around the WAN/LAN title switch: 30 dp of drawn text grows to a 48 dp target. */
+private val NetSideTouchX = 6.dp
+private val NetSideTouchY = 9.dp
+
 @Composable
 private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onSide: (HomeNetSide) -> Unit) {
     val c = LocalHomeColors.current
@@ -614,7 +621,11 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
                 val tint by animateColorAsState(if (active) c.t1 else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current), label = "home-net-side")
                 Text(
                     side.label,
-                    (if (active) Modifier else Modifier.homeTap(onClickLabel = ht("切换到 %s").fill(side.label), role = Role.Button) { haptics(HomeHaptic.Tick); onSide(side) })
+                    // The quiet side keeps its drawn size but gets a 48 dp tall touch box around it.
+                    (if (active) Modifier else Modifier
+                        .homeTouchExpand(NetSideTouchX, NetSideTouchY)
+                        .homeTap(onClickLabel = ht("切换到 %s").fill(side.label), role = Role.Button) { haptics(HomeHaptic.Tick); onSide(side) }
+                        .padding(horizontal = NetSideTouchX, vertical = NetSideTouchY))
                         .padding(end = 10.dp, top = 4.dp, bottom = 4.dp),
                     color = tint,
                     style = if (active) HomeType.cardLabel else HomeType.cardLabel.copy(fontWeight = FontWeight.Medium),
@@ -657,8 +668,14 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
 private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit) {
     val c = LocalHomeColors.current
     val live = state.status.isLive
+    // The last half minute drawn faintly beneath the figures: download in the accent, upload quieter.
+    val history = state.speedHistory.takeIf { live }
+    val download = c.accent
+    val upload = lerp(c.accent, c.t2, .6f)
+    val backdrop: (DrawScope.() -> Unit)? = if (history == null) null else ({ drawHomeSpeedBackdrop(history, download, upload) })
     MetricCard(
         modifier = modifier, onClick = onOpen, clickLabel = "选择网速数据来源",
+        backdrop = backdrop,
         header = {
             MetricTitle("网速")
             Spacer(Modifier.weight(1f))
@@ -813,7 +830,7 @@ internal fun HomeStartFailedSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(HomeIcons.Copy, null, Modifier.size(20.dp), tint = c.accent)
-                Text(ht("复制"), color = c.accent, style = HomeType.button)
+                Text(ht("复制"), color = c.accentText, style = HomeType.button)
             }
         },
         footer = {

@@ -105,6 +105,11 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
+/**
+ * The pre-V20.87 home page. The four-tab shell draws [NewUiHome] (home/ module) instead, so this
+ * screen has no route in the running app; it is kept, unchanged, because nothing is deleted and
+ * the concept-coverage tests still render and read it.
+ */
 @Composable
 internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val context = LocalContext.current

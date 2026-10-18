@@ -383,7 +383,7 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(panelHighlight(set.name, query), Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accentText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text(set.meta, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     when (val state = set.update) {
@@ -401,7 +401,7 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
                     is PanelUpdate.Failed -> Box(
                         Modifier.heightIn(min = HomeDims.touch).clip(HomeDims.controlShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onUpdate(set.name) }.padding(horizontal = 12.dp),
                         contentAlignment = Alignment.Center,
-                    ) { Text(ht("重试"), color = c.accent, style = HomeType.button) }
+                    ) { Text(ht("重试"), color = c.accentText, style = HomeType.button) }
                     PanelUpdate.Idle -> HomeIconButton(PanelIcons.Download, "更新规则集", { onUpdate(set.name) }, tint = c.accent)
                 }
             }

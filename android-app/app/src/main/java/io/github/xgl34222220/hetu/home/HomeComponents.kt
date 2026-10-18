@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -124,13 +125,16 @@ internal fun HomeCard(
     shape: Shape = HomeDims.cardShape,
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String? = null,
+    /** Drawn on the card's surface beneath the content (the 网速 curve); takes no layout space. */
+    backdrop: (DrawScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHomeHaptics.current
     val label = clickLabel?.let { ht(it) }
+    val source = remember { MutableInteractionSource() }
     val tappable = when {
         onClick == null -> modifier
-        onLongClick == null -> modifier.homeTap(onClickLabel = label, role = Role.Button) {
+        onLongClick == null -> modifier.homeTap(onClickLabel = label, role = Role.Button, interactionSource = source) {
             haptics(HomeHaptic.Tap)
             onClick()
         }
@@ -138,12 +142,17 @@ internal fun HomeCard(
             onClickLabel = label, role = Role.Button,
             onLongClickLabel = longClickLabel?.let { ht(it) },
             onLongClick = { haptics(HomeHaptic.Confirm); onLongClick() },
+            interactionSource = source,
         ) {
             haptics(HomeHaptic.Tap)
             onClick()
         }
     }
-    Column(tappable.homeGlassPanel(shape, background), content = content)
+    val surface = tappable.homeGlassPanel(shape, background)
+    Column(
+        (if (backdrop == null) surface else surface.drawBehind(backdrop)).homePressTint(source, enabled = onClick != null),
+        content = content,
+    )
 }
 
 /** Hairline between rows of one card. [inset] keeps it clear of the card's rounded edges. */
@@ -258,7 +267,7 @@ internal fun HomeBanner(
                 Modifier.clip(SharedBadgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
                     .heightIn(min = 32.dp).padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            ) { Text(actionLabel, color = c.accentText, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }
@@ -351,11 +360,25 @@ internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp
     }
 }
 
-/** Colour of a latency figure: accent while healthy, amber when slow, red when very slow. */
+/** Latency bands shared by 首页 and 面板: under [HomeDelayFastMs] is healthy, under [HomeDelaySlowMs] slow. */
+internal const val HomeDelayFastMs = 300L
+internal const val HomeDelaySlowMs = 800L
+
+/**
+ * Colour of a latency figure as text: [HomeColors.delayFastText] while healthy (the accent, or
+ * green when the accent itself is red–amber), amber when slow, red when very slow.
+ */
 internal fun HomeColors.delayColor(ms: Long): Color = when {
-    ms < 300L -> accent
-    ms < 800L -> warnText
+    ms < HomeDelayFastMs -> delayFastText
+    ms < HomeDelaySlowMs -> warnText
     else -> badText
+}
+
+/** The colour a latency capsule's soft fill is mixed from, in the same bands as [delayColor]. */
+internal fun HomeColors.delayBase(ms: Long): Color = when {
+    ms < HomeDelayFastMs -> delayFast
+    ms < HomeDelaySlowMs -> warn
+    else -> bad
 }
 
 /** “28 ms” as plain coloured text; null = unknown, negative = timed out. */
@@ -483,27 +506,29 @@ internal fun HomeButton(
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val lead = if (danger) c.bad else c.accent
-    val leadText = if (danger) c.badText else c.accent
+    val leadText = if (danger) c.badText else c.accentText
     val onLead = if (danger) (if (c.dark) Color(0xFF1B0808) else Color.White) else c.onAccent
     val (fill, content) = when (kind) {
         HomeButtonKind.Primary -> lead to onLead
         HomeButtonKind.Secondary -> c.surface to leadText
         HomeButtonKind.Soft -> when {
             danger -> c.badSoft to c.badText
-            tinted -> c.accentSoft to c.accent
+            tinted -> c.accentSoft to c.accentText
             else -> c.sunken to c.t1
         }
         HomeButtonKind.Ghost -> Color.Transparent to leadText
     }
     val shape = HomeDims.controlShape
     val active = enabled && !loading
+    val source = remember { MutableInteractionSource() }
     Row(
         modifier
             .heightIn(min = height)
             .alpha(if (active) 1f else .5f)
-            .homeTap(enabled = active, role = Role.Button) { haptics(if (kind == HomeButtonKind.Primary) HomeHaptic.Confirm else HomeHaptic.Tap); onClick() }
+            .homeTap(enabled = active, role = Role.Button, interactionSource = source) { haptics(if (kind == HomeButtonKind.Primary) HomeHaptic.Confirm else HomeHaptic.Tap); onClick() }
             .clip(shape)
             .background(fill)
+            .homePressTint(source, enabled = active)
             .let { if (kind == HomeButtonKind.Secondary) it.border(1.5.dp, lead.copy(alpha = if (c.dark) .70f else .62f), shape) else it }
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -690,7 +715,7 @@ internal fun HomeNotice(
             Box(
                 Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            ) { Text(ht(actionLabel), color = c.accentText, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
         if (onClose != null) {
             Box(
@@ -1026,6 +1051,64 @@ internal fun HomeSparkline(
             drawCircle(color, 3.dp.toPx(), last)
         }
     }
+}
+
+/** Slots of the 网速 backdrop: the window [HomeSpeedHistory] keeps, newest at the right edge. */
+private const val SpeedBackdropSlots = 30
+
+/**
+ * Faint traffic curves along the lower part of a card: [download] as a soft area with a thin
+ * line, [upload] quieter behind it. Values are scaled to the window's peak with a floor, so an
+ * idle connection hugs the bottom instead of filling the card. Nothing animates; each new second
+ * simply redraws, and a null sample breaks the curve.
+ */
+internal fun DrawScope.drawHomeSpeedBackdrop(history: HomeSpeedHistory, download: Color, upload: Color) {
+    val count = maxOf(history.download.size, history.upload.size)
+    if (count < 2) return
+    val peak = maxOf(
+        history.download.maxOfOrNull { it ?: 0L } ?: 0L,
+        history.upload.maxOfOrNull { it ?: 0L } ?: 0L,
+        64L * 1024L,
+    ).toFloat()
+    val w = size.width
+    val h = size.height
+    val band = h * .5f
+    val foot = 2.dp.toPx()
+    val step = w / (SpeedBackdropSlots - 1)
+    fun curve(values: List<Long?>, color: Color, area: Float, line: Float) {
+        val segments = mutableListOf<MutableList<Offset>>()
+        var current = mutableListOf<Offset>()
+        values.forEachIndexed { index, value ->
+            if (value == null) {
+                if (current.isNotEmpty()) segments.add(current)
+                current = mutableListOf()
+            } else {
+                val x = w - (values.size - 1 - index) * step
+                current.add(Offset(x, h - foot - (value / peak).coerceIn(0f, 1f) * (band - foot)))
+            }
+        }
+        if (current.isNotEmpty()) segments.add(current)
+        for (points in segments) {
+            if (points.size < 2) continue
+            val path = Path().apply {
+                moveTo(points[0].x, points[0].y)
+                for (i in 1 until points.size) {
+                    val midX = (points[i - 1].x + points[i].x) / 2f
+                    cubicTo(midX, points[i - 1].y, midX, points[i].y, points[i].x, points[i].y)
+                }
+            }
+            val fill = Path().apply {
+                addPath(path)
+                lineTo(points.last().x, h)
+                lineTo(points.first().x, h)
+                close()
+            }
+            drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = area), color.copy(alpha = 0f)), startY = h - band, endY = h))
+            drawPath(path, color.copy(alpha = line), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+    curve(history.upload, upload, area = .10f, line = .30f)
+    curve(history.download, download, area = .16f, line = .42f)
 }
 
 /* ------------------------------------------------------------------ */

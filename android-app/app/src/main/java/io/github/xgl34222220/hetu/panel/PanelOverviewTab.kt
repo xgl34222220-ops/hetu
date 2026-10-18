@@ -116,7 +116,7 @@ internal fun LazyListScope.panelOverviewTab(
                 Text(ht("总流量"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("/", Modifier.padding(horizontal = 9.dp), color = c.t2, style = HomeType.value)
-                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accentText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

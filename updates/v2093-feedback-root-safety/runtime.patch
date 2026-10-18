@@ -63867,7 +63867,7 @@ index 0000000..4bae890
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..ccc08de 100644
+index 2b1a624..c4691fa 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -64253,7 +64253,7 @@ index 2b1a624..ccc08de 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -449,12 +535,14 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -449,37 +535,82 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
@@ -64267,23 +64267,45 @@ index 2b1a624..ccc08de 100644
              label = "dockShift",
          )
          val detailVisible = (vm.tab == HxTab.Home && homeDetail) || (vm.tab == HxTab.Tools && toolsDetail)
-+        androidx.compose.runtime.SideEffect { onDockOccupancyChanged(if (detailVisible || !dockVisible) 0.dp else dockHeight) }
-         if (!detailVisible) HetuGlassDock(
-             items = items,
-             selected = selectedIndex,
-@@ -463,23 +551,54 @@ private fun MainTabs(vm: HetuViewModel) {
-                 if (next == vm.tab) vm.reselect++ else vm.tab = next
-             },
-             hazeState = dockHaze,
+-        if (!detailVisible) HetuGlassDock(
+-            items = items,
+-            selected = selectedIndex,
+-            onSelect = { index ->
+-                val next = dockTabs[index.coerceIn(0, dockTabs.lastIndex)]
+-                if (next == vm.tab) vm.reselect++ else vm.tab = next
+-            },
+-            hazeState = dockHaze,
 -            backdrop = liquidBackdrop.takeIf { runtimeLiquid },
 -            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
-+            backdrop = null,
-+            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
-+            onHeightChanged = { measuredDockHeight = it },
-         )
-     }
- }
-
+-        )
++        androidx.compose.runtime.SideEffect { onDockOccupancyChanged(if (detailVisible || !dockVisible) 0.dp else dockHeight) }
++        val dock: @Composable (Modifier) -> Unit = { placement ->
++            HetuGlassDock(
++                items = items,
++                selected = selectedIndex,
++                onSelect = { index ->
++                    val next = dockTabs[index.coerceIn(0, dockTabs.lastIndex)]
++                    if (next == vm.tab) vm.reselect++ else vm.tab = next
++                },
++                hazeState = dockHaze,
++                backdrop = null,
++                modifier = placement.offset { IntOffset(0, dockShift.value.roundToPx()) },
++                onHeightChanged = { measuredDockHeight = it },
++            )
++        }
++        // A detail page owns the bottom edge: the dock slides down out of its way and back up on
++        // return instead of vanishing. With reduced motion it simply hides, as before.
++        if (motion) AnimatedVisibility(
++            visible = !detailVisible,
++            modifier = Modifier.align(Alignment.BottomCenter),
++            enter = slideInVertically(spring(dampingRatio = .88f, stiffness = 420f)) { it } + fadeIn(tween(160)),
++            exit = slideOutVertically(tween(220, easing = HxMotion.Exit)) { it } + fadeOut(tween(180)),
++            label = "dock-detail",
++        ) { dock(Modifier) }
++        else if (!detailVisible) dock(Modifier.align(Alignment.BottomCenter))
++    }
++}
++
 +/**
 + * 「当前核心（X）不支持此功能」 for an action the running core lacks (热重载, 流量模式, 测速):
 + * the same glass card as the panel's degraded tabs, in a dialog, instead of an error toast.
@@ -64309,9 +64331,9 @@ index 2b1a624..ccc08de 100644
 +                }
 +            }
 +        }
-+    }
-+}
-+
+     }
+ }
+
  /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
  @Composable
  internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
@@ -64329,7 +64351,7 @@ index 2b1a624..ccc08de 100644
              // Longer messages stay a little longer so they can actually be read.
              delay((1500L + message.length * 45L).coerceAtMost(4200L))
              floatingMessage = null
-@@ -489,14 +608,27 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+@@ -489,14 +620,27 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -64362,7 +64384,7 @@ index 2b1a624..ccc08de 100644
      }
  }
 
-@@ -513,6 +645,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
+@@ -513,6 +657,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
                  Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                      content(vm)
                      HxToastHost(vm)
@@ -64370,7 +64392,7 @@ index 2b1a624..ccc08de 100644
                  }
              }
          }
-@@ -544,15 +677,21 @@ internal fun hxToastTone(message: String): HxTone = when {
+@@ -544,15 +689,21 @@ internal fun hxToastTone(message: String): HxTone = when {
      else -> HxTone.Neutral
  }
 
@@ -64396,7 +64418,7 @@ index 2b1a624..ccc08de 100644
              .graphicsLayer {
                  translationY = drag
                  alpha = (1f - drag / 160f).coerceIn(0f, 1f)
-@@ -563,12 +702,14 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+@@ -563,12 +714,14 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
                  onDragStopped = { velocity ->
                      if (drag > 36f || velocity > 900f) {
                          onDismiss()
@@ -64412,7 +64434,7 @@ index 2b1a624..ccc08de 100644
              .homeGlassPanel(shape, c.raised, raised = true)
              .heightIn(min = 48.dp)
              .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
-@@ -588,6 +729,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+@@ -588,6 +741,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
              )
          }
          Spacer(Modifier.width(10.dp))
@@ -65635,10 +65657,22 @@ index 250b8a8..60c7718 100644
 +    val offerRestart: Boolean = false,
 +)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
-index d5a6fcd..02d88a1 100644
+index d5a6fcd..610a246 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
-@@ -401,88 +401,6 @@ private fun HeroAction(label: String, color: Color, busy: Boolean, enabled: Bool
+@@ -105,6 +105,11 @@ import androidx.compose.ui.unit.dp
+ import kotlinx.coroutines.CancellationException
+ import kotlinx.coroutines.launch
+
++/**
++ * The pre-V20.87 home page. The four-tab shell draws [NewUiHome] (home/ module) instead, so this
++ * screen has no route in the running app; it is kept, unchanged, because nothing is deleted and
++ * the concept-coverage tests still render and read it.
++ */
+ @Composable
+ internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
+     val context = LocalContext.current
+@@ -401,88 +406,6 @@ private fun HeroAction(label: String, color: Color, busy: Boolean, enabled: Bool
 
  /* ---------------------------- tiles ---------------------------- */
 
@@ -65727,7 +65761,7 @@ index d5a6fcd..02d88a1 100644
  @Composable
  private fun HomeLatencyCard(vm: HetuViewModel) {
      val c = Hx.colors
-@@ -757,55 +675,6 @@ private fun HomeResourceCard(vm: HetuViewModel, modifier: Modifier, onOpen: () -
+@@ -757,55 +680,6 @@ private fun HomeResourceCard(vm: HetuViewModel, modifier: Modifier, onOpen: () -
      }
  }
 
@@ -65783,7 +65817,7 @@ index d5a6fcd..02d88a1 100644
  @Composable
  private fun ConnectionToggle(running: Boolean, busy: Boolean, onClick: () -> Unit) {
      val c = Hx.colors
-@@ -862,98 +731,6 @@ private fun ConnectionToggle(running: Boolean, busy: Boolean, onClick: () -> Uni
+@@ -862,98 +736,6 @@ private fun ConnectionToggle(running: Boolean, busy: Boolean, onClick: () -> Uni
      }
  }
 
@@ -65882,7 +65916,7 @@ index d5a6fcd..02d88a1 100644
  @Composable
  private fun HomeRate(
      label: String,
-@@ -1085,77 +862,6 @@ private fun HomeNodeDelay(delay: Long?, testing: Boolean, onClick: () -> Unit) {
+@@ -1085,77 +867,6 @@ private fun HomeNodeDelay(delay: Long?, testing: Boolean, onClick: () -> Unit) {
 
  /* ---------------------------- shortcuts ---------------------------- */
 
@@ -65960,7 +65994,7 @@ index d5a6fcd..02d88a1 100644
  @Composable
  private fun HomeTile(
      icon: androidx.compose.ui.graphics.vector.ImageVector,
-@@ -1223,77 +929,6 @@ private fun Modifier.combinedClickableCompat(
+@@ -1223,77 +934,6 @@ private fun Modifier.combinedClickableCompat(
      ),
  )
 
@@ -66038,7 +66072,7 @@ index d5a6fcd..02d88a1 100644
  /* ---------------------------- status ---------------------------- */
 
  @Composable
-@@ -1483,106 +1118,8 @@ private fun SpeedFigure(label: String, value: Long, icon: androidx.compose.ui.gr
+@@ -1483,106 +1123,8 @@ private fun SpeedFigure(label: String, value: Long, icon: androidx.compose.ui.gr
      }
  }
 
@@ -71191,10 +71225,22 @@ index 0000000..f15c8ed
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
-index 820f6b5..4e8f89a 100644
+index 820f6b5..7bc7c59 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
-@@ -118,109 +118,21 @@ internal fun ToolsScreen(
+@@ -75,6 +75,11 @@ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+ /*  面板: every live Mihomo view in one swipeable page                   */
+ /* ------------------------------------------------------------------ */
+
++/**
++ * The pre-V20.87 panel host and its legacy section screens. The four-tab shell draws the panel/
++ * module's [io.github.xgl34222220.hetu.panel.NewUiPanel] instead, so this host has no route in
++ * the running app; it is kept, unchanged, because nothing is deleted and tests still render it.
++ */
+ @Composable
+ internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
+     HxTabbedPage(
+@@ -118,109 +123,21 @@ internal fun ToolsScreen(
          ),
          onSubPageVisibleChanged = onSubPageVisibleChanged,
          onConfigChanged = { scope.launch { vm.refreshNow() } },
@@ -71772,10 +71818,18 @@ index bb42974..966d773 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 2b4638e..b96c84b 100644
+index 2b4638e..a7464f9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
+@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
+ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.geometry.Size
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.isSpecified
+ import androidx.compose.ui.graphics.drawscope.DrawScope
+ import androidx.compose.ui.graphics.drawscope.Stroke
+ import androidx.compose.ui.graphics.drawscope.clipRect
+@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.sp
  import io.github.xgl34222220.hetu.home.HomeDims
  import io.github.xgl34222220.hetu.home.HomeHaptic
  import io.github.xgl34222220.hetu.home.HomeIcons
@@ -71783,7 +71837,15 @@ index 2b4638e..b96c84b 100644
  import io.github.xgl34222220.hetu.home.HomeMotion
  import io.github.xgl34222220.hetu.home.HomePop
  import io.github.xgl34222220.hetu.home.HomeReveal
-@@ -93,6 +94,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -72,6 +74,7 @@ import io.github.xgl34222220.hetu.home.HomeType
+ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
++import io.github.xgl34222220.hetu.home.homeColors
+ import io.github.xgl34222220.hetu.panel.PanelIcons
+ import io.github.xgl34222220.hetu.tools.ToolsIcons
+ import io.github.xgl34222220.hetu.ui.ht
+@@ -93,6 +96,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
      var choice by remember { mutableStateOf<String?>(null) }
      var subPage by remember { mutableStateOf(initialSubPage) }
      var restoreUri by remember { mutableStateOf<Uri?>(null) }
@@ -71794,7 +71856,7 @@ index 2b4638e..b96c84b 100644
      val density = LocalDensity.current
      var firstGroupHeightPx by remember { mutableIntStateOf(0) }
 
-@@ -155,6 +160,16 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -155,6 +162,16 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                              "选择文件", onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } },
                              modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 10.dp), filled = false,
                          )
@@ -71811,7 +71873,7 @@ index 2b4638e..b96c84b 100644
                      }
                  }
              }
-@@ -352,7 +367,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -352,7 +369,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                  restoreUri = null
                  scope.launch {
                      try {
@@ -71820,7 +71882,7 @@ index 2b4638e..b96c84b 100644
                          vm.toast("已恢复 $count 项，请检查设置后手动应用")
                          vm.reloadAppearance()
                          bump()
-@@ -360,6 +375,8 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -360,6 +377,8 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                          throw cancel
                      } catch (error: Exception) {
                          vm.toast(error.message ?: "恢复失败")
@@ -71829,7 +71891,7 @@ index 2b4638e..b96c84b 100644
                      }
                  }
              },
-@@ -371,6 +388,36 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -371,6 +390,36 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
              )
          }
      }
@@ -71866,7 +71928,7 @@ index 2b4638e..b96c84b 100644
  }
 
  /** A card of the root list. Its rows carry no hairlines: the icons already set them apart. */
-@@ -393,21 +440,22 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -393,21 +442,22 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      val nav = LocalNav.current
      val context = LocalContext.current
      val prefs = vm.prefs
@@ -71899,7 +71961,7 @@ index 2b4638e..b96c84b 100644
      fun changed(key: String) {
          ProxyRuntimeSettings.markDirty(prefs, key)
          revision++
-@@ -465,10 +513,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -465,10 +515,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
          }
          item(key = "config") {
              SettingsSection {
@@ -71911,7 +71973,7 @@ index 2b4638e..b96c84b 100644
              }
          }
          if (pending) {
-@@ -485,41 +530,27 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -485,41 +532,27 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      }
 
      when (choice) {
@@ -71968,7 +72030,7 @@ index 2b4638e..b96c84b 100644
              onDismiss = { choice = null },
          )
          "mode" -> HxChoiceSheet(
-@@ -627,9 +658,10 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
+@@ -627,9 +660,10 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
      val tileShape = RoundedCornerShape(18.dp)
      Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
          listOf(
@@ -71982,7 +72044,17 @@ index 2b4638e..b96c84b 100644
          ).forEach { (value, label, note) ->
              val active = selected == value
              val source = remember { MutableInteractionSource() }
-@@ -662,7 +694,7 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
+@@ -652,7 +686,8 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
+             ) {
+                 Box(Modifier.fillMaxWidth().height(58.dp)) {
+                     val accent = c.accent
+-                    Box(Modifier.fillMaxWidth().height(58.dp).drawBehind { drawThemePreview(value, accent) })
++                    val tint = c.canvasTint
++                    Box(Modifier.fillMaxWidth().height(58.dp).drawBehind { drawThemePreview(value, accent, tint) })
+                     HomePop(active, Modifier.align(Alignment.TopEnd).padding(5.dp)) {
+                         Box(Modifier.size(20.dp).background(c.accent, CircleShape), contentAlignment = Alignment.Center) {
+                             Icon(HomeIcons.Check, null, Modifier.size(13.dp), tint = c.onAccent)
+@@ -662,17 +697,20 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
                  Spacer(Modifier.height(10.dp))
                  Text(label, color = c.t1, style = HomeType.noteStrong.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), maxLines = 2, textAlign = TextAlign.Center)
                  Spacer(Modifier.height(2.dp))
@@ -71991,7 +72063,23 @@ index 2b4638e..b96c84b 100644
              }
          }
      }
-@@ -794,7 +826,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+ }
+
+-/** A thumbnail of the app in one theme: canvas, a bar, a card with two lines and the accent. */
+-private fun DrawScope.drawThemePreview(mode: String, accent: Color) {
++/**
++ * A thumbnail of the app in one theme: canvas, a bar, a card with two lines and the accent.
++ * [tint] is the live palette's canvas tint, so a non-default accent previews its washed canvas.
++ */
++private fun DrawScope.drawThemePreview(mode: String, accent: Color, tint: Color) {
+     val radius = CornerRadius(12.dp.toPx())
+     fun half(dark: Boolean) {
+-        val canvas = if (dark) Color(0xFF0E0F13) else Color(0xFFECEEFB)
++        val canvas = if (tint.isSpecified) homeColors(dark, tint).bg else if (dark) Color(0xFF0E0F13) else Color(0xFFECEEFB)
+         val card = if (dark) Color(0xFF20232B) else Color(0xFFFFFFFF)
+         val ink = if (dark) Color(0xFFEBEDF2) else Color(0xFF12161A)
+         drawRoundRect(canvas, cornerRadius = radius)
+@@ -794,7 +832,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      SettingsDivider()
                      SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = HxIcons.PanelBottom)
                      SettingsDivider()
@@ -73495,7 +73583,7 @@ index 0000000..c824968
 +    private fun spaces(n: Int): String = " ".repeat(n)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-index 0ceaa23..2f6e885 100644
+index 0ceaa23..d2e0838 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 @@ -94,6 +94,15 @@ internal fun HetuHomeV2(
@@ -73514,9 +73602,13 @@ index 0ceaa23..2f6e885 100644
  ) {
      val context = LocalContext.current
      val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
-@@ -128,6 +137,12 @@ internal fun HetuHomeV2(
+@@ -126,8 +135,16 @@ internal fun HetuHomeV2(
+             memoryHistoryMb = resourceSamples?.map { it.memoryBytes?.div(1024f * 1024f) } ?: history.second,
+         ),
      )
++    val speedHistory = rememberSpeedHistory(sampling, speedSource, mapped.uploadBytesPerSecond, mapped.downloadBytesPerSecond)
      val state = mapped.copy(
++        speedHistory = speedHistory,
          connection = connection,
 +        lastGood = lastGood,
 +        lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
@@ -73527,7 +73619,7 @@ index 0ceaa23..2f6e885 100644
          statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
          wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
              city = wanExtras.city.known(),
-@@ -137,19 +152,38 @@ internal fun HetuHomeV2(
+@@ -137,19 +154,38 @@ internal fun HetuHomeV2(
              coordinates = wanExtras.coordinates.known(),
              state = HomeWanState.fromId(wanExtras.state),
              error = wanExtras.error.known(),
@@ -73575,7 +73667,7 @@ index 0ceaa23..2f6e885 100644
              onNetSideChange = { side ->
                  netSide = side
                  prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
-@@ -158,31 +192,37 @@ internal fun HetuHomeV2(
+@@ -158,31 +194,37 @@ internal fun HetuHomeV2(
                  speedSource = source
                  prefs.edit().putString(PrefSpeedSource, source.id).apply()
              },
@@ -73629,7 +73721,7 @@ index 0ceaa23..2f6e885 100644
          ) {
              HomeRoute(
                  state = state.copy(ipRefreshing = data.refreshing),
-@@ -210,6 +250,8 @@ internal data class HomeWanExtras(
+@@ -210,6 +252,8 @@ internal data class HomeWanExtras(
      /** `ProxyRuntimeSnapshot.wanState`: idle, loading, success, stale or failed. */
      val state: String = "",
      val error: String = "",
@@ -73638,7 +73730,7 @@ index 0ceaa23..2f6e885 100644
  )
 
  internal fun homeStatusOf(data: CompactHomeData, startupError: String?): HomeStatus = when {
-@@ -290,8 +332,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
+@@ -290,8 +334,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
  @Composable
  private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
      var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
@@ -73651,7 +73743,7 @@ index 0ceaa23..2f6e885 100644
          var lastTx = TrafficStats.getTotalTxBytes()
          var lastRx = TrafficStats.getTotalRxBytes()
          var lastAt = SystemClock.elapsedRealtime()
-@@ -321,8 +366,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+@@ -321,8 +368,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
      val memoryPoints = remember { mutableStateListOf<Float?>() }
      val latestCpu by rememberUpdatedState(cpu)
      val latestMemory by rememberUpdatedState(memoryBytes)
@@ -73664,7 +73756,40 @@ index 0ceaa23..2f6e885 100644
          while (true) {
              cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
              memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })
-@@ -418,3 +466,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
+@@ -333,6 +383,32 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+     return cpuPoints.toList() to memoryPoints.toList()
+ }
+
++/**
++ * Rolling window (30 points, one a second) of the figures the 网速 card shows, for its faint
++ * backdrop curve. Switching the source starts a fresh window, so API and local rates never mix.
++ */
++@Composable
++private fun rememberSpeedHistory(sampling: Boolean, source: HomeSpeedSource, up: Long?, down: Long?): HomeSpeedHistory {
++    val upPoints = remember { mutableStateListOf<Long?>() }
++    val downPoints = remember { mutableStateListOf<Long?>() }
++    val latestUp by rememberUpdatedState(up)
++    val latestDown by rememberUpdatedState(down)
++    val visible = rememberScreenVisible()
++    LaunchedEffect(source) { upPoints.clear(); downPoints.clear() }
++    LaunchedEffect(sampling, visible) {
++        if (!sampling) { upPoints.clear(); downPoints.clear(); return@LaunchedEffect }
++        // Keep the window while the screen is off, but do not wake every second to extend it.
++        if (!visible) return@LaunchedEffect
++        while (true) {
++            upPoints.add(latestUp)
++            downPoints.add(latestDown)
++            while (upPoints.size > 30) { upPoints.removeAt(0); downPoints.removeAt(0) }
++            delay(1000L)
++        }
++    }
++    return HomeSpeedHistory(upPoints.toList(), downPoints.toList())
++}
++
+ private fun loadTargets(prefs: SharedPreferences): HomeTargetsConfig = HomeTargetsConfig(
+     targets = ProxyLatencyTargets.load(prefs).map { HomeTarget(it.name, it.url) },
+     autoRefreshSeconds = prefs.getInt(PrefAutoRefresh, 0).takeIf { it == 30 || it == 60 } ?: 0,
+@@ -418,3 +494,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
  }
 
  private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
@@ -73681,7 +73806,7 @@ index 0ceaa23..2f6e885 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-index 9afc132..af093a8 100644
+index 9afc132..e756b31 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 @@ -1,6 +1,7 @@
@@ -73700,7 +73825,15 @@ index 9afc132..af093a8 100644
  import androidx.compose.runtime.Stable
  import androidx.compose.runtime.State
  import androidx.compose.runtime.derivedStateOf
-@@ -76,9 +78,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
+@@ -68,6 +70,7 @@ import androidx.compose.ui.graphics.Shape
+ import androidx.compose.ui.graphics.SolidColor
+ import androidx.compose.ui.graphics.StrokeCap
+ import androidx.compose.ui.graphics.StrokeJoin
++import androidx.compose.ui.graphics.drawscope.DrawScope
+ import androidx.compose.ui.graphics.drawscope.Stroke
+ import androidx.compose.ui.graphics.drawscope.clipRect
+ import androidx.compose.ui.graphics.graphicsLayer
+@@ -76,9 +79,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.contentDescription
  import androidx.compose.ui.semantics.semantics
@@ -73713,12 +73846,14 @@ index 9afc132..af093a8 100644
  import androidx.compose.ui.text.style.TextAlign
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.Dp
-@@ -117,13 +122,26 @@ internal fun HomeCard(
+@@ -117,15 +123,36 @@ internal fun HomeCard(
      clickLabel: String? = null,
      background: Color = LocalHomeColors.current.surface,
      shape: Shape = HomeDims.cardShape,
 +    onLongClick: (() -> Unit)? = null,
 +    longClickLabel: String? = null,
++    /** Drawn on the card's surface beneath the content (the 网速 curve); takes no layout space. */
++    backdrop: (DrawScope.() -> Unit)? = null,
      content: @Composable ColumnScope.() -> Unit,
  ) {
      val haptics = LocalHomeHaptics.current
@@ -73726,9 +73861,10 @@ index 9afc132..af093a8 100644
 -    val tappable = if (onClick == null) modifier else modifier.homeTap(onClickLabel = label, role = Role.Button) {
 -        haptics(HomeHaptic.Tap)
 -        onClick()
++    val source = remember { MutableInteractionSource() }
 +    val tappable = when {
 +        onClick == null -> modifier
-+        onLongClick == null -> modifier.homeTap(onClickLabel = label, role = Role.Button) {
++        onLongClick == null -> modifier.homeTap(onClickLabel = label, role = Role.Button, interactionSource = source) {
 +            haptics(HomeHaptic.Tap)
 +            onClick()
 +        }
@@ -73736,23 +73872,31 @@ index 9afc132..af093a8 100644
 +            onClickLabel = label, role = Role.Button,
 +            onLongClickLabel = longClickLabel?.let { ht(it) },
 +            onLongClick = { haptics(HomeHaptic.Confirm); onLongClick() },
++            interactionSource = source,
 +        ) {
 +            haptics(HomeHaptic.Tap)
 +            onClick()
 +        }
      }
-     Column(tappable.homeGlassPanel(shape, background), content = content)
+-    Column(tappable.homeGlassPanel(shape, background), content = content)
++    val surface = tappable.homeGlassPanel(shape, background)
++    Column(
++        (if (backdrop == null) surface else surface.drawBehind(backdrop)).homePressTint(source, enabled = onClick != null),
++        content = content,
++    )
  }
-@@ -240,7 +258,7 @@ internal fun HomeBanner(
+
+ /** Hairline between rows of one card. [inset] keeps it clear of the card's rounded edges. */
+@@ -240,7 +267,7 @@ internal fun HomeBanner(
                  Modifier.clip(SharedBadgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
                      .heightIn(min = 32.dp).padding(horizontal = 8.dp),
                  contentAlignment = Alignment.Center,
 -            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1) }
-+            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
++            ) { Text(actionLabel, color = c.accentText, style = SharedNoteStrongText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
          }
      }
  }
-@@ -313,15 +331,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
+@@ -313,26 +340,47 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
   */
  @Composable
  internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
@@ -73782,7 +73926,68 @@ index 9afc132..af093a8 100644
          drawCircle(tint, radius)
      }
  }
-@@ -506,13 +531,18 @@ internal fun HomeIconButton(
+
+-/** Colour of a latency figure: accent while healthy, amber when slow, red when very slow. */
++/** Latency bands shared by 首页 and 面板: under [HomeDelayFastMs] is healthy, under [HomeDelaySlowMs] slow. */
++internal const val HomeDelayFastMs = 300L
++internal const val HomeDelaySlowMs = 800L
++
++/**
++ * Colour of a latency figure as text: [HomeColors.delayFastText] while healthy (the accent, or
++ * green when the accent itself is red–amber), amber when slow, red when very slow.
++ */
+ internal fun HomeColors.delayColor(ms: Long): Color = when {
+-    ms < 300L -> accent
+-    ms < 800L -> warnText
++    ms < HomeDelayFastMs -> delayFastText
++    ms < HomeDelaySlowMs -> warnText
+     else -> badText
+ }
+
++/** The colour a latency capsule's soft fill is mixed from, in the same bands as [delayColor]. */
++internal fun HomeColors.delayBase(ms: Long): Color = when {
++    ms < HomeDelayFastMs -> delayFast
++    ms < HomeDelaySlowMs -> warn
++    else -> bad
++}
++
+ /** “28 ms” as plain coloured text; null = unknown, negative = timed out. */
+ @Composable
+ internal fun HomeDelayText(delayMs: Long?, modifier: Modifier = Modifier, style: TextStyle = HomeType.metric) {
+@@ -458,27 +506,29 @@ internal fun HomeButton(
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+     val lead = if (danger) c.bad else c.accent
+-    val leadText = if (danger) c.badText else c.accent
++    val leadText = if (danger) c.badText else c.accentText
+     val onLead = if (danger) (if (c.dark) Color(0xFF1B0808) else Color.White) else c.onAccent
+     val (fill, content) = when (kind) {
+         HomeButtonKind.Primary -> lead to onLead
+         HomeButtonKind.Secondary -> c.surface to leadText
+         HomeButtonKind.Soft -> when {
+             danger -> c.badSoft to c.badText
+-            tinted -> c.accentSoft to c.accent
++            tinted -> c.accentSoft to c.accentText
+             else -> c.sunken to c.t1
+         }
+         HomeButtonKind.Ghost -> Color.Transparent to leadText
+     }
+     val shape = HomeDims.controlShape
+     val active = enabled && !loading
++    val source = remember { MutableInteractionSource() }
+     Row(
+         modifier
+             .heightIn(min = height)
+             .alpha(if (active) 1f else .5f)
+-            .homeTap(enabled = active, role = Role.Button) { haptics(if (kind == HomeButtonKind.Primary) HomeHaptic.Confirm else HomeHaptic.Tap); onClick() }
++            .homeTap(enabled = active, role = Role.Button, interactionSource = source) { haptics(if (kind == HomeButtonKind.Primary) HomeHaptic.Confirm else HomeHaptic.Tap); onClick() }
+             .clip(shape)
+             .background(fill)
++            .homePressTint(source, enabled = active)
+             .let { if (kind == HomeButtonKind.Secondary) it.border(1.5.dp, lead.copy(alpha = if (c.dark) .70f else .62f), shape) else it }
+             .padding(horizontal = 16.dp),
+         verticalAlignment = Alignment.CenterVertically,
+@@ -506,13 +556,18 @@ internal fun HomeIconButton(
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      val spoken = ht(label)
@@ -73802,7 +74007,7 @@ index 9afc132..af093a8 100644
          contentAlignment = Alignment.Center,
      ) {
          if (loading) HomeSpinner(size = 20.dp, color = c.t2)
-@@ -638,6 +668,9 @@ internal fun HomeNotice(
+@@ -638,6 +693,9 @@ internal fun HomeNotice(
      actionLabel: String? = null,
      onAction: (() -> Unit)? = null,
      filled: Boolean = true,
@@ -73812,7 +74017,7 @@ index 9afc132..af093a8 100644
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
-@@ -647,7 +680,7 @@ internal fun HomeNotice(
+@@ -647,7 +705,7 @@ internal fun HomeNotice(
              .heightIn(min = if (filled) 44.dp else 28.dp)
              .clip(HomeDims.controlShape)
              .let { if (filled) it.background(tone.soft()) else it }
@@ -73821,12 +74026,12 @@ index 9afc132..af093a8 100644
          verticalAlignment = Alignment.CenterVertically,
      ) {
          Icon(icon, null, Modifier.size(18.dp), tint = tone.foreground())
-@@ -657,7 +690,14 @@ internal fun HomeNotice(
+@@ -657,7 +715,14 @@ internal fun HomeNotice(
              Box(
                  Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                  contentAlignment = Alignment.Center,
 -            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
-+            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
++            ) { Text(ht(actionLabel), color = c.accentText, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis) }
 +        }
 +        if (onClose != null) {
 +            Box(
@@ -73837,7 +74042,7 @@ index 9afc132..af093a8 100644
          }
      }
  }
-@@ -724,30 +764,38 @@ internal class HomeBarGlass internal constructor(
+@@ -724,30 +789,38 @@ internal class HomeBarGlass internal constructor(
 
  @Composable
  internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
@@ -73884,7 +74089,7 @@ index 9afc132..af093a8 100644
      val progressive = haze != null && LocalHomeBarProgressive.current
      val surface = if (haze != null) {
          Modifier
-@@ -759,7 +807,7 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
+@@ -759,7 +832,7 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
                  if (progressive) Brush.verticalGradient(listOf(c.bg.copy(alpha = .56f), c.bg.copy(alpha = .30f), c.bg.copy(alpha = .06f)))
                  else Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))),
              )
@@ -73893,7 +74098,7 @@ index 9afc132..af093a8 100644
      Box(
          modifier
              .graphicsLayer { alpha = glass.shown }
-@@ -890,7 +938,7 @@ internal fun HomeTextField(
+@@ -890,7 +963,7 @@ internal fun HomeTextField(
                          .padding(horizontal = 14.dp),
                      contentAlignment = Alignment.CenterStart,
                  ) {
@@ -73902,6 +74107,71 @@ index 9afc132..af093a8 100644
                      inner()
                  }
              },
+@@ -980,6 +1053,64 @@ internal fun HomeSparkline(
+     }
+ }
+
++/** Slots of the 网速 backdrop: the window [HomeSpeedHistory] keeps, newest at the right edge. */
++private const val SpeedBackdropSlots = 30
++
++/**
++ * Faint traffic curves along the lower part of a card: [download] as a soft area with a thin
++ * line, [upload] quieter behind it. Values are scaled to the window's peak with a floor, so an
++ * idle connection hugs the bottom instead of filling the card. Nothing animates; each new second
++ * simply redraws, and a null sample breaks the curve.
++ */
++internal fun DrawScope.drawHomeSpeedBackdrop(history: HomeSpeedHistory, download: Color, upload: Color) {
++    val count = maxOf(history.download.size, history.upload.size)
++    if (count < 2) return
++    val peak = maxOf(
++        history.download.maxOfOrNull { it ?: 0L } ?: 0L,
++        history.upload.maxOfOrNull { it ?: 0L } ?: 0L,
++        64L * 1024L,
++    ).toFloat()
++    val w = size.width
++    val h = size.height
++    val band = h * .5f
++    val foot = 2.dp.toPx()
++    val step = w / (SpeedBackdropSlots - 1)
++    fun curve(values: List<Long?>, color: Color, area: Float, line: Float) {
++        val segments = mutableListOf<MutableList<Offset>>()
++        var current = mutableListOf<Offset>()
++        values.forEachIndexed { index, value ->
++            if (value == null) {
++                if (current.isNotEmpty()) segments.add(current)
++                current = mutableListOf()
++            } else {
++                val x = w - (values.size - 1 - index) * step
++                current.add(Offset(x, h - foot - (value / peak).coerceIn(0f, 1f) * (band - foot)))
++            }
++        }
++        if (current.isNotEmpty()) segments.add(current)
++        for (points in segments) {
++            if (points.size < 2) continue
++            val path = Path().apply {
++                moveTo(points[0].x, points[0].y)
++                for (i in 1 until points.size) {
++                    val midX = (points[i - 1].x + points[i].x) / 2f
++                    cubicTo(midX, points[i - 1].y, midX, points[i].y, points[i].x, points[i].y)
++                }
++            }
++            val fill = Path().apply {
++                addPath(path)
++                lineTo(points.last().x, h)
++                lineTo(points.first().x, h)
++                close()
++            }
++            drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = area), color.copy(alpha = 0f)), startY = h - band, endY = h))
++            drawPath(path, color.copy(alpha = line), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
++        }
++    }
++    curve(history.upload, upload, area = .10f, line = .30f)
++    curve(history.download, download, area = .16f, line = .42f)
++}
++
+ /* ------------------------------------------------------------------ */
+ /*  Bottom sheet content frame                                          */
+ /* ------------------------------------------------------------------ */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt
 new file mode 100644
 index 0000000..6e10b86
@@ -73983,11 +74253,92 @@ index 0000000..6e10b86
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt
+index e11af45..ea43a6a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt
+@@ -4,6 +4,17 @@ import androidx.compose.foundation.Canvas
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.border
+ import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.text.InlineTextContent
++import androidx.compose.foundation.text.appendInlineContent
++import androidx.compose.runtime.remember
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.ui.text.Placeholder
++import androidx.compose.ui.text.PlaceholderVerticalAlign
++import androidx.compose.ui.text.TextStyle
++import androidx.compose.ui.text.buildAnnotatedString
++import androidx.compose.ui.unit.em
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+@@ -66,6 +77,40 @@ internal fun HomeFlag(code: String, modifier: Modifier = Modifier, height: Dp =
+ /** True when [code] has a drawing (callers may want a different fallback than the code chip). */
+ internal fun homeFlagAvailable(code: String): Boolean = FlagPainters.containsKey(code.trim().uppercase(Locale.ROOT))
+
++/** Flag height in a [rememberHomeFlaggedName] line, relative to the text size, and the gap after it. */
++private const val InlineFlagEm = .8f
++private const val InlineFlagGapEm = .3f
++
++/**
++ * [name] for a Text, with a leading flag emoji drawn as the same vector flag the group cards use,
++ * so node tiles show one flag style on every ROM. The original characters stay in the text as
++ * the placeholder's alternate text, so search, copy and TalkBack still read the name as it is.
++ * A name without a leading flag, or with one there is no drawing for, comes back unchanged.
++ * The placeholder is about as wide as the emoji and its space, so lines wrap as before.
++ */
++@Composable
++internal fun rememberHomeFlaggedName(name: String, style: TextStyle): Pair<AnnotatedString, Map<String, InlineTextContent>> {
++    val density = LocalDensity.current
++    return remember(name, style.fontSize, density) {
++        val rest = HomeRegions.withoutFlag(name)
++        val code = if (rest == name) "" else HomeRegions.codeOf(name)
++        if (code.isEmpty() || !homeFlagAvailable(code) || !style.fontSize.isSp) return@remember AnnotatedString(name) to emptyMap()
++        val text = buildAnnotatedString {
++            appendInlineContent(InlineFlagId, name.removeSuffix(rest))
++            append(rest)
++        }
++        val flagHeight = with(density) { (style.fontSize * InlineFlagEm).toDp() }
++        val content = InlineTextContent(
++            Placeholder((InlineFlagEm * 1.42f + InlineFlagGapEm).em, InlineFlagEm.em, PlaceholderVerticalAlign.TextCenter),
++        ) {
++            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { HomeFlag(code, height = flagHeight) }
++        }
++        text to mapOf(InlineFlagId to content)
++    }
++}
++
++private const val InlineFlagId = "home-flag"
++
+ /* ------------------------------------------------------------------ */
+ /*  Drawing helpers                                                     */
+ /* ------------------------------------------------------------------ */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt
-index 448efcc..c648e8b 100644
+index 448efcc..9d6112e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt
-@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.BoxScope
+@@ -1,10 +1,26 @@
+ package io.github.xgl34222220.hetu.home
+
+ import android.animation.ValueAnimator
++import androidx.compose.animation.core.Animatable
++import androidx.compose.animation.core.tween
++import androidx.compose.foundation.interaction.InteractionSource
++import androidx.compose.foundation.interaction.PressInteraction
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.rememberUpdatedState
++import androidx.compose.ui.draw.drawBehind
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.layout.layout
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.offset
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.collectLatest
+ import androidx.compose.foundation.layout.BoxScope
  import androidx.compose.foundation.layout.PaddingValues
  import androidx.compose.foundation.layout.padding
  import androidx.compose.foundation.clickable
@@ -73996,7 +74347,7 @@ index 448efcc..c648e8b 100644
  import androidx.compose.foundation.interaction.MutableInteractionSource
  import androidx.compose.material3.ExperimentalMaterial3Api
  import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-@@ -16,6 +18,10 @@ import androidx.compose.runtime.remember
+@@ -16,6 +32,10 @@ import androidx.compose.runtime.remember
  import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.platform.testTag
@@ -74007,7 +74358,26 @@ index 448efcc..c648e8b 100644
  import androidx.compose.ui.semantics.CustomAccessibilityAction
  import androidx.compose.ui.semantics.customActions
  import androidx.compose.ui.semantics.semantics
-@@ -42,6 +48,23 @@ internal fun Modifier.homeTap(
+@@ -29,19 +49,94 @@ internal val LocalHomeMotionEnabled = staticCompositionLocalOf { true }
+ @Composable
+ internal fun homeMotionEnabled(): Boolean = LocalHetuMotionEnabled.current && ValueAnimator.areAnimatorsEnabled()
+
+-/** Uses the existing interaction-driven dip; scroll cancellation returns to the resting size. */
++/**
++ * Uses the existing interaction-driven dip; scroll cancellation returns to the resting size.
++ * Pass [interactionSource] to draw [homePressTint] from the same presses inside the caller's clip.
++ */
+ @Composable
+ internal fun Modifier.homeTap(
+     enabled: Boolean = true,
+     role: Role = Role.Button,
+     onClickLabel: String? = null,
++    interactionSource: MutableInteractionSource? = null,
+     onClick: () -> Unit,
+ ): Modifier {
+-    val source = remember { MutableInteractionSource() }
++    val source = interactionSource ?: remember { MutableInteractionSource() }
+     return hetuPressScale(source, enabled, pressedScale = .975f, motion = LocalHomeMotionEnabled.current)
          .clickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel, onClick = onClick)
  }
 
@@ -74020,18 +74390,72 @@ index 448efcc..c648e8b 100644
 +    onClickLabel: String? = null,
 +    onLongClickLabel: String?,
 +    onLongClick: () -> Unit,
++    interactionSource: MutableInteractionSource? = null,
 +    onClick: () -> Unit,
 +): Modifier {
-+    val source = remember { MutableInteractionSource() }
++    val source = interactionSource ?: remember { MutableInteractionSource() }
 +    return hetuPressScale(source, enabled, pressedScale = .975f, motion = LocalHomeMotionEnabled.current)
 +        .combinedClickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel,
 +            onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)
 +}
 +
++/**
++ * Pressed feedback that does not depend on motion: a faint ink wash over the surface, beneath
++ * the content, while [source] is pressed. With motion it fades in and out; with reduced motion
++ * it switches on and off, held briefly so even a quick tap visibly lands. Nothing is laid out
++ * again and the page never recomposes for it: the level is read only while drawing.
++ * Place it after the caller's clip and background.
++ */
++@Composable
++internal fun Modifier.homePressTint(source: InteractionSource, enabled: Boolean = true): Modifier {
++    val c = LocalHomeColors.current
++    val motion = LocalHomeMotionEnabled.current
++    val level = remember { Animatable(0f) }
++    val active by rememberUpdatedState(enabled)
++    LaunchedEffect(source, motion) {
++        level.snapTo(0f)
++        source.interactions.collectLatest { interaction ->
++            when (interaction) {
++                is PressInteraction.Press -> if (active) { if (motion) level.animateTo(1f, tween(70)) else level.snapTo(1f) }
++                is PressInteraction.Release, is PressInteraction.Cancel -> if (motion) {
++                    // A tap shorter than the fade-in still shows a full wash before it eases out.
++                    if (interaction is PressInteraction.Release && active && level.value < .6f) level.animateTo(1f, tween(60))
++                    level.animateTo(0f, tween(240, easing = HomeMotion.Decelerate))
++                } else {
++                    if (interaction is PressInteraction.Release && level.value > 0f) delay(90L)
++                    level.snapTo(0f)
++                }
++                else -> Unit
++            }
++            Unit
++        }
++    }
++    val ink = if (c.dark) Color.White.copy(alpha = .08f) else c.t1.copy(alpha = .06f)
++    return drawBehind {
++        val shown = level.value
++        if (shown > 0f) drawRect(ink.copy(alpha = ink.alpha * shown))
++    }
++}
++
++/**
++ * Grows the touch box of a small tappable (a text switch) by [horizontal] and [vertical] on each
++ * side without moving or resizing anything: the wrapped node is measured larger, placed back by
++ * the same amount and reports its original size. Put it before the click modifier and pad the
++ * content by the same amounts after it.
++ */
++internal fun Modifier.homeTouchExpand(horizontal: Dp, vertical: Dp): Modifier = layout { measurable, constraints ->
++    val h = horizontal.roundToPx()
++    val v = vertical.roundToPx()
++    val placeable = measurable.measure(constraints.offset(2 * h, 2 * v))
++    layout((placeable.width - 2 * h).coerceAtLeast(0), (placeable.height - 2 * v).coerceAtLeast(0)) {
++        placeable.place(-h, -v)
++    }
++}
++
  /** A real nested-scroll refresh gesture; the caller owns its request and completion state. */
  @OptIn(ExperimentalMaterial3Api::class)
  @Composable
-@@ -55,6 +78,13 @@ internal fun HomeRefreshBox(
+@@ -55,6 +150,13 @@ internal fun HomeRefreshBox(
  ) {
      val state = rememberPullToRefreshState()
      val colors = LocalHomeColors.current
@@ -74045,7 +74469,7 @@ index 448efcc..c648e8b 100644
      PullToRefreshBox(
          isRefreshing = refreshing,
          onRefresh = { if (!refreshing) onRefresh() },
-@@ -74,6 +104,14 @@ internal fun HomeRefreshBox(
+@@ -74,6 +176,14 @@ internal fun HomeRefreshBox(
                  color = colors.accent,
              )
          },
@@ -74122,20 +74546,34 @@ index d77ecc5..4ba62e3 100644
                          HomeKeyValueRow(
                              label = ht(row.label),
                              value = value ?: placeholder,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeLatencyTargetsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeLatencyTargetsScreen.kt
+index 783ab4b..7985ec4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeLatencyTargetsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeLatencyTargetsScreen.kt
+@@ -109,7 +109,7 @@ private fun AutoRefreshRow(seconds: Int, onChange: (Int) -> Unit, modifier: Modi
+                     HomeTargets.autoRefreshChoices.forEach { choice ->
+                         val selected = choice == seconds
+                         DropdownMenuItem(
+-                            text = { Text(homeAutoRefreshLabel(choice), color = if (selected) c.accent else c.t1, style = HomeType.body) },
++                            text = { Text(homeAutoRefreshLabel(choice), color = if (selected) c.accentText else c.t1, style = HomeType.body) },
+                             onClick = { haptics(HomeHaptic.Tick); open = false; onChange(choice) },
+                             trailingIcon = if (selected) { { Icon(HomeIcons.Check, null, Modifier.size(20.dp), tint = c.accent) } } else null,
+                         )
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
-index 36f72fa..583c51f 100644
+index 36f72fa..9cd042e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
-@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Offset
+@@ -11,6 +11,9 @@ import androidx.compose.ui.geometry.Offset
  import androidx.compose.ui.graphics.Brush
  import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.Shape
 +import androidx.compose.ui.graphics.drawOutline
 +import androidx.compose.ui.graphics.drawscope.translate
++import androidx.compose.ui.graphics.isSpecified
  import androidx.compose.ui.graphics.lerp
  import androidx.compose.ui.platform.LocalDensity
  import androidx.compose.ui.unit.dp
-@@ -22,41 +24,45 @@ import kotlin.math.max
+@@ -22,41 +25,47 @@ import kotlin.math.max
   * An OLED black preference keeps the page exactly black, including while blur is unavailable.
   */
  @Composable
@@ -74169,7 +74607,9 @@ index 36f72fa..583c51f 100644
 -            center = Offset(size.width * .22f, size.height * 1.08f), radius = extent * .61f,
 +    // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
 +    // soft light at the top. No coloured blobs; cached per size, nothing animates.
-+    val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
++    // A non-default accent tints the mist too, so the wash and the canvas share one hue.
++    val neutralMist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
++    val mist = if (c.canvasTint.isSpecified) lerp(neutralMist, c.canvasTint, if (c.dark) .22f else .30f) else neutralMist
 +    val material = remember(c, base, washHeight) { Modifier.drawWithCache {
 +        val wash = Brush.verticalGradient(startY = 0f, endY = washHeight, colors = listOf(
 +            lerp(base, if (c.dark) Color(0xFF1B2330) else Color.White, if (c.dark) .30f else .42f),
@@ -74204,7 +74644,7 @@ index 36f72fa..583c51f 100644
   */
  @Composable
  internal fun Modifier.homeGlassPanel(
-@@ -65,22 +71,34 @@ internal fun Modifier.homeGlassPanel(
+@@ -65,22 +74,34 @@ internal fun Modifier.homeGlassPanel(
      raised: Boolean = false,
  ): Modifier {
      val c = LocalHomeColors.current
@@ -74251,7 +74691,7 @@ index 36f72fa..583c51f 100644
      return this.then(material)
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
-index 108ce15..74304c4 100644
+index 108ce15..dc8d70c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 @@ -97,6 +97,8 @@ internal data class HomeWan(
@@ -74263,7 +74703,23 @@ index 108ce15..74304c4 100644
  )
 
  internal data class HomeLan(val ip: String? = null, val iface: String? = null)
-@@ -132,11 +134,14 @@ internal data class HomeConnectionObservation(
+@@ -124,6 +126,15 @@ internal data class HomeResource(
+     val hasGap: Boolean get() = cpuHistory.any { it == null } || memoryHistoryMb.any { it == null }
+ }
+
++/**
++ * The last half minute of the 网速 card's own figures (one point a second, oldest first). A null
++ * entry is a second the source gave no value for, so the backdrop curve shows the gap.
++ */
++internal data class HomeSpeedHistory(
++    val upload: List<Long?> = emptyList(),
++    val download: List<Long?> = emptyList(),
++)
++
+ /** Observations stay separate: a core PID, local takeover and Internet reachability differ. */
+ internal data class HomeConnectionObservation(
+     val controllerReady: Boolean = false,
+@@ -132,11 +143,14 @@ internal data class HomeConnectionObservation(
      /** Null until a real local runtime health record exists; true does not prove Internet access. */
      val takeoverHealthy: Boolean? = null,
      val runtimeMessage: String = "",
@@ -74278,7 +74734,7 @@ index 108ce15..74304c4 100644
          else -> HomeConnectionHealth.LocalReady
      }
  }
-@@ -146,6 +151,29 @@ internal enum class HomeConnectionHealth(val caption: String) {
+@@ -146,6 +160,29 @@ internal enum class HomeConnectionHealth(val caption: String) {
      ControllerUnavailable("控制接口异常 · 连接状态未确认"),
      TakeoverDegraded("接管检查异常 · 出口未验证"),
      LocalReady("接管检查通过 · 出口未验证"),
@@ -74308,8 +74764,12 @@ index 108ce15..74304c4 100644
  }
 
  internal data class HomeUiState(
-@@ -169,8 +197,24 @@ internal data class HomeUiState(
+@@ -167,10 +204,28 @@ internal data class HomeUiState(
+     val speedSource: HomeSpeedSource = HomeSpeedSource.Api,
+     val uploadBytesPerSecond: Long? = null,
      val downloadBytesPerSecond: Long? = null,
++    /** Recent throughput behind the 网速 figures, oldest first; drawn as a faint backdrop only. */
++    val speedHistory: HomeSpeedHistory = HomeSpeedHistory(),
      val subscription: HomeSubscription? = null,
      val resource: HomeResource = HomeResource(),
 +    /** Audit G1: the current core's 「上次可启动」 copy; the start-failure sheet offers it when present. */
@@ -74333,7 +74793,7 @@ index 108ce15..74304c4 100644
  /* ------------------------------------------------------------------ */
  /*  Direct-probe targets form                                           */
  /* ------------------------------------------------------------------ */
-@@ -198,7 +242,7 @@ internal object HomeTargets {
+@@ -198,7 +253,7 @@ internal object HomeTargets {
      val defaults = listOf(
          HomeTarget("Baidu", "https://www.baidu.com/"),
          HomeTarget("Cloudflare", "https://cp.cloudflare.com/generate_204"),
@@ -74342,7 +74802,7 @@ index 108ce15..74304c4 100644
      )
 
      fun autoRefreshLabel(seconds: Int): String = if (seconds <= 0) "关闭" else "$seconds 秒"
-@@ -247,6 +291,10 @@ internal class HomeActions(
+@@ -247,6 +302,10 @@ internal class HomeActions(
      val onOpenBasicSettings: () -> Unit = {},
      /** Config tag: opens 工具 › 配置管理. */
      val onOpenConfigs: () -> Unit = {},
@@ -74353,7 +74813,7 @@ index 108ce15..74304c4 100644
      /** “查看配置” in the start-failure sheet: opens the YAML editor at the reported line when known. */
      val onViewConfig: () -> Unit = {},
      val onDismissStartFailure: () -> Unit = {},
-@@ -254,8 +302,37 @@ internal class HomeActions(
+@@ -254,8 +313,37 @@ internal class HomeActions(
      val loadTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
      val saveTargets: (HomeTargetsConfig) -> Unit = {},
      val resetTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
@@ -74498,10 +74958,10 @@ index a6f5728..401aa54 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..3a11a97 100644
+index e31ca99..abea86c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-@@ -50,16 +50,23 @@ import androidx.compose.ui.platform.testTag
+@@ -50,16 +50,24 @@ import androidx.compose.ui.platform.testTag
  import androidx.compose.ui.draw.alpha
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.draw.drawBehind
@@ -74510,6 +74970,7 @@ index e31ca99..3a11a97 100644
  import androidx.compose.ui.geometry.Size
  import androidx.compose.ui.graphics.Brush
  import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.drawscope.DrawScope
  import androidx.compose.ui.graphics.lerp
  import androidx.compose.ui.semantics.Role
 +import androidx.compose.ui.text.AnnotatedString
@@ -74526,7 +74987,7 @@ index e31ca99..3a11a97 100644
  import androidx.compose.ui.unit.dp
  import androidx.compose.ui.unit.sp
  import io.github.xgl34222220.hetu.ui.ht
-@@ -70,7 +77,7 @@ import java.util.Locale
+@@ -70,7 +78,7 @@ import java.util.Locale
   * [actions] or one of the navigation lambdas.
   *
   * Top to bottom, as in the concept: status card with the large ring, run controls, traffic mode
@@ -74535,7 +74996,7 @@ index e31ca99..3a11a97 100644
   * WAN / speed / subscription / resources. A soft glow in the status colour sits behind the
   * top of the page and cross-fades when the proxy changes state.
   *
-@@ -88,8 +95,16 @@ internal fun HomeScreen(
+@@ -88,8 +96,16 @@ internal fun HomeScreen(
      modifier: Modifier = Modifier,
      contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
      motion: Boolean = true,
@@ -74552,7 +75013,7 @@ index e31ca99..3a11a97 100644
      val scroll = rememberScrollState()
      val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
      val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
-@@ -127,7 +142,7 @@ internal fun HomeScreen(
+@@ -127,7 +143,7 @@ internal fun HomeScreen(
                      val reach = 340.dp.toPx()
                      drawRect(
                          Brush.verticalGradient(
@@ -74561,7 +75022,7 @@ index e31ca99..3a11a97 100644
                              1f to glow.copy(alpha = 0f),
                              startY = 0f, endY = reach,
                          ),
-@@ -137,11 +152,17 @@ internal fun HomeScreen(
+@@ -137,11 +153,17 @@ internal fun HomeScreen(
                  .padding(contentPadding)
                  .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
          ) {
@@ -74582,7 +75043,7 @@ index e31ca99..3a11a97 100644
              } else if (state.status.isLive && state.connection.health == HomeConnectionHealth.TakeoverDegraded && state.connection.runtimeMessage.isNotBlank()) {
                  HomeNotice(state.connection.runtimeMessage, HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
              }
-@@ -160,6 +181,24 @@ internal fun HomeScreen(
+@@ -160,6 +182,24 @@ internal fun HomeScreen(
                      textStyle = HomeType.button,
                  )
              }
@@ -74607,7 +75068,7 @@ index e31ca99..3a11a97 100644
              HomeReveal(state.status is HomeStatus.PendingRestart) {
                  HomeNotice(
                      ht("设置已修改，重启后生效"), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
-@@ -167,21 +206,22 @@ internal fun HomeScreen(
+@@ -167,21 +207,22 @@ internal fun HomeScreen(
                  )
              }
 
@@ -74634,7 +75095,7 @@ index e31ca99..3a11a97 100644
                  HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
              }
              Spacer(Modifier.height(8.dp))
-@@ -201,6 +241,22 @@ internal fun HomeScreen(
+@@ -201,6 +242,23 @@ internal fun HomeScreen(
 
  internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
 
@@ -74651,13 +75112,14 @@ index e31ca99..3a11a97 100644
 +    },
 +    uploadBytesPerSecond = null,
 +    downloadBytesPerSecond = null,
++    speedHistory = HomeSpeedHistory(),
 +    resource = HomeResource(),
 +)
 +
  /** [HomeFormat.uptime] in the app language. */
  @Composable
  internal fun homeUptimeText(seconds: Long): String = when {
-@@ -230,8 +286,9 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -230,8 +288,9 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
      val line = when (status) {
          is HomeStatus.Running -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
          is HomeStatus.PendingRestart -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
@@ -74669,7 +75131,7 @@ index e31ca99..3a11a97 100644
      }
      val tint by animateColorAsState(
          when (glyph) {
-@@ -256,10 +313,10 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -256,10 +315,10 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
          HomeStatusGlyph(glyph, Modifier.align(Alignment.BottomEnd).offset(x = 21.dp, y = 26.dp).size(116.dp), animate = motion, tint = tint)
          Column(Modifier.padding(start = 20.dp, top = 12.dp, end = 104.dp, bottom = 14.dp)) {
              Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -74682,7 +75144,7 @@ index e31ca99..3a11a97 100644
              if (status is HomeStatus.Running || status is HomeStatus.PendingRestart) {
                  Text(ht(state.connection.health.caption), Modifier.padding(top = 5.dp, bottom = 3.dp).testTag("home-connection-caption"), color = c.t1,
                      style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
-@@ -275,7 +332,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -275,7 +334,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
  private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
      val c = LocalHomeColors.current
      Row(
@@ -74691,7 +75153,7 @@ index e31ca99..3a11a97 100644
          verticalAlignment = Alignment.CenterVertically,
          horizontalArrangement = Arrangement.spacedBy(2.dp),
      ) {
-@@ -287,8 +344,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -287,8 +346,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
  /** A running core becomes a healthy local glyph only after both observations succeeded. */
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
@@ -74707,7 +75169,7 @@ index e31ca99..3a11a97 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
-@@ -347,6 +410,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+@@ -347,6 +412,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
      }
  }
 
@@ -74747,16 +75209,19 @@ index e31ca99..3a11a97 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -377,95 +473,52 @@ private fun RowScope.ControlAction(
+@@ -377,95 +475,52 @@ private fun RowScope.ControlAction(
          horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
      ) {
          if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
 -        Text(text, color = tint, style = HomeType.control, maxLines = 1)
 -        if (loading && !loadingLeads) HomeSpinner(size = 18.dp, color = color, strokeWidth = 2.5.dp)
--    }
--}
--
--/* ------------------------------------------------------------------ */
++        Text(text, color = tint, style = HomeType.control, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
++        if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
+     }
+ }
+
+ /* ------------------------------------------------------------------ */
 -/*  Current node                                                        */
 -/* ------------------------------------------------------------------ */
 -
@@ -74810,13 +75275,10 @@ index e31ca99..3a11a97 100644
 -            drawCircle(cut, slab * .15f, Offset(size.width * .19f, y + slab / 2f))
 -            drawRoundRect(cut, Offset(size.width * .36f, y + slab * .40f), Size(size.width * .46f, slab * .20f), CornerRadius(slab * .1f, slab * .1f))
 -        }
-+        Text(text, color = tint, style = HomeType.control, maxLines = 1, overflow = TextOverflow.Ellipsis)
-+        // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
-+        if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
-     }
- }
-
- /* ------------------------------------------------------------------ */
+-    }
+-}
+-
+-/* ------------------------------------------------------------------ */
 -/*  Direct probe (本机直测)                                              */
 +/*  Latency (网络延迟)                                                   */
  /* ------------------------------------------------------------------ */
@@ -74866,7 +75328,7 @@ index e31ca99..3a11a97 100644
                          if (delay == null) Text(HomeFormat.Dash, color = c.t2, style = HomeType.metric)
                          else HomeDelayText(delay)
                      }
-@@ -475,6 +528,19 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
+@@ -475,6 +530,19 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
      }
  }
 
@@ -74886,20 +75348,21 @@ index e31ca99..3a11a97 100644
  /* ------------------------------------------------------------------ */
  /*  Metric cards (2 × 2)                                                */
  /* ------------------------------------------------------------------ */
-@@ -485,9 +551,11 @@ private fun MetricCard(
+@@ -485,9 +553,12 @@ private fun MetricCard(
      onClick: () -> Unit,
      clickLabel: String,
      header: @Composable RowScope.() -> Unit,
 +    onLongClick: (() -> Unit)? = null,
 +    longClickLabel: String? = null,
++    backdrop: (DrawScope.() -> Unit)? = null,
      content: @Composable ColumnScope.() -> Unit,
  ) {
 -    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel) {
-+    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel, onLongClick = onLongClick, longClickLabel = longClickLabel) {
++    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel, onLongClick = onLongClick, longClickLabel = longClickLabel, backdrop = backdrop) {
          Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
              Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
              content()
-@@ -497,7 +565,7 @@ private fun MetricCard(
+@@ -497,7 +568,7 @@ private fun MetricCard(
 
  @Composable
  private fun MetricTitle(text: String) {
@@ -74908,7 +75371,7 @@ index e31ca99..3a11a97 100644
  }
 
  /** Label on the left, live value on the right. A null [value] is an honest dash, never a zero. */
-@@ -511,7 +579,7 @@ private fun MetricLine(
+@@ -511,7 +582,7 @@ private fun MetricLine(
  ) {
      val c = LocalHomeColors.current
      Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -74917,7 +75380,15 @@ index e31ca99..3a11a97 100644
          Spacer(Modifier.width(8.dp))
          Spacer(Modifier.weight(1f))
          when {
-@@ -536,7 +604,6 @@ private fun addressStyle(text: String?): TextStyle = when {
+@@ -532,11 +603,14 @@ private fun addressStyle(text: String?): TextStyle = when {
+     else -> HomeType.value.copy(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+ }
+
++/** Extra touch room around the WAN/LAN title switch: 30 dp of drawn text grows to a 48 dp target. */
++private val NetSideTouchX = 6.dp
++private val NetSideTouchY = 9.dp
++
+ @Composable
  private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onSide: (HomeNetSide) -> Unit) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
@@ -74925,7 +75396,16 @@ index e31ca99..3a11a97 100644
      val wan = state.netSide == HomeNetSide.Wan
      MetricCard(
          modifier = modifier, onClick = onOpen, clickLabel = "查看 IP 详情",
-@@ -551,7 +618,7 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
+@@ -547,11 +621,15 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
+                 val tint by animateColorAsState(if (active) c.t1 else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current), label = "home-net-side")
+                 Text(
+                     side.label,
+-                    (if (active) Modifier else Modifier.homeTap(onClickLabel = ht("切换到 %s").fill(side.label), role = Role.Button) { haptics(HomeHaptic.Tick); onSide(side) })
++                    // The quiet side keeps its drawn size but gets a 48 dp tall touch box around it.
++                    (if (active) Modifier else Modifier
++                        .homeTouchExpand(NetSideTouchX, NetSideTouchY)
++                        .homeTap(onClickLabel = ht("切换到 %s").fill(side.label), role = Role.Button) { haptics(HomeHaptic.Tick); onSide(side) }
++                        .padding(horizontal = NetSideTouchX, vertical = NetSideTouchY))
                          .padding(end = 10.dp, top = 4.dp, bottom = 4.dp),
                      color = tint,
                      style = if (active) HomeType.cardLabel else HomeType.cardLabel.copy(fontWeight = FontWeight.Medium),
@@ -74934,7 +75414,7 @@ index e31ca99..3a11a97 100644
                  )
              }
              Spacer(Modifier.weight(1f))
-@@ -559,18 +626,25 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
+@@ -559,18 +637,25 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
          },
      ) {
          if (wan) {
@@ -74967,7 +75447,18 @@ index e31ca99..3a11a97 100644
              }
          } else {
              MetricLine("IP", state.lan.ip, addressStyle(state.lan.ip))
-@@ -588,29 +662,40 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
+@@ -583,34 +668,51 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
+ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit) {
+     val c = LocalHomeColors.current
+     val live = state.status.isLive
++    // The last half minute drawn faintly beneath the figures: download in the accent, upload quieter.
++    val history = state.speedHistory.takeIf { live }
++    val download = c.accent
++    val upload = lerp(c.accent, c.t2, .6f)
++    val backdrop: (DrawScope.() -> Unit)? = if (history == null) null else ({ drawHomeSpeedBackdrop(history, download, upload) })
+     MetricCard(
+         modifier = modifier, onClick = onOpen, clickLabel = "选择网速数据来源",
++        backdrop = backdrop,
          header = {
              MetricTitle("网速")
              Spacer(Modifier.weight(1f))
@@ -75016,7 +75507,7 @@ index e31ca99..3a11a97 100644
      }
  }
 
-@@ -623,12 +708,40 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
+@@ -623,12 +725,40 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
          modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
          header = { MetricTitle("资源占用") },
      ) {
@@ -75060,7 +75551,7 @@ index e31ca99..3a11a97 100644
  /* ------------------------------------------------------------------ */
  /*  Sheets that belong to the home page                                 */
  /* ------------------------------------------------------------------ */
-@@ -673,7 +786,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
+@@ -673,7 +803,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
 
  /** 启动失败: the error text can be copied; two exits, open the config or try again. */
  @Composable
@@ -75084,7 +75575,15 @@ index e31ca99..3a11a97 100644
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      HomeSheetContent(
-@@ -692,5 +820,19 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
+@@ -685,12 +830,26 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
+                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+             ) {
+                 Icon(HomeIcons.Copy, null, Modifier.size(20.dp), tint = c.accent)
+-                Text(ht("复制"), color = c.accent, style = HomeType.button)
++                Text(ht("复制"), color = c.accentText, style = HomeType.button)
+             }
+         },
+         footer = {
              HomeButton("查看配置", onViewConfig, Modifier.weight(1f), kind = HomeButtonKind.Soft)
              HomeButton("重新启动", onRetry, Modifier.weight(1f), kind = HomeButtonKind.Primary)
          },
@@ -75145,7 +75644,7 @@ index 552f3dd..cad6ae2 100644
          val centre = Offset(size.width / 2f, size.height / 2f)
          val stroke = radius * .215f
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
-index 256be3e..512e1e8 100644
+index 256be3e..a2a661a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
 @@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75156,7 +75655,125 @@ index 256be3e..512e1e8 100644
  import androidx.compose.runtime.staticCompositionLocalOf
  import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.Shape
-@@ -290,7 +291,9 @@ internal fun HetuHomeTheme(
+@@ -54,7 +55,28 @@ internal data class HomeColors(
+     val hero: Color = accentSoft,
+     /** Menus, dialogs and sheets: one step above [surface]. */
+     val raised: Color = surface,
+-)
++    /**
++     * The accent the page canvas is faintly washed with, or [Color.Unspecified] for the concept
++     * default blue, whose lavender canvas stays exactly as designed.
++     */
++    val canvasTint: Color = Color.Unspecified,
++) {
++    /**
++     * The accent where it is read as text (text buttons, counts, 测速中). An accent too light for
++     * small text on [sunken] is deepened toward [t1] just enough for 4.5:1; fills, rings and
++     * icons keep [accent]. The default blue already passes and is returned unchanged.
++     */
++    val accentText: Color = homeInk(accent, sunken, t1)
++
++    /**
++     * A healthy latency is drawn in the accent. A red, pink, orange or amber accent would read as
++     * 慢 or 超时 next to [warn] and [bad], so with those the healthy figure turns green instead.
++     */
++    val delayFast: Color = if (homeAccentNearWarnings(accent)) good else accent
++
++    /** [delayFast] as small text on a card or on its own soft capsule. */
++    val delayFastText: Color = if (homeAccentNearWarnings(accent)) homeInk(good, sunken, t1) else accentText
++}
+
+ /** Amber deep enough to be read as text on [HomeColors.warnSoft] or on a card. */
+ internal val HomeColors.warnText: Color get() = if (dark) warn else lerp(warn, t1, .30f)
+@@ -104,6 +126,41 @@ internal fun homeOnAccent(accent: Color): Color {
+     }
+ }
+
++private fun homeContrast(a: Color, b: Color): Float {
++    val la = a.luminance()
++    val lb = b.luminance()
++    return (maxOf(la, lb) + .05f) / (minOf(la, lb) + .05f)
++}
++
++/** [color], or the smallest step from it toward [toward] that reads at 4.5:1 on [background]. */
++internal fun homeInk(color: Color, background: Color, toward: Color): Color {
++    if (homeContrast(color, background) >= 4.5f) return color
++    var step = .05f
++    while (step < 1f) {
++        val deeper = lerp(color, toward, step)
++        if (homeContrast(deeper, background) >= 4.5f) return deeper
++        step += .05f
++    }
++    return toward
++}
++
++/** True for an accent whose hue sits in the red–amber band (300°–60°) the latency warnings use. */
++internal fun homeAccentNearWarnings(accent: Color): Boolean {
++    val r = accent.red
++    val g = accent.green
++    val b = accent.blue
++    val high = maxOf(r, g, b)
++    val delta = high - minOf(r, g, b)
++    if (delta < .12f) return false // near-grey: no hue to confuse with amber or red
++    val sector = when (high) {
++        r -> ((g - b) / delta) % 6f
++        g -> (b - r) / delta + 2f
++        else -> (r - g) / delta + 4f
++    }
++    val hue = (sector * 60f).let { if (it < 0f) it + 360f else it }
++    return hue >= 300f || hue <= 60f
++}
++
+ private val HomeOnAccentNavy = Color(0xFF0A1633)
+ private val DefaultLightAccent = Color(0xFF0A62E8)
+ private val DefaultDarkAccent = Color(0xFF7EA6FF)
+@@ -126,10 +183,13 @@ internal fun homeColors(
+     val warn = Color(0xFFE08A0B)
+     val bad = Color(0xFFE0393E)
+     val accentSoft = lerp(surface, accent, .15f)
++    // Any accent but the concept blue washes the lavender canvas toward itself, so an orange or
++    // jade theme does not sit on a blue-violet page. The concept default stays byte-identical.
++    val tinted = accent != DefaultLightAccent
+     HomeColors(
+-        bg = Color(0xFFECEEFB),
++        bg = if (tinted) lerp(Color(0xFFEDEEF3), accent, .05f) else Color(0xFFECEEFB),
+         surface = surface,
+-        sunken = Color(0xFFE9EBF7),
++        sunken = if (tinted) lerp(Color(0xFFEAEBF0), accent, .05f) else Color(0xFFE9EBF7),
+         line = t1.copy(alpha = .08f),
+         line2 = t1.copy(alpha = .18f),
+         t1 = t1,
+@@ -149,16 +209,19 @@ internal fun homeColors(
+         // The concept's status card is lavender under the default blue; other accents tint it themselves.
+         hero = if (accent == DefaultLightAccent) Color(0xFFDEDDFC) else lerp(surface, accent, .16f),
+         raised = Color(0xFFFBFAFE),
++        canvasTint = if (tinted) accent else Color.Unspecified,
+     )
+ } else {
+     val surface = if (pureBlack) Color(0xFF111215) else Color(0xFF181A20)
+     val good = Color(0xFF4ADE80)
+     val warn = Color(0xFFFBBF24)
+     val bad = Color(0xFFF87171)
++    // OLED black stays black whatever the accent.
++    val tinted = accent != DefaultDarkAccent && !pureBlack
+     HomeColors(
+-        bg = if (pureBlack) Color(0xFF000000) else Color(0xFF0E0F13),
++        bg = if (pureBlack) Color(0xFF000000) else if (tinted) lerp(Color(0xFF0E0F13), accent, .035f) else Color(0xFF0E0F13),
+         surface = surface,
+-        sunken = if (pureBlack) Color(0xFF1B1D22) else Color(0xFF22252D),
++        sunken = if (pureBlack) Color(0xFF1B1D22) else if (tinted) lerp(Color(0xFF22252D), accent, .05f) else Color(0xFF22252D),
+         line = Color.White.copy(alpha = .07f),
+         line2 = Color.White.copy(alpha = .16f),
+         t1 = Color(0xFFEBEDF2),
+@@ -177,6 +240,7 @@ internal fun homeColors(
+         dark = true,
+         hero = if (accent == DefaultDarkAccent) Color(0xFF22243C) else lerp(surface, accent, .15f),
+         raised = if (pureBlack) Color(0xFF17191D) else Color(0xFF1E2128),
++        canvasTint = if (tinted) accent else Color.Unspecified,
+     )
+ }
+
+@@ -290,7 +354,9 @@ internal fun HetuHomeTheme(
      customAccent: Color? = null,
      content: @Composable () -> Unit,
  ) {
@@ -75686,7 +76303,7 @@ index 9f66ac0..ab51d6a 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-index b187a2f..a1d7863 100644
+index b187a2f..dd0369e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 @@ -1,9 +1,18 @@
@@ -75717,7 +76334,18 @@ index b187a2f..a1d7863 100644
  import androidx.compose.ui.text.AnnotatedString
  import androidx.compose.ui.text.SpanStyle
  import androidx.compose.ui.text.TextStyle
-@@ -210,6 +221,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
+@@ -94,8 +105,9 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+ import io.github.xgl34222220.hetu.home.badText
++import io.github.xgl34222220.hetu.home.delayBase
++import io.github.xgl34222220.hetu.home.delayColor
+ import io.github.xgl34222220.hetu.home.homeTap
+-import io.github.xgl34222220.hetu.home.warnText
+ import io.github.xgl34222220.hetu.ui.ht
+ import kotlin.math.roundToInt
+ import kotlinx.coroutines.launch
+@@ -210,6 +222,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
          modifier
              .fillMaxWidth()
              .onSizeChanged { viewport = it.width }
@@ -75725,7 +76353,7 @@ index b187a2f..a1d7863 100644
              .horizontalScroll(scroll)
              .panelGutter()
              .drawBehind {
-@@ -234,7 +246,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
+@@ -234,7 +247,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
                      .padding(horizontal = 13.dp),
                  contentAlignment = Alignment.Center,
              ) {
@@ -75734,7 +76362,7 @@ index b187a2f..a1d7863 100644
              }
          }
      }
-@@ -262,7 +274,7 @@ internal fun PanelSearchField(value: String, onValueChange: (String) -> Unit, pl
+@@ -262,7 +275,7 @@ internal fun PanelSearchField(value: String, onValueChange: (String) -> Unit, pl
                  Icon(PanelIcons.Search, null, Modifier.size(22.dp), tint = c.t1)
                  Spacer(Modifier.width(10.dp))
                  Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -75743,7 +76371,7 @@ index b187a2f..a1d7863 100644
                      inner()
                  }
                  if (value.isNotEmpty()) {
-@@ -308,7 +320,7 @@ internal fun PanelChip(
+@@ -308,7 +321,7 @@ internal fun PanelChip(
          horizontalArrangement = Arrangement.spacedBy(5.dp),
      ) {
          if (leading != null) leading()
@@ -75752,7 +76380,14 @@ index b187a2f..a1d7863 100644
          if (trailingIcon != null) Icon(trailingIcon, null, Modifier.size(16.dp), tint = tint)
      }
  }
-@@ -411,41 +423,67 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
+@@ -406,46 +419,68 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
+ }
+
+ /**
+- * Latency capsule. Healthy figures use the accent, slow ones amber, very slow ones and timeouts
+- * red; an unknown value is a quiet grey capsule. With [onClick] the capsule re-tests that node
++ * Latency capsule. Healthy figures use the accent (green under a red–amber accent), slow ones
++ * amber, very slow ones and timeouts red; an unknown value is a quiet grey capsule. With [onClick] the capsule re-tests that node
   * only and gets a comfortable touch box that grows up and to the left of it.
   */
  @Composable
@@ -75767,20 +76402,18 @@ index b187a2f..a1d7863 100644
 -        PanelDelay.Unknown -> Triple(ht("未知"), c.t2, c.t3)
 -        PanelDelay.Testing -> Triple(ht("测速中"), c.accent, c.accent)
 -        PanelDelay.Timeout -> Triple(ht("超时"), c.badText, c.bad)
-+    // Text colour and the colour the capsule fill is mixed from.
-+    val look: Pair<Color, Color> = when (delay) {
-+        PanelDelay.Unknown -> c.t2 to c.t3
-+        PanelDelay.Testing -> c.accent to c.accent
-+        PanelDelay.Timeout -> c.badText to c.bad
-+        PanelDelay.Failed -> c.badText to c.bad
-         is PanelDelay.Ms -> when {
+-        is PanelDelay.Ms -> when {
 -            delay.value < 300L -> Triple("${delay.value} ms", c.accent, c.accent)
 -            delay.value < 800L -> Triple("${delay.value} ms", c.warnText, c.warn)
 -            else -> Triple("${delay.value} ms", c.badText, c.bad)
-+            delay.value < 300L -> c.accent to c.accent
-+            delay.value < 800L -> c.warnText to c.warn
-+            else -> c.badText to c.bad
-         }
+-        }
++    // Text colour and the colour the capsule fill is mixed from.
++    val look: Pair<Color, Color> = when (delay) {
++        PanelDelay.Unknown -> c.t2 to c.t3
++        PanelDelay.Testing -> c.accentText to c.accent
++        PanelDelay.Timeout -> c.badText to c.bad
++        PanelDelay.Failed -> c.badText to c.bad
++        is PanelDelay.Ms -> c.delayColor(delay.value) to c.delayBase(delay.value)
      }
 -    val text = look.first
 -    val content = look.second
@@ -75835,7 +76468,7 @@ index b187a2f..a1d7863 100644
          contentAlignment = Alignment.BottomEnd,
      ) { capsule() }
  }
-@@ -455,18 +493,18 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier,
+@@ -455,18 +490,18 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier,
  internal fun RowScope.PanelStat(value: String, unit: String?, label: String, valueColor: Color = LocalHomeColors.current.t1, style: TextStyle = PanelType.stat) {
      val c = LocalHomeColors.current
      Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -75852,14 +76485,14 @@ index b187a2f..a1d7863 100644
      val c = LocalHomeColors.current
      Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
 -        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1)
-+        Text(ht(title), color = titleColor ?: c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        Text(ht(title), color = titleColor ?: c.accentText, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
          Spacer(Modifier.weight(1f))
 -        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
 +        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
          if (trailing != null) trailing()
      }
  }
-@@ -616,8 +654,18 @@ internal class PanelTrendSeries(val values: List<Float>, val color: Color, val f
+@@ -616,8 +651,18 @@ internal class PanelTrendSeries(val values: List<Float>, val color: Color, val f
   * the baseline; every series draws itself in from the left once per [reveal] run.
   */
  @Composable
@@ -76282,7 +76915,7 @@ index 0000000..99b3b19
 +            }
 +        }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-index c95890c..5099f52 100644
+index c95890c..84680fb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 @@ -1,6 +1,8 @@
@@ -76305,15 +76938,18 @@ index c95890c..5099f52 100644
  import androidx.compose.ui.platform.testTag
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.selected
-@@ -54,6 +58,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+@@ -53,7 +57,10 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
  import io.github.xgl34222220.hetu.home.fill
  import io.github.xgl34222220.hetu.home.homeEnter
++import io.github.xgl34222220.hetu.home.homePressTint
++import io.github.xgl34222220.hetu.home.rememberHomeFlaggedName
  import io.github.xgl34222220.hetu.home.homeTap
 +import io.github.xgl34222220.hetu.home.homeGlassPanel
  import io.github.xgl34222220.hetu.ui.HetuStaggerState
  import io.github.xgl34222220.hetu.ui.hetuPressScale
  import io.github.xgl34222220.hetu.ui.ht
-@@ -112,6 +117,7 @@ internal fun LazyListScope.panelGroupsTab(
+@@ -112,6 +119,7 @@ internal fun LazyListScope.panelGroupsTab(
                          GroupCard(
                              group = group, data = data, view = view, wide = columns == 1,
                              modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onToggleGroup(group.name) },
@@ -76321,7 +76957,7 @@ index c95890c..5099f52 100644
                          )
                      }
                      repeat(columns - row.groups.size) { Spacer(Modifier.weight(1f)) }
-@@ -152,11 +158,25 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
+@@ -152,51 +160,83 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
  /* ------------------------------------------------------------------ */
 
  @Composable
@@ -76348,13 +76984,18 @@ index c95890c..5099f52 100644
      val motion = LocalHomeMotionEnabled.current
      val fill by animateColorAsState(if (expanded) lerp(c.surface, c.accent, if (c.dark) .14f else .055f) else c.surface, HomeMotion.fade(motion), label = "groupFill")
      val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
-@@ -166,37 +186,53 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState,
+     val opened = ht("已展开")
+     val closed = ht("已收起")
++    val press = remember { MutableInteractionSource() }
+     val shell = modifier
          .testTag("panel-group:${group.name}")
          .semantics { stateDescription = if (expanded) opened else closed }
-         .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+-        .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
 -        .clip(PanelDims.groupShape)
 -        .background(fill)
++        .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button, interactionSource = press) { haptics(HomeHaptic.Tap); onClick() }
 +        .homeGlassPanel(PanelDims.groupShape, fill)
++        .homePressTint(press)
          .border(1.5.dp, outline, PanelDims.groupShape)
 -        .padding(start = 13.dp, end = 12.dp, top = if (compact) 13.dp else 17.dp, bottom = if (compact) 10.dp else 14.dp)
 +        .padding(start = 13.dp, end = 12.dp,
@@ -76418,7 +77059,7 @@ index c95890c..5099f52 100644
              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                  title(Modifier.weight(1f))
                  GroupTile(group)
-@@ -240,6 +276,9 @@ private fun GroupTile(group: PanelGroup) {
+@@ -240,6 +280,9 @@ private fun GroupTile(group: PanelGroup) {
  private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (String) -> Unit) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
@@ -76428,7 +77069,7 @@ index c95890c..5099f52 100644
      Row(
          Modifier.panelGutter().fillMaxWidth()
              .background(c.surface, RoundedCornerShape(topStart = PanelDims.nodesShape, topEnd = PanelDims.nodesShape))
-@@ -253,11 +292,14 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
+@@ -253,12 +296,15 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
          Row(
              Modifier.heightIn(min = 44.dp).clip(PanelDims.tabShape)
                  .homeTap(enabled = !testing, onClickLabel = ht("测试该组全部节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onTestGroup(group.name) }
@@ -76439,13 +77080,24 @@ index c95890c..5099f52 100644
              horizontalArrangement = Arrangement.spacedBy(6.dp),
          ) {
 -            if (testing) HomeSpinner(size = 18.dp) else Icon(PanelIcons.Gauge, null, Modifier.size(20.dp), tint = c.accent)
+-            Text(ht(if (testing) "测速中" else "测速"), color = c.accent, style = HomeType.buttonSmall)
 +            PanelSwapFade(testing, motion) { busy ->
 +                if (busy) HomeSpinner(size = 18.dp) else Icon(PanelIcons.Gauge, null, Modifier.size(20.dp), tint = c.accent)
 +            }
-             Text(ht(if (testing) "测速中" else "测速"), color = c.accent, style = HomeType.buttonSmall)
++            Text(ht(if (testing) "测速中" else "测速"), color = c.accentText, style = HomeType.buttonSmall)
          }
      }
-@@ -300,7 +342,7 @@ private fun NodeCard(
+ }
+@@ -292,7 +338,7 @@ private fun NodeCard(
+     val compact = view.layout.compactNodes
+     val source = remember { MutableInteractionSource() }
+     val motion = LocalHomeMotionEnabled.current
+-    val rest = if (c.dark) c.sunken else c.sunken
++    val rest = c.sunken
+     val fill by animateColorAsState(if (selected) lerp(rest, c.accent, if (c.dark) .20f else .09f) else rest, HomeMotion.fade(motion), label = "nodeFill")
+     val outline by animateColorAsState(
+         when { selected -> c.accent.copy(alpha = .62f); switching -> c.accent.copy(alpha = .28f); else -> Color.Transparent },
+@@ -300,12 +346,13 @@ private fun NodeCard(
      )
      val info = ht("节点信息")
      val shell = modifier
@@ -76454,12 +77106,25 @@ index c95890c..5099f52 100644
          .testTag("panel-node:${node.name}")
          .semantics { this.selected = selected }
          .hetuPressScale(source, pressedScale = .975f, motion = motion)
-@@ -320,16 +362,18 @@ private fun NodeCard(
+         .clip(PanelDims.nodeShape)
+         .background(fill)
++        .homePressTint(source)
+         .border(1.5.dp, outline, PanelDims.nodeShape)
+         .combinedClickable(
+             interactionSource = source,
+@@ -316,20 +363,24 @@ private fun NodeCard(
+             onClick = { haptics(HomeHaptic.Confirm); onSelect() },
+         )
+         .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 8.dp)
++    // A leading flag emoji is drawn as the group cards' vector flag; the text itself is unchanged.
++    val (label, flag) = rememberHomeFlaggedName(node.name, PanelType.nodeName)
+     val name: @Composable (Modifier) -> Unit = { m ->
          Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
              Text(
-                 node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
+-                node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
 -                maxLines = if (view.layout.wrapNames) 3 else if (compact) 1 else 2, overflow = TextOverflow.Ellipsis,
-+                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis,
++                label, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
++                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis, inlineContent = flag,
              )
 -            if (switching) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)
 -            else HomePop(selected, Modifier.padding(end = 2.dp)) { HomeCheckMark(true, size = 20.dp) }
@@ -76479,7 +77144,7 @@ index c95890c..5099f52 100644
          }
      } else {
          Column(shell) {
-@@ -345,3 +389,13 @@ private fun NodeCard(
+@@ -345,3 +396,13 @@ private fun NodeCard(
          }
      }
  }
@@ -76494,7 +77159,7 @@ index c95890c..5099f52 100644
 +    Crossfade(busy, animationSpec = tween(140), label = "panelSwap") { shown -> content(shown) }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-index 253b603..bdedb01 100644
+index 253b603..cf0c365 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 @@ -21,6 +21,11 @@ import androidx.compose.material3.Icon
@@ -76784,7 +77449,7 @@ index 253b603..bdedb01 100644
                      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                          Text(panelHighlight(set.name, query), Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
 -                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1)
-+                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accentText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                      }
                      Text(set.meta, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                      when (val state = set.update) {
@@ -76800,6 +77465,15 @@ index 253b603..bdedb01 100644
                      }
                  }
                  when (set.update) {
+@@ -329,7 +401,7 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
+                     is PanelUpdate.Failed -> Box(
+                         Modifier.heightIn(min = HomeDims.touch).clip(HomeDims.controlShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onUpdate(set.name) }.padding(horizontal = 12.dp),
+                         contentAlignment = Alignment.Center,
+-                    ) { Text(ht("重试"), color = c.accent, style = HomeType.button) }
++                    ) { Text(ht("重试"), color = c.accentText, style = HomeType.button) }
+                     PanelUpdate.Idle -> HomeIconButton(PanelIcons.Download, "更新规则集", { onUpdate(set.name) }, tint = c.accent)
+                 }
+             }
 @@ -362,8 +434,10 @@ internal fun LazyListScope.panelLogsTab(
  ) {
      item(key = "log-filters") {
@@ -77061,7 +77735,7 @@ index 149c8e1..3272fd2 100644
                  DetailRow("应用") {
                      if (conn.app.isBlank()) Text(ht(PanelLogic.UnattributedApp), color = c.t3, style = HomeType.label)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
-index 2a4844e..af51181 100644
+index 2a4844e..e89ea48 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
 @@ -1,5 +1,6 @@
@@ -77101,7 +77775,7 @@ index 2a4844e..af51181 100644
 +                Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  Text("/", Modifier.padding(horizontal = 9.dp), color = c.t2, style = HomeType.value)
 -                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1)
-+                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accentText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
              }
          }
      }
@@ -77183,7 +77857,7 @@ index e7112d0..2b444df 100644
      BackHandler(enabled = view.searching) { view = view.toggleSearch() }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-index fb308a8..4b48e82 100644
+index fb308a8..b87853b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 @@ -1,5 +1,6 @@
@@ -77378,7 +78052,7 @@ index fb308a8..4b48e82 100644
 +        horizontalArrangement = Arrangement.spacedBy(6.dp),
 +    ) {
 +        HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
-+        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        Text(ht("同步中"), color = c.accentText, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
@@ -77761,15 +78435,24 @@ index d256004..954cdae 100644
  }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
-index 47a2394..2d21e90 100644
+index 47a2394..716eb0c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
+@@ -181,7 +181,7 @@ internal fun ToolsAppsScreen(
+                 ToolsFooterBar {
+                     Text(ht("已选"), color = c.t1, style = HomeType.noteStrong)
+                     Spacer(Modifier.width(6.dp))
+-                    HomeRollingText(state.selectedCount.toString(), c.accent, HomeType.value.copy(fontWeight = FontWeight.Bold), alignment = Alignment.Center)
++                    HomeRollingText(state.selectedCount.toString(), c.accentText, HomeType.value.copy(fontWeight = FontWeight.Bold), alignment = Alignment.Center)
+                     Spacer(Modifier.width(6.dp))
+                     Text(ht("个"), color = c.t1, style = HomeType.noteStrong)
+                     Text("  ·  ", color = c.t3, style = HomeType.note)
 @@ -228,7 +228,7 @@ private fun AppRow(
          }
          if (app.uid >= 0) {
              Spacer(Modifier.width(10.dp))
 -            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1)
-+            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text("#${app.uid}", color = c.accentText, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
          }
          Spacer(Modifier.width(12.dp))
          ToolsCheckCircle(checked)
@@ -77944,7 +78627,7 @@ index ee40a76..d227f15 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
-index 9ec8a80..babe6f1 100644
+index 9ec8a80..ea7d501 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 @@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.home.HomeIconButton
@@ -77974,6 +78657,15 @@ index 9ec8a80..babe6f1 100644
              }
          }
      }
+@@ -210,7 +210,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
+                         verticalAlignment = Alignment.CenterVertically,
+                         horizontalArrangement = Arrangement.spacedBy(10.dp),
+                     ) {
+-                        Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.label.copy(fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        Text(item.title, Modifier.weight(1f), color = c.accentText, style = HomeType.label.copy(fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                         Text(item.line.toString(), color = c.t2, style = HomeType.delay)
+                         ToolsChevron()
+                     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 index f575100..2d5cdfb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
@@ -78194,7 +78886,7 @@ index f575100..2d5cdfb 100644
 
  /**
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
-index 378e395..d49eb16 100644
+index 378e395..fd08d08 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 @@ -132,7 +132,7 @@ internal fun ToolsBarTextButton(
@@ -78206,6 +78898,15 @@ index 378e395..d49eb16 100644
      }
  }
 
+@@ -317,7 +317,7 @@ internal fun ColumnScope.ToolsListEditor(
+             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+         ) {
+             Icon(ToolsIcons.Plus, null, Modifier.size(20.dp), tint = c.accent)
+-            Text(ht("添加一项"), color = c.accent, style = HomeType.button)
++            Text(ht("添加一项"), color = c.accentText, style = HomeType.button)
+         }
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 index 40111ed..8bc0a0a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
@@ -94110,6 +94811,285 @@ index 0000000..86ec97f
 +            configs.contains("if (subscriptions.isEmpty() && !loading && loadError == null) {"))
 +        assertTrue("subscriptions show placeholders on the first read",
 +            configs.contains("if (subscriptions.isEmpty() && loading) {"))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt
+new file mode 100644
+index 0000000..e6be278
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish445Test.kt
+@@ -0,0 +1,273 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.os.Looper
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.material3.Text
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.ImageBitmap
++import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
++import androidx.compose.ui.graphics.isSpecified
++import androidx.compose.ui.graphics.luminance
++import androidx.compose.ui.graphics.toPixelMap
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.test.assertTextEquals
++import androidx.compose.ui.test.getUnclippedBoundsInRoot
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onNodeWithTag
++import androidx.compose.ui.test.onRoot
++import androidx.compose.ui.test.performTouchInput
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.LayoutDirection
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HomeAccent
++import io.github.xgl34222220.hetu.home.HomeCard
++import io.github.xgl34222220.hetu.home.HomeColors
++import io.github.xgl34222220.hetu.home.HomeSpeedHistory
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.HomeUiState
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
++import io.github.xgl34222220.hetu.home.badText
++import io.github.xgl34222220.hetu.home.delayColor
++import io.github.xgl34222220.hetu.home.drawHomeSpeedBackdrop
++import io.github.xgl34222220.hetu.home.homeColors
++import io.github.xgl34222220.hetu.home.homeTouchExpand
++import io.github.xgl34222220.hetu.home.rememberHomeFlaggedName
++import io.github.xgl34222220.hetu.home.warnText
++import io.github.xgl34222220.hetu.home.withoutLiveSamples
++import java.io.File
++import java.time.Duration
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertTrue
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/**
++ * 4.4.4 beautification pass, layout untouched: latency colours that never borrow the warning
++ * hues, accent text that reads on every card, an accent-washed canvas (default blue and OLED
++ * black unchanged), pressed feedback that survives reduced motion, a 48 dp WAN/LAN touch box,
++ * the 网速 backdrop curve, one flag style on node tiles and the sliding dock.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class UiPolish445Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    private fun ratio(a: Color, b: Color): Float =
++        (maxOf(a.luminance(), b.luminance()) + .05f) / (minOf(a.luminance(), b.luminance()) + .05f)
++
++    private fun palettes(): List<Pair<String, HomeColors>> = listOf(false, true).flatMap { dark ->
++        HomeAccent.entries.map { accent -> "$accent/${if (dark) "dark" else "light"}" to homeColors(dark, accent.color(dark)) }
++    }
++
++    @Test fun healthyLatencyNeverWearsTheWarningHues() {
++        val warm = setOf(HomeAccent.Red, HomeAccent.Orange, HomeAccent.Pink)
++        for (dark in listOf(false, true)) for (accent in HomeAccent.entries) {
++            val c = homeColors(dark, accent.color(dark))
++            if (accent in warm) assertEquals("$accent fast latency turns green", c.good, c.delayFast)
++            else assertEquals("$accent fast latency keeps the accent", c.accent, c.delayFast)
++            assertTrue("$accent/$dark healthy figure readable", ratio(c.delayColor(28), c.sunken) >= 4.5f)
++            assertEquals(c.warnText, c.delayColor(500))
++            assertEquals(c.badText, c.delayColor(1200))
++            assertNotEquals("$accent/$dark healthy and very slow must differ", c.delayColor(28), c.delayColor(1200))
++        }
++        val panel = source("panel/PanelComponents.kt")
++        assertTrue(panel.contains("is PanelDelay.Ms -> c.delayColor(delay.value) to c.delayBase(delay.value)"))
++        assertFalse("one set of latency bands for home and panel", panel.contains("delay.value < 300L"))
++    }
++
++    @Test fun accentTextReadsOnEveryCardSurfaceAndTheDefaultBlueIsUnchanged() {
++        for ((name, c) in palettes()) {
++            assertTrue("$name on sunken", ratio(c.accentText, c.sunken) >= 4.5f)
++            assertTrue("$name on surface", ratio(c.accentText, c.surface) >= 4.5f)
++        }
++        val blue = homeColors(false)
++        assertEquals(blue.accent, blue.accentText)
++        val orange = homeColors(false, HomeAccent.Orange.color(false))
++        assertNotEquals("orange is deepened for small text", orange.accent, orange.accentText)
++        for (path in listOf("panel/PanelGroupsTab.kt", "panel/PanelListTabs.kt", "tools/ToolsFeatureComponents.kt", "home/HomeScreen.kt")) {
++            assertFalse("$path: no Text drawn in the raw accent", Regex("""Text\([^\n]*color = c\.accent[,)\s]""").containsMatchIn(source(path)))
++        }
++    }
++
++    @Test fun nonDefaultAccentWashesTheCanvasWhileDefaultAndOledStayExact() {
++        val light = homeColors(false)
++        val dark = homeColors(true)
++        assertEquals(Color(0xFFECEEFB), light.bg)
++        assertEquals(Color(0xFFE9EBF7), light.sunken)
++        assertEquals(Color(0xFF0E0F13), dark.bg)
++        assertFalse(light.canvasTint.isSpecified)
++        assertFalse(dark.canvasTint.isSpecified)
++        for (accent in HomeAccent.entries) {
++            assertEquals("$accent OLED stays black", Color.Black, homeColors(true, accent.color(true), pureBlack = true).bg)
++            if (accent == HomeAccent.Default) continue
++            val tinted = homeColors(false, accent.color(false))
++            assertEquals(accent.color(false), tinted.canvasTint)
++            assertNotEquals("$accent washes the canvas", light.bg, tinted.bg)
++            assertTrue("$accent metadata still readable", ratio(tinted.t3, tinted.surface) >= 4.5f)
++            assertTrue("$accent body text readable on the canvas", ratio(tinted.t2, tinted.bg) >= 4.5f)
++        }
++        assertTrue(source("home/HomeMaterial.kt").contains("if (c.canvasTint.isSpecified) lerp(neutralMist, c.canvasTint"))
++    }
++
++    @Test fun pressedCardShowsATintWithReducedMotionAndClearsAfterRelease() {
++        rule.setContent {
++            CompositionLocalProvider(LocalHomeColors provides homeColors(), LocalHomeMotionEnabled provides false) {
++                Box(Modifier.size(240.dp)) {
++                    HomeCard(Modifier.padding(20.dp).size(180.dp).testTag("card"), onClick = {}) {}
++                }
++            }
++        }
++        fun centre(): Int {
++            val bounds = rule.onNodeWithTag("card").fetchSemanticsNode().boundsInWindow
++            val x = bounds.center.x.toInt()
++            val y = bounds.center.y.toInt()
++            return capture().let { val p = it.getPixel(x, y); it.recycle(); p }
++        }
++        val resting = centre()
++        rule.onNodeWithTag("card").performTouchInput { down(center) }
++        advance(50)
++        val pressed = centre()
++        assertNotEquals("a press must be visible without motion", resting, pressed)
++        assertTrue("the wash darkens the light card", Color(pressed).luminance() < Color(resting).luminance())
++        rule.onNodeWithTag("card").performTouchInput { up() }
++        advance(400)
++        assertEquals("released card returns to rest", resting, centre())
++    }
++
++    @Test fun touchExpandGrowsTheTargetWithoutMovingAnything() {
++        val clicks = mutableIntStateOf(0)
++        rule.setContent {
++            Column {
++                Spacer(Modifier.height(40.dp))
++                Row(Modifier.testTag("expanded-row")) {
++                    Text("LAN", Modifier.homeTouchExpand(6.dp, 9.dp).clickable { clicks.intValue++ }.padding(horizontal = 6.dp, vertical = 9.dp).testTag("lan"))
++                    Text("next", Modifier.testTag("next"))
++                }
++                Row(Modifier.testTag("plain-row")) {
++                    Text("LAN", Modifier.testTag("lan-plain"))
++                    Text("next", Modifier.testTag("next-plain"))
++                }
++            }
++        }
++        val lan = rule.onNodeWithTag("lan").getUnclippedBoundsInRoot()
++        val plain = rule.onNodeWithTag("lan-plain").getUnclippedBoundsInRoot()
++        assertEquals("drawn text keeps its size", (plain.right - plain.left).value, (lan.right - lan.left).value, .5f)
++        assertEquals("the neighbour does not move", rule.onNodeWithTag("next-plain").getUnclippedBoundsInRoot().left.value,
++            rule.onNodeWithTag("next").getUnclippedBoundsInRoot().left.value, .5f)
++        val rowHeight = rule.onNodeWithTag("expanded-row").getUnclippedBoundsInRoot().let { (it.bottom - it.top).value }
++        val plainHeight = rule.onNodeWithTag("plain-row").getUnclippedBoundsInRoot().let { (it.bottom - it.top).value }
++        assertEquals("the row keeps its height", plainHeight, rowHeight, .5f)
++        // 7 dp above the drawn text is outside its own bounds but inside the expanded box.
++        rule.onRoot().performTouchInput { click(Offset(((lan.left + lan.right) / 2).toPx(), (lan.top - 7.dp).toPx())) }
++        rule.waitForIdle()
++        assertEquals(1, clicks.intValue)
++    }
++
++    @Test fun networkTitleSwitchUsesTheExpandedTouchBox() {
++        val home = source("home/HomeScreen.kt")
++        assertTrue(home.contains(".homeTouchExpand(NetSideTouchX, NetSideTouchY)"))
++        assertTrue(home.contains(".padding(horizontal = NetSideTouchX, vertical = NetSideTouchY))"))
++    }
++
++    @Test fun speedBackdropDrawsOnlyInTheLowerHalfAndNeedsTwoPoints() {
++        fun draw(history: HomeSpeedHistory): ImageBitmap {
++            val image = ImageBitmap(300, 120)
++            CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(image), Size(300f, 120f)) {
++                drawHomeSpeedBackdrop(history, Color.Blue, Color.Gray)
++            }
++            return image
++        }
++        val window = (1..30).map { if (it == 12) null else it * 40_000L }
++        val pixels = draw(HomeSpeedHistory(upload = window.map { it?.div(4) }, download = window)).toPixelMap()
++        for (y in 0 until 56) for (x in 0 until 300) assertEquals("upper half stays clear at $x,$y", 0f, pixels[x, y].alpha)
++        var inked = 0
++        for (y in 60 until 120) for (x in 200 until 300) if (pixels[x, y].alpha > 0f) inked++
++        assertTrue("recent traffic is drawn at the right", inked > 200)
++        val single = draw(HomeSpeedHistory(upload = listOf(1L), download = listOf(1L))).toPixelMap()
++        for (y in 0 until 120 step 4) for (x in 0 until 300 step 4) assertEquals(0f, single[x, y].alpha)
++    }
++
++    @Test fun calmViewDropsTheSpeedWindowLikeTheOtherLiveSamples() {
++        val live = HomeUiState(speedHistory = HomeSpeedHistory(listOf(1L, 2L), listOf(3L, null)))
++        assertEquals(HomeSpeedHistory(), live.withoutLiveSamples().speedHistory)
++        val adapter = source("home/HomeAdapter.kt")
++        assertTrue(adapter.contains("rememberSpeedHistory(sampling, speedSource, mapped.uploadBytesPerSecond, mapped.downloadBytesPerSecond)"))
++        assertTrue("source switch starts a fresh window", adapter.contains("LaunchedEffect(source) { upPoints.clear(); downPoints.clear() }"))
++    }
++
++    @Test fun leadingFlagEmojiIsDrawnAsTheVectorFlagButTheNameStaysTheSame() {
++        val flagged = "🇭🇰 香港 01"
++        var flaggedInline = -1
++        var plainInline = -1
++        rule.setContent {
++            CompositionLocalProvider(LocalHomeColors provides homeColors()) {
++                Column {
++                    val (text, inline) = rememberHomeFlaggedName(flagged, HomeType.rowTitle)
++                    flaggedInline = inline.size
++                    Text(text, Modifier.testTag("flagged"), inlineContent = inline)
++                    val (plain, none) = rememberHomeFlaggedName("香港 02", HomeType.rowTitle)
++                    plainInline = none.size
++                    Text(plain, Modifier.testTag("plain"), inlineContent = none)
++                }
++            }
++        }
++        rule.waitForIdle()
++        assertEquals(1, flaggedInline)
++        assertEquals(0, plainInline)
++        rule.onNodeWithTag("flagged").assertTextEquals(flagged)
++        rule.onNodeWithTag("plain").assertTextEquals("香港 02")
++        assertTrue(source("panel/PanelGroupsTab.kt").contains("val (label, flag) = rememberHomeFlaggedName(node.name, PanelType.nodeName)"))
++    }
++
++    @Test fun dockSlidesAwayForDetailPagesAndSimplyHidesWithReducedMotion() {
++        val shell = source("app/HetuActivity.kt")
++        assertTrue(shell.contains("if (motion) AnimatedVisibility(\n            visible = !detailVisible,"))
++        assertTrue(shell.contains("else if (!detailVisible) dock(Modifier.align(Alignment.BottomCenter))"))
++        assertFalse(shell.contains("if (!detailVisible) HetuGlassDock("))
++    }
++
++    /** Moves both the frame clock and the main looper, whichever one the effect's delay runs on. */
++    private fun advance(ms: Long) {
++        rule.mainClock.advanceTimeBy(ms)
++        rule.runOnUiThread { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms)) }
++        rule.mainClock.advanceTimeBy(16)
++    }
++
++    private fun capture(): Bitmap {
++        rule.waitForIdle()
++        lateinit var bitmap: Bitmap
++        rule.runOnIdle {
++            val view = rule.activity.window.decorView
++            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
++            view.draw(Canvas(bitmap))
++        }
++        return bitmap
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt

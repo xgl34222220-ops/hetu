@@ -75,6 +75,11 @@ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 /*  面板: every live Mihomo view in one swipeable page                   */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The pre-V20.87 panel host and its legacy section screens. The four-tab shell draws the panel/
+ * module's [io.github.xgl34222220.hetu.panel.NewUiPanel] instead, so this host has no route in
+ * the running app; it is kept, unchanged, because nothing is deleted and tests still render it.
+ */
 @Composable
 internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
     HxTabbedPage(

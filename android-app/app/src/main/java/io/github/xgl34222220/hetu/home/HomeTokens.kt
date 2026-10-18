@@ -55,7 +55,28 @@ internal data class HomeColors(
     val hero: Color = accentSoft,
     /** Menus, dialogs and sheets: one step above [surface]. */
     val raised: Color = surface,
-)
+    /**
+     * The accent the page canvas is faintly washed with, or [Color.Unspecified] for the concept
+     * default blue, whose lavender canvas stays exactly as designed.
+     */
+    val canvasTint: Color = Color.Unspecified,
+) {
+    /**
+     * The accent where it is read as text (text buttons, counts, 测速中). An accent too light for
+     * small text on [sunken] is deepened toward [t1] just enough for 4.5:1; fills, rings and
+     * icons keep [accent]. The default blue already passes and is returned unchanged.
+     */
+    val accentText: Color = homeInk(accent, sunken, t1)
+
+    /**
+     * A healthy latency is drawn in the accent. A red, pink, orange or amber accent would read as
+     * 慢 or 超时 next to [warn] and [bad], so with those the healthy figure turns green instead.
+     */
+    val delayFast: Color = if (homeAccentNearWarnings(accent)) good else accent
+
+    /** [delayFast] as small text on a card or on its own soft capsule. */
+    val delayFastText: Color = if (homeAccentNearWarnings(accent)) homeInk(good, sunken, t1) else accentText
+}
 
 /** Amber deep enough to be read as text on [HomeColors.warnSoft] or on a card. */
 internal val HomeColors.warnText: Color get() = if (dark) warn else lerp(warn, t1, .30f)
@@ -105,6 +126,41 @@ internal fun homeOnAccent(accent: Color): Color {
     }
 }
 
+private fun homeContrast(a: Color, b: Color): Float {
+    val la = a.luminance()
+    val lb = b.luminance()
+    return (maxOf(la, lb) + .05f) / (minOf(la, lb) + .05f)
+}
+
+/** [color], or the smallest step from it toward [toward] that reads at 4.5:1 on [background]. */
+internal fun homeInk(color: Color, background: Color, toward: Color): Color {
+    if (homeContrast(color, background) >= 4.5f) return color
+    var step = .05f
+    while (step < 1f) {
+        val deeper = lerp(color, toward, step)
+        if (homeContrast(deeper, background) >= 4.5f) return deeper
+        step += .05f
+    }
+    return toward
+}
+
+/** True for an accent whose hue sits in the red–amber band (300°–60°) the latency warnings use. */
+internal fun homeAccentNearWarnings(accent: Color): Boolean {
+    val r = accent.red
+    val g = accent.green
+    val b = accent.blue
+    val high = maxOf(r, g, b)
+    val delta = high - minOf(r, g, b)
+    if (delta < .12f) return false // near-grey: no hue to confuse with amber or red
+    val sector = when (high) {
+        r -> ((g - b) / delta) % 6f
+        g -> (b - r) / delta + 2f
+        else -> (r - g) / delta + 4f
+    }
+    val hue = (sector * 60f).let { if (it < 0f) it + 360f else it }
+    return hue >= 300f || hue <= 60f
+}
+
 private val HomeOnAccentNavy = Color(0xFF0A1633)
 private val DefaultLightAccent = Color(0xFF0A62E8)
 private val DefaultDarkAccent = Color(0xFF7EA6FF)
@@ -127,10 +183,13 @@ internal fun homeColors(
     val warn = Color(0xFFE08A0B)
     val bad = Color(0xFFE0393E)
     val accentSoft = lerp(surface, accent, .15f)
+    // Any accent but the concept blue washes the lavender canvas toward itself, so an orange or
+    // jade theme does not sit on a blue-violet page. The concept default stays byte-identical.
+    val tinted = accent != DefaultLightAccent
     HomeColors(
-        bg = Color(0xFFECEEFB),
+        bg = if (tinted) lerp(Color(0xFFEDEEF3), accent, .05f) else Color(0xFFECEEFB),
         surface = surface,
-        sunken = Color(0xFFE9EBF7),
+        sunken = if (tinted) lerp(Color(0xFFEAEBF0), accent, .05f) else Color(0xFFE9EBF7),
         line = t1.copy(alpha = .08f),
         line2 = t1.copy(alpha = .18f),
         t1 = t1,
@@ -150,16 +209,19 @@ internal fun homeColors(
         // The concept's status card is lavender under the default blue; other accents tint it themselves.
         hero = if (accent == DefaultLightAccent) Color(0xFFDEDDFC) else lerp(surface, accent, .16f),
         raised = Color(0xFFFBFAFE),
+        canvasTint = if (tinted) accent else Color.Unspecified,
     )
 } else {
     val surface = if (pureBlack) Color(0xFF111215) else Color(0xFF181A20)
     val good = Color(0xFF4ADE80)
     val warn = Color(0xFFFBBF24)
     val bad = Color(0xFFF87171)
+    // OLED black stays black whatever the accent.
+    val tinted = accent != DefaultDarkAccent && !pureBlack
     HomeColors(
-        bg = if (pureBlack) Color(0xFF000000) else Color(0xFF0E0F13),
+        bg = if (pureBlack) Color(0xFF000000) else if (tinted) lerp(Color(0xFF0E0F13), accent, .035f) else Color(0xFF0E0F13),
         surface = surface,
-        sunken = if (pureBlack) Color(0xFF1B1D22) else Color(0xFF22252D),
+        sunken = if (pureBlack) Color(0xFF1B1D22) else if (tinted) lerp(Color(0xFF22252D), accent, .05f) else Color(0xFF22252D),
         line = Color.White.copy(alpha = .07f),
         line2 = Color.White.copy(alpha = .16f),
         t1 = Color(0xFFEBEDF2),
@@ -178,6 +240,7 @@ internal fun homeColors(
         dark = true,
         hero = if (accent == DefaultDarkAccent) Color(0xFF22243C) else lerp(surface, accent, .15f),
         raised = if (pureBlack) Color(0xFF17191D) else Color(0xFF1E2128),
+        canvasTint = if (tinted) accent else Color.Unspecified,
     )
 }
 

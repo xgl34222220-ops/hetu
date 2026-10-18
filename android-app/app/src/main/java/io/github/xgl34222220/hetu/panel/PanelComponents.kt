@@ -105,8 +105,9 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.badText
+import io.github.xgl34222220.hetu.home.delayBase
+import io.github.xgl34222220.hetu.home.delayColor
 import io.github.xgl34222220.hetu.home.homeTap
-import io.github.xgl34222220.hetu.home.warnText
 import io.github.xgl34222220.hetu.ui.ht
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -418,8 +419,8 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
 }
 
 /**
- * Latency capsule. Healthy figures use the accent, slow ones amber, very slow ones and timeouts
- * red; an unknown value is a quiet grey capsule. With [onClick] the capsule re-tests that node
+ * Latency capsule. Healthy figures use the accent (green under a red–amber accent), slow ones
+ * amber, very slow ones and timeouts red; an unknown value is a quiet grey capsule. With [onClick] the capsule re-tests that node
  * only and gets a comfortable touch box that grows up and to the left of it.
  */
 @Composable
@@ -431,14 +432,10 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
     // Text colour and the colour the capsule fill is mixed from.
     val look: Pair<Color, Color> = when (delay) {
         PanelDelay.Unknown -> c.t2 to c.t3
-        PanelDelay.Testing -> c.accent to c.accent
+        PanelDelay.Testing -> c.accentText to c.accent
         PanelDelay.Timeout -> c.badText to c.bad
         PanelDelay.Failed -> c.badText to c.bad
-        is PanelDelay.Ms -> when {
-            delay.value < 300L -> c.accent to c.accent
-            delay.value < 800L -> c.warnText to c.warn
-            else -> c.badText to c.bad
-        }
+        is PanelDelay.Ms -> c.delayColor(delay.value) to c.delayBase(delay.value)
     }
     val content = look.first
     val base = look.second
@@ -502,7 +499,7 @@ internal fun RowScope.PanelStat(value: String, unit: String?, label: String, val
 internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, titleColor: Color? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
     val c = LocalHomeColors.current
     Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(ht(title), color = titleColor ?: c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht(title), color = titleColor ?: c.accentText, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
         if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailing != null) trailing()
