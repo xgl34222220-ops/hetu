@@ -55,6 +55,7 @@ import kotlinx.coroutines.withContext
  * @param onLog receives the diagnostics text for 诊断工具, as `RefTools` does today.
  * @param onSubPageVisibleChanged true while a pushed page covers the tab: hide the dock.
  * @param onConfigChanged the config library or the current config changed: refresh the shell state.
+ * @param onConfigSelected the user made another config current: the host applies it to a running proxy and says so.
  */
 @Composable
 internal fun HetuToolsV2(
@@ -63,6 +64,7 @@ internal fun HetuToolsV2(
     contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
     onSubPageVisibleChanged: (Boolean) -> Unit = {},
     onConfigChanged: () -> Unit = {},
+    onConfigSelected: ((String) -> Unit)? = null,
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
     onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
     onOpenConfigEditor: (() -> Unit)? = null,
@@ -77,6 +79,7 @@ internal fun HetuToolsV2(
     val haptics = rememberHetuHaptics()
     val log by rememberUpdatedState(onLog)
     val changed by rememberUpdatedState(onConfigChanged)
+    val selected by rememberUpdatedState(onConfigSelected)
     val openExternal by rememberUpdatedState(onOpenExternalEntry)
     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
     val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
@@ -140,8 +143,13 @@ internal fun HetuToolsV2(
                     subscriptions = subscriptions.map { ToolsSubscription(it.name, it.url, it.placeholder) },
                 )
             },
-            selectConfig = { name -> controller.selectConfig(name); changed() },
-            exportConfig = { name -> exporting = name; exporter.launch(name) },
+            selectConfig = { name -> controller.selectConfig(name); changed(); selected?.invoke(name) },
+            selectionAnnounced = onConfigSelected != null,
+            exportConfig = { name ->
+                exporting = name
+                // A disabled DocumentsUI is a message, not a crash (DocumentPickerSafety).
+                if (!io.github.xgl34222220.hetu.launchDocumentPicker(::toast) { exporter.launch(name) }) exporting = null
+            },
             renameConfig = { from, to -> withContext(Dispatchers.IO) { ToolsConfigBridge.rename(app, from, to) }; changed() },
             deleteConfig = { name -> controller.deleteConfig(name); changed() },
             addSubscription = { name, url -> controller.addSubscription(name, url); changed() },
@@ -153,7 +161,7 @@ internal fun HetuToolsV2(
                 controller.validateConfigText(text)
                 withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
             },
-            onPickImportFile = { picker.launch(arrayOf("*/*")) },
+            onPickImportFile = { io.github.xgl34222220.hetu.launchDocumentPicker(::toast) { picker.launch(arrayOf("*/*")) } },
             onClearPickedFile = { pickedFile = null },
             importFile = { file ->
                 val uri = file.token as? Uri ?: throw IOException("无法读取配置文件")

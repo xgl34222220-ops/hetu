@@ -72,6 +72,34 @@ final class ProxyRuntimeProfile {
         }
     }
 
+    /**
+     * The mode {@code core} runs in when the saved one is not available for it: the saved mode when it is, else
+     * TPROXY (every core supports it). Picking or starting a core never turns it back into Mihomo.
+     */
+    static Mode runnableMode(Core core,Mode mode){return capability(core,mode).available?mode:Mode.TPROXY;}
+
+    /** The Mihomo-only mode (TUN / Enhance / eBPF) a pick of another core replaced with TPROXY; restored on a pick of Mihomo. */
+    static final String MIHOMO_MODE_KEY="proxyMihomoModeBeforeCore";
+
+    /**
+     * The mode to save with a pick of {@code to} while {@code current} is saved: {@link #runnableMode}, remembering a
+     * Mihomo-only mode it replaces, and bringing that mode back when Mihomo is picked again while TPROXY is still the
+     * saved mode. Writes only the memory key.
+     */
+    static Mode modeForPick(SharedPreferences p,Core to,Mode current){
+        boolean mihomo=to==Core.MIHOMO||to==Core.MIHOMO_SMART;
+        String saved=p.getString(MIHOMO_MODE_KEY,null);
+        if(mihomo){
+            if(saved==null)return runnableMode(to,current);
+            p.edit().remove(MIHOMO_MODE_KEY).apply();
+            Mode back=Mode.from(saved);
+            return current==Mode.TPROXY&&capability(to,back).available?back:runnableMode(to,current);
+        }
+        Mode mode=runnableMode(to,current);
+        if(mode!=current)p.edit().putString(MIHOMO_MODE_KEY,current.id).apply();
+        return mode;
+    }
+
     boolean acceptsFilename(String name){if(name==null)return false;int dot=name.lastIndexOf('.');return dot>=0&&core.extensions.contains(name.substring(dot+1).toLowerCase(Locale.ROOT));}
     String summary(){return core.label+" · "+mode.label;}
     private static Set<String> set(String...values){return Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(values)));}

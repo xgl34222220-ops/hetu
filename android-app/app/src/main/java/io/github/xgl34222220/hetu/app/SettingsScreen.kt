@@ -542,15 +542,31 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                     !supported -> HxChoice(core.id, core.label, ht("暂不支持：") + ProxyCoreSupport.unsupportedReason(core), enabled = false)
                     // Non-Mihomo cores run too; say up front which panel features they lack.
                     installed -> HxChoice(core.id, core.label, ProxyCoreSupport.featureSummary(core).takeIf { it.isNotEmpty() })
-                    else -> HxChoice(core.id, core.label, ht("尚未安装，请先在核心管理下载"), enabled = false)
+                    // Tappable: it opens 工具 › 核心管理 instead of being a dead end.
+                    else -> HxChoice(core.id, core.label, ht("尚未安装，请先在核心管理下载"))
                 }
             },
             selected = profile.core.id,
-            onPick = {
+            onPick = pick@{
+                val picked = ProxyRuntimeProfile.Core.from(it)
+                if (picked != ProxyRuntimeProfile.Core.MIHOMO && !ProxyCoreStore(context).installed(picked)) {
+                    choice = null
+                    nav.openRequested(HxRoute.Main)
+                    vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Cores)
+                    return@pick
+                }
                 // A non-Mihomo core with no config of its own starts on its built-in template (内置);
                 // selected before the core is saved so one dirty check sees both changes.
-                ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(it))
+                ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(picked)
+                // TUN / Enhance / eBPF are Mihomo-only: the picked core runs in TPROXY instead of being refused,
+                // and Mihomo gets its mode back when it is picked again.
+                val mode = ProxyRuntimeProfile.modeForPick(prefs, picked, profile.mode)
+                if (mode != profile.mode) putString("proxyBaseMode", mode.id)
                 putString("proxyBaseCore", it)
+                if (mode != profile.mode) vm.toast(
+                    if (ProxyRuntimeProfile.runnableMode(picked, profile.mode) != profile.mode) "${picked.label} 不支持 ${profile.mode.label}，运行模式已改为 ${mode.label}"
+                    else "运行模式已恢复为 ${mode.label}",
+                )
                 choice = null
             },
             onDismiss = { choice = null },
@@ -558,9 +574,14 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         "mode" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
             title = ht("运行模式"),
+            // Modes another core supports stay listed, disabled with the reason, so a hidden mode is not a mystery.
             choices = ProxyRuntimeProfile.Mode.values()
-                .filter { ProxyRuntimeProfile.capability(profile.core, it).available }
-                .map { HxChoice(it.id, it.label, ht(modeDescription(it))) },
+                .filter { mode -> ProxyRuntimeProfile.Core.values().any { ProxyRuntimeProfile.capability(it, mode).available } }
+                .map {
+                    val capability = ProxyRuntimeProfile.capability(profile.core, it)
+                    if (capability.available) HxChoice(it.id, it.label, ht(modeDescription(it)))
+                    else HxChoice(it.id, it.label, ht("仅 Mihomo 可用"), enabled = false)
+                },
             selected = profile.mode.id,
             onPick = { putString("proxyBaseMode", it); choice = null },
             onDismiss = { choice = null },

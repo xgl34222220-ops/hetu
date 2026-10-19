@@ -3,6 +3,9 @@
     "loglevel": "warning"
   },
   "dns": {
+    "hosts": {
+      "hetu-liveness.invalid": "127.0.0.1"
+    },
     "servers": ["fakedns", "https://1.1.1.1/dns-query", "223.5.5.5"],
     "queryStrategy": "UseIP",
     "tag": "hetu-dns"

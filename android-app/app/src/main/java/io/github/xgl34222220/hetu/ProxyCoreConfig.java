@@ -47,6 +47,12 @@ final class ProxyCoreConfig {
     static final String DEFAULT_FAKE_IP_V4 = "198.18.0.1/16";
     static final String DEFAULT_DIRECT_DNS = "223.5.5.5";
     static final String DEFAULT_REMOTE_DNS = "1.1.1.1";
+    /**
+     * The name hetu-root.sh's watchdog asks the DNS listener of a core without a controller (wd_dns_probe). Xray / V2Fly
+     * answer it from their own hosts table, so a slow or dead upstream DNS (a dead node) is not taken for a hung core:
+     * that cost three core restarts and then the proxy.
+     */
+    static final String LIVENESS_HOST = "hetu-liveness.invalid";
     static final String SING_GEOSITE = "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-%s.srs";
     static final String SING_GEOIP = "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-%s.srs";
     static final int MAX_PROVIDER_BYTES = 8 * 1024 * 1024;
@@ -146,6 +152,13 @@ final class ProxyCoreConfig {
         String warningText() { return String.join("；", warnings); }
         /** Dangling group/outbound references removed before start (also contained in warnings). */
         List<String> cleanupNotices = Collections.emptyList();
+        /** The same result for a rewritten config, with more warnings. */
+        Result with(String rewritten, List<String> more) {
+            List<String> all = new ArrayList<>(warnings); all.addAll(more);
+            Result r = new Result(rewritten, nativeSource, all, nodes, fakeIpV4, fakeIpV6, adblockApplied);
+            r.cleanupNotices = cleanupNotices;
+            return r;
+        }
     }
 
     // ------------------------------------------------------------------ source classification
@@ -1770,6 +1783,7 @@ final class ProxyCoreConfig {
             for (String d : p.directDns) { String host = d.replaceFirst("^udp://", ""); if (isIp(host.replaceAll(":\\d+$", ""))) { direct = host; break; } }
             servers.add(direct);
             LinkedHashMap<String, Object> m = new LinkedHashMap<>();
+            m.put("hosts", map(LIVENESS_HOST, "127.0.0.1"));
             m.put("servers", servers);
             m.put("queryStrategy", o.ipv6 ? "UseIP" : "UseIPv4");
             m.put("tag", "hetu-dns");
@@ -1996,6 +2010,10 @@ final class ProxyCoreConfig {
 
         static void appendHetu(StringBuilder y, Options o, String resolver, String remoteDns) {
             y.append("# --- Hetu runtime isolation ---\n");
+            // 5.1.0: listen first and connect on the first connection. Without it the client exits when the server is
+            // unreachable at start (hysteria 2.13.0: FATAL failed to initialize client: connect error: timeout), so a
+            // start before the network is up, or a brief outage, stopped the whole proxy; Mihomo starts either way.
+            y.append("lazy: true\n");
             // Go's resolver has no system DNS on Android; resolve the server name explicitly.
             y.append("resolver:\n  type: udp\n  udp:\n    addr: ").append(resolver).append("\n    timeout: 4s\n");
             if (o.tproxyPort > 0) {
@@ -2028,7 +2046,7 @@ final class ProxyCoreConfig {
         String server = str(root, "server");
         if (server.isEmpty()) throw new IOException("Hysteria 配置缺少 server");
         for (String key : HYSTERIA_OWNED) if (root.remove(key) != null) warnings.add("已由河图接管 Hysteria 的 " + key + " 入站");
-        boolean hasResolver = root.containsKey("resolver");
+        boolean hasResolver = root.containsKey("resolver"), hasLazy = root.containsKey("lazy");
         // server is host:port, host:port-range or [v6]:port.
         String host = server, rest = "";
         if (server.startsWith("[")) { int close = server.indexOf(']'); host = server.substring(1, close); rest = server.substring(close + 1); }
@@ -2052,9 +2070,45 @@ final class ProxyCoreConfig {
         Hysteria.appendHetu(tail, o, DEFAULT_DIRECT_DNS + ":53", DEFAULT_REMOTE_DNS + ":53");
         String tailText = tail.toString();
         if (hasResolver) tailText = tailText.replaceFirst("resolver:\\n  type: udp\\n  udp:\\n    addr: [^\\n]+\\n    timeout: 4s\\n", "");
+        if (hasLazy) tailText = tailText.replaceFirst("lazy: true\\n", "");
         y.append(tailText);
         warnings.add("Hysteria 是单服务器客户端：规则分流、策略组、面板与测速不可用");
         return new Result(y.toString(), true, warnings, 1, "", "", false);
+    }
+
+    /** The fake-IP pools a running core answers from: Mihomo / sing-box / Xray default 198.18.0.0/15. */
+    static final String FAKE_IP_POOLS_V4 = "198.18.0.0/15";
+
+    /** Whether IPv4 {@code ip} lies in one of the comma separated {@code cidrs} (a.b.c.d/n). */
+    static boolean inIpv4Cidrs(String ip, String cidrs) {
+        long a = ipv4(ip);
+        if (a < 0 || cidrs == null) return false;
+        for (String c : cidrs.split(",")) {
+            String t = c.trim();
+            int slash = t.indexOf('/');
+            long base = ipv4(slash < 0 ? t : t.substring(0, slash));
+            int bits;
+            try { bits = slash < 0 ? 32 : Integer.parseInt(t.substring(slash + 1)); } catch (NumberFormatException bad) { continue; }
+            if (base < 0 || bits < 0 || bits > 32) continue;
+            long mask = bits == 0 ? 0 : (0xffffffffL << (32 - bits)) & 0xffffffffL;
+            if ((a & mask) == (base & mask)) return true;
+        }
+        return false;
+    }
+
+    private static long ipv4(String s) {
+        if (s == null) return -1;
+        String[] p = s.trim().split("\\.");
+        if (p.length != 4) return -1;
+        long v = 0;
+        for (String x : p) {
+            if (x.isEmpty() || x.length() > 3) return -1;
+            for (int i = 0; i < x.length(); i++) if (!Character.isDigit(x.charAt(i))) return -1;
+            int n = Integer.parseInt(x);
+            if (n > 255) return -1;
+            v = v * 256 + n;
+        }
+        return v;
     }
 
     /** Host → literal IP through {@link Options#hostResolver}; unchanged when absent or already an IP. */
@@ -2148,6 +2202,12 @@ final class ProxyCoreConfig {
             root.put("dns", map("servers", Arrays.asList(DEFAULT_REMOTE_DNS, DEFAULT_DIRECT_DNS), "queryStrategy", o.ipv6 ? "UseIP" : "UseIPv4"));
             warnings.add("配置没有 dns 段，已添加默认 DNS（Android 上没有可用的系统解析）");
         }
+        Map<String, Object> dnsSection = asMap(root.get("dns"));
+        if (dnsSection != null) {
+            Map<String, Object> hosts = asMap(dnsSection.get("hosts"));
+            if (hosts == null) { hosts = new LinkedHashMap<>(); dnsSection.put("hosts", hosts); }
+            if (!hosts.containsKey(LIVENESS_HOST)) hosts.put(LIVENESS_HOST, "127.0.0.1");
+        }
         Map<String, Object> fake = null;
         for (Object s : asList(asMap(root.get("dns")).get("servers"))) if ("fakedns".equals(String.valueOf(s))) fake = asMap(root.get("dns"));
         root.put("inbounds", XrayConv.inbounds(o, fake != null));
@@ -2156,5 +2216,188 @@ final class ProxyCoreConfig {
 
     static void stripKey(List<Object> list, String key) {
         for (Object o : list) { Map<String, Object> m = asMap(o); if (m != null) m.remove(key); }
+    }
+
+    // ------------------------------------------------------------------ sing-box rule-set files
+
+    /** The body of a rule-set file, or null when it cannot be fetched. */
+    interface BinaryFetcher { byte[] fetch(String url) throws IOException; }
+
+    /** One rule-set file the deployment writes to {@link #path} before the core starts. */
+    static final class RuleSetFile {
+        final String tag, url, path;
+        final byte[] body;
+        RuleSetFile(String tag, String url, String path, byte[] body) { this.tag = tag; this.url = url; this.path = path; this.body = body; }
+    }
+
+    static final class LocalRuleSets {
+        final String config;
+        final List<RuleSetFile> files;
+        /** Tags of the rule-sets that could not be fetched (dropped from a converted config, still remote in a native one). */
+        final List<String> missing;
+        LocalRuleSets(String config, List<RuleSetFile> files, List<String> missing) { this.config = config; this.files = files; this.missing = missing; }
+    }
+
+    /** The deployed file name of a rule-set: stable for one URL, so a restart replaces the same file. */
+    static String ruleSetFileName(String url, String format) {
+        String name;
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (int i = 0; i < 12; i++) hex.append(String.format(Locale.ROOT, "%02x", d[i] & 0xff));
+            name = hex.toString();
+        } catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+        return name + ("source".equals(format) ? ".json" : ".srs");
+    }
+
+    /** A sing-box rule-set file: binary srs (magic "SRS") or source JSON; an HTML error page from a mirror is neither. */
+    static boolean ruleSetBody(byte[] b) { return ruleSetBody(b, "binary") || ruleSetBody(b, "source"); }
+
+    static boolean ruleSetBody(byte[] b, String format) {
+        if (b == null || b.length < 3) return false;
+        if (!"source".equals(format)) return b[0] == 'S' && b[1] == 'R' && b[2] == 'S';
+        for (byte c : b) { if (c == '{') return true; if (c != ' ' && c != '\n' && c != '\r' && c != '\t' && c != (byte) 0xef && c != (byte) 0xbb && c != (byte) 0xbf) return false; }
+        return false;
+    }
+
+    /**
+     * The same file from the other GitHub mirrors, the original first: jsDelivr (testingcf / fastly / cdn) and
+     * raw.githubusercontent.com serve one repository layout. Any other URL has no known mirror.
+     */
+    static List<String> ruleSetMirrors(String url) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        out.add(url);
+        String owner = null, repo = null, ref = null, path = null;
+        Matcher jsd = Pattern.compile("^https?://[a-z0-9.-]*jsdelivr\\.net/gh/([^/@]+)/([^/@]+)@([^/]+)/(.+)$").matcher(url);
+        Matcher raw = Pattern.compile("^https?://raw\\.githubusercontent\\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$").matcher(url);
+        Matcher gh = Pattern.compile("^https?://github\\.com/([^/]+)/([^/]+)/raw/([^/]+)/(.+)$").matcher(url);
+        if (jsd.matches()) { owner = jsd.group(1); repo = jsd.group(2); ref = jsd.group(3); path = jsd.group(4); }
+        else if (raw.matches()) { owner = raw.group(1); repo = raw.group(2); ref = raw.group(3); path = raw.group(4); }
+        else if (gh.matches()) { owner = gh.group(1); repo = gh.group(2); ref = gh.group(3); path = gh.group(4); }
+        if (owner == null) return new ArrayList<>(out);
+        for (String host : new String[]{"testingcf", "fastly", "cdn", "gcore"})
+            out.add("https://" + host + ".jsdelivr.net/gh/" + owner + "/" + repo + "@" + ref + "/" + path);
+        out.add("https://raw.githubusercontent.com/" + owner + "/" + repo + "/" + ref + "/" + path);
+        return new ArrayList<>(out);
+    }
+
+    /**
+     * sing-box downloads every remote rule-set when it starts and exits when any one download fails (sing-box
+     * 1.14.3: {@code FATAL start service: start router: initialize rule-set[n]: …}), so one slow or unreachable
+     * mirror on a start without a cache stops the whole core. The App fetches each remote rule-set first (its own
+     * UID is never intercepted; the fetcher keeps the last good copy) and the config names the deployed file in
+     * {@code dir} instead. A rule-set that cannot be fetched is removed from a converted config together with the
+     * rules that need it, the way Mihomo starts without an unavailable provider; a native config keeps it remote.
+     */
+    static LocalRuleSets localizeSingBoxRuleSets(String json, BinaryFetcher fetcher, String dir, boolean dropMissing,
+                                                 int parallel, long timeoutMillis) throws IOException {
+        Map<String, Object> root = CoreJson.parseObject(json);
+        Map<String, Object> route = asMap(root.get("route"));
+        List<Object> sets = route == null ? Collections.emptyList() : asList(route.get("rule_set"));
+        Set<Map<String, Object>> remote = Collections.newSetFromMap(new IdentityHashMap<Map<String, Object>, Boolean>());
+        for (Object s : sets) {
+            Map<String, Object> m = asMap(s);
+            if (m != null && "remote".equals(str(m, "type")) && !str(m, "url").isEmpty() && !str(m, "tag").isEmpty()) remote.add(m);
+        }
+        if (remote.isEmpty() || fetcher == null) return new LocalRuleSets(json, Collections.<RuleSetFile>emptyList(), Collections.<String>emptyList());
+        Map<String, byte[]> bodies = fetchAll(remote, fetcher, parallel, timeoutMillis);
+        List<RuleSetFile> files = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
+        List<Object> kept = new ArrayList<>();
+        for (Object s : sets) {
+            Map<String, Object> m = asMap(s);
+            if (m == null || !remote.contains(m)) { kept.add(s); continue; }
+            String tag = str(m, "tag"), url = str(m, "url");
+            String format = str(m, "format").isEmpty() ? (url.endsWith(".json") ? "source" : "binary") : str(m, "format");
+            byte[] body = bodies.get(url);
+            if (!ruleSetBody(body, format)) {
+                missing.add(tag);
+                if (!dropMissing) kept.add(s);
+                continue;
+            }
+            String path = dir + "/" + ruleSetFileName(url, format);
+            files.add(new RuleSetFile(tag, url, path, body));
+            kept.add(map("type", "local", "tag", tag, "format", format, "path", path));
+        }
+        if (dropMissing && !missing.isEmpty()) {
+            Set<String> gone = new HashSet<>(missing);
+            route.put("rules", pruneRules(asList(route.get("rules")), gone));
+            Map<String, Object> dns = asMap(root.get("dns"));
+            if (dns != null && dns.containsKey("rules")) dns.put("rules", pruneRules(asList(dns.get("rules")), gone));
+        }
+        if (kept.isEmpty()) route.remove("rule_set"); else route.put("rule_set", kept);
+        return new LocalRuleSets(CoreJson.write(root), files, missing);
+    }
+
+    private static Map<String, byte[]> fetchAll(Set<Map<String, Object>> remote, BinaryFetcher fetcher, int parallel, long timeoutMillis) {
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        for (Map<String, Object> m : remote) urls.add(str(m, "url"));
+        Map<String, byte[]> out = new java.util.concurrent.ConcurrentHashMap<>();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(Math.max(1, Math.min(parallel, urls.size())));
+        try {
+            List<java.util.concurrent.Callable<Void>> jobs = new ArrayList<>();
+            for (String url : urls) jobs.add(() -> {
+                byte[] b = fetcher.fetch(url);
+                if (b != null && b.length > 0) out.put(url, b);
+                return null;
+            });
+            pool.invokeAll(jobs, Math.max(1, timeoutMillis), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } finally {
+            pool.shutdownNow();
+        }
+        return new HashMap<>(out);
+    }
+
+    /** Domain and IP items a sing-box rule ORs with its rule_set: what is left of the rule without the rule-set. */
+    private static final String[] RULE_MATCH_ITEMS = {"domain", "domain_suffix", "domain_keyword", "domain_regex", "ip_cidr", "ip_is_private"};
+
+    static List<Object> pruneRules(List<Object> rules, Set<String> missing) {
+        List<Object> out = new ArrayList<>();
+        for (Object r : rules) {
+            Map<String, Object> m = asMap(r);
+            if (m == null) { out.add(r); continue; }
+            Map<String, Object> p = pruneRule(m, missing);
+            if (p != null) out.add(p);
+        }
+        return out;
+    }
+
+    /**
+     * The rule without the missing rule-sets, or null when what remains would match something the rule never did:
+     * a rule that matched only through them, an inverted rule, an AND that needs them.
+     */
+    static Map<String, Object> pruneRule(Map<String, Object> rule, Set<String> missing) {
+        if ("logical".equals(str(rule, "type"))) {
+            boolean and = "and".equals(str(rule, "mode")), changed = false;
+            List<Object> kept = new ArrayList<>();
+            for (Object child : asList(rule.get("rules"))) {
+                Map<String, Object> c = asMap(child);
+                Map<String, Object> p = c == null ? null : pruneRule(c, missing);
+                if (c != null && p != c) changed = true;
+                if (p != null) kept.add(p);
+                else if (c != null && and) return null;
+            }
+            if (!changed) return rule;
+            if (kept.isEmpty() || bool(rule, "invert", false)) return null;
+            LinkedHashMap<String, Object> copy = new LinkedHashMap<>(rule);
+            copy.put("rules", kept);
+            return copy;
+        }
+        if (!rule.containsKey("rule_set")) return rule;
+        List<String> tags = strings(rule.get("rule_set")), kept = new ArrayList<>();
+        for (String t : tags) if (!missing.contains(t)) kept.add(t);
+        if (kept.size() == tags.size()) return rule;
+        if (bool(rule, "invert", false)) return null;
+        LinkedHashMap<String, Object> copy = new LinkedHashMap<>(rule);
+        if (!kept.isEmpty()) { copy.put("rule_set", kept); return copy; }
+        boolean other = false;
+        for (String k : RULE_MATCH_ITEMS) if (copy.containsKey(k)) other = true;
+        if (!other) return null;
+        copy.remove("rule_set");
+        copy.remove("rule_set_ip_cidr_match_source");
+        copy.remove("rule_set_ip_cidr_accept_empty");
+        return copy;
     }
 }

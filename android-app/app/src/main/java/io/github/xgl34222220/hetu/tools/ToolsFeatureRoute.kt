@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.github.xgl34222220.hetu.home.HomeModalSheet
+import io.github.xgl34222220.hetu.home.HomeTone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -54,7 +55,8 @@ internal fun ToolsFeaturePage(
     }
 }
 
-private fun Throwable.reason(fallback: String): String = message?.takeIf { it.isNotBlank() } ?: fallback
+/** A friendly Chinese message (hxErrorMessage maps timeouts, DNS and HTTP failures); the raw text goes to the log. */
+private fun Throwable.reason(fallback: String): String = io.github.xgl34222220.hetu.hxErrorMessage(this, fallback)
 
 /** Launches [block]; anything it throws except cancellation goes to [onError]. */
 private fun CoroutineScope.attempt(onError: (Exception) -> Unit, block: suspend () -> Unit) {
@@ -143,6 +145,8 @@ private fun AppsHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
 private fun CoresHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier: Modifier) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(ToolsCoresState()) }
+    /** Remove / Restore wait for a confirmation (5.5.5: deleting the core in use made the next start fail). */
+    var confirm by remember { mutableStateOf<Pair<ToolsCore, ToolsCoreAction>?>(null) }
 
     suspend fun read(network: Boolean) {
         val snapshot = (actions.loadCores ?: return)(network)
@@ -197,13 +201,19 @@ private fun CoresHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier
         onCheck = { check(announce = true) },
         onPrimary = { core, action ->
             when (action) {
-                ToolsCoreAction.Update, ToolsCoreAction.Download ->
-                    run(core, "${core.name} 已更新", "${core.name} 下载失败") {
+                ToolsCoreAction.Update, ToolsCoreAction.Download -> {
+                    val inUse = state.running == core.name
+                    val done = (if (action == ToolsCoreAction.Download) "${core.name} 已安装" else "${core.name} 已更新") + when {
+                        inUse -> "，重启代理后使用新版本"
+                        action == ToolsCoreAction.Download -> "，可在「设置 → 基础代理配置 → 代理核心」选用"
+                        else -> ""
+                    }
+                    run(core, done, "${core.name} 下载失败") {
                         // Progress arrives on the download thread; hop to the UI scope before touching state.
                         actions.downloadCore(core.id) { line -> scope.launch { state = state.copy(progress = line) } }
                     }
-                ToolsCoreAction.Restore -> run(core, "${core.name} 已恢复内置版本", "恢复失败") { actions.removeCore(core.id) }
-                ToolsCoreAction.Remove -> run(core, "${core.name} 下载核心已删除", "删除失败") { actions.removeCore(core.id) }
+                }
+                ToolsCoreAction.Restore, ToolsCoreAction.Remove -> if (state.busyId == null) confirm = core to action
             }
         },
         onImport = { core ->
@@ -219,6 +229,27 @@ private fun CoresHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier
         onRetry = { state = state.copy(load = ToolsLoad.Loading); check(announce = false) },
         modifier = modifier,
     )
+
+    confirm?.let { (core, action) ->
+        val inUse = state.running == core.name
+        val restore = action == ToolsCoreAction.Restore
+        ToolsDialog(onDismiss = { confirm = null }) {
+            ToolsDialogCard(
+                title = if (restore) "恢复内置 ${core.name}？" else "删除 ${core.name}？",
+                text = (if (restore) "将删除下载的版本，改用 App 内置版本。" else "将删除下载的 ${core.name} 核心文件，之后可重新下载。") +
+                    if (inUse) "\n这是正在运行的核心：重启代理后才会生效" + (if (restore) "。" else "，删除后选用它的启动会失败。") else "",
+                confirmLabel = if (restore) "恢复" else "删除",
+                confirmKind = if (restore) ToolsConfirmKind.Primary else ToolsConfirmKind.Danger,
+                icon = if (restore) null else ToolsIcons.Trash2, iconTone = if (restore) HomeTone.Accent else HomeTone.Bad,
+                onConfirm = {
+                    confirm = null
+                    if (restore) run(core, "${core.name} 已恢复内置版本", "恢复失败") { actions.removeCore(core.id) }
+                    else run(core, "${core.name} 下载核心已删除", "删除失败") { actions.removeCore(core.id) }
+                },
+                onCancel = { confirm = null },
+            )
+        }
+    }
 }
 
 /* ------------------------------ 绕过规则 ------------------------------ */

@@ -123,6 +123,8 @@ private fun CoreCard(
                         }
                     }
                     Text(core.versionLine, color = c.t2, style = HomeRowSubStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // Why there is nothing to download or no latest version, instead of a silent card.
+                    if (core.notice.isNotBlank() && !busy) Text(core.notice, color = c.t3, style = HomeRowSubStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
             HomeReveal(busy) {

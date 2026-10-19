@@ -176,7 +176,11 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             },
             downloadCore = { id, onProgress -> ToolsRuntimeBridge.downloadCore(app, id, onProgress) },
             removeCore = { id -> ToolsRuntimeBridge.removeCore(app, id) },
-            importCore = { id, onDone -> importRequest = id to onDone; corePicker.launch(arrayOf("*/*")) },
+            importCore = { id, onDone ->
+                importRequest = id to onDone
+                // A disabled DocumentsUI ends the import with a message instead of crashing the tap.
+                io.github.xgl34222220.hetu.launchDocumentPicker({ message -> importRequest = null; onDone(message) }) { corePicker.launch(arrayOf("*/*")) }
+            },
 
             /* ------------------------------ 绕过规则 ------------------------------ */
             loadBypass = { ToolsBypassRules(prefs.strings(Keys.BypassCidrs).sorted(), prefs.strings(Keys.BypassInterfaces).sorted()) },
@@ -413,6 +417,7 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
         downloaded = downloaded,
         runnable = runtimeReady,
         canDownload = canDownload,
+        notice = message.takeIf { !canDownload || latestVersion.isBlank() }.orEmpty(),
     )
 }
 

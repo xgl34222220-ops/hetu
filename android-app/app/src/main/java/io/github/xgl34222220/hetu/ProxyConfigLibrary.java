@@ -90,14 +90,19 @@ final class ProxyConfigLibrary {
 
     /**
      * The non-Mihomo built-in template still on its placeholder node (example.invalid) cannot reach any server, so a
-     * start of that core follows Mihomo's built-in instead: 河图内置-TPROXY.yaml with the user's subscription, its
-     * groups and rules, converted for the core at start (ProxyCoreConfig). Returns that Mihomo entry, or null when
-     * {@code e} is anything else (the user's own file, or a template the user filled with a server).
+     * start of that core follows Mihomo instead: the config Mihomo starts from (its selection, by default the built-in
+     * 河图内置-TPROXY.yaml with the user's subscription), its groups and rules, converted for the core at start
+     * (ProxyCoreConfig). Returns that Mihomo entry, or null when {@code e} is anything else (the user's own file, or a
+     * template the user filled with a server).
+     *
+     * <p>5.1.0: 5.0.0 always followed the built-in, so a user whose working Mihomo config is an imported one (the
+     * built-in never got a subscription) had every other core refused with "请先填写订阅".
      */
     Entry followedBuiltin(Entry e){
         if(e==null||e.core==ProxyRuntimeProfile.Core.MIHOMO||e.core==ProxyRuntimeProfile.Core.MIHOMO_SMART||!BundledCoreTemplates.isBundledName(e.name))return null;
         try{if(!BundledCoreTemplates.hasPlaceholderNode(read(e)))return null;}catch(IOException unreadable){return null;}
-        ensureBundled(ProxyRuntimeProfile.Core.MIHOMO);
+        Entry mihomo=selected(ProxyRuntimeProfile.Core.MIHOMO);
+        if(mihomo!=null)return mihomo;
         File f=new File(dir(ProxyRuntimeProfile.Core.MIHOMO),BUNDLED_NAME);
         return f.isFile()?new Entry(ProxyRuntimeProfile.Core.MIHOMO,BUNDLED_NAME,f):null;
     }

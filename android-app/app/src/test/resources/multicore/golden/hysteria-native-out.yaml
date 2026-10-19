@@ -8,6 +8,7 @@ bandwidth:
   up: 30 mbps
   down: 100 mbps
 # --- Hetu runtime isolation ---
+lazy: true
 resolver:
   type: udp
   udp:
