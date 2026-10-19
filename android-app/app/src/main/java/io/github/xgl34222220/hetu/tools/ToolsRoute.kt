@@ -129,7 +129,7 @@ internal fun ToolsRoute(
     fun selectConfig(config: ToolsConfig) {
         configOverlay = null
         if (config.current) return
-        mutateConfigs("已切换到 ${config.name}", "切换配置失败") { act.selectConfig(config.name) }
+        mutateConfigs(if (act.selectionAnnounced) null else "已切换到 ${config.name}", "切换配置失败") { act.selectConfig(config.name) }
     }
 
     fun confirmRename(overlay: ToolsConfigOverlay.Rename) {
@@ -519,4 +519,5 @@ internal fun ToolsRoute(
     }
 }
 
-private fun Throwable.reason(fallback: String): String = message?.takeIf { it.isNotBlank() } ?: fallback
+/** A friendly Chinese message (hxErrorMessage maps timeouts, DNS and HTTP failures); the raw text goes to the log. */
+private fun Throwable.reason(fallback: String): String = io.github.xgl34222220.hetu.hxErrorMessage(this, fallback)

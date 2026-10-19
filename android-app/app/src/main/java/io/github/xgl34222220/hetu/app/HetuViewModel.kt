@@ -880,7 +880,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     state = recovered
                 } else if (!stopping) {
                     startupError = if (kind == HxStartFailure.AppScope) {
-                        "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
+                        "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「工具 → 应用管理」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                     } else if (configProblem) {
                         reason
                     } else if (!HxRootCheck.granted(app)) {
@@ -888,7 +888,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         HxRootCheck.message(reason)
                     } else {
                         val diagnostics = try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
-                        if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
+                        if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / 核心诊断 ——\n${diagnostics.trim()}"
                     }
                 } else {
                     toastAs(HxTone.Bad, reason)
@@ -933,7 +933,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     val diagnostics = if (kind != HxStartFailure.Runtime) "" else
                         try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
                     startupError = "上次可启动的版本也未能启动：$reason" +
-                        if (diagnostics.isBlank()) "" else "\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
+                        if (diagnostics.isBlank()) "" else "\n\n—— Root / 核心诊断 ——\n${diagnostics.trim()}"
                 }
             } finally {
                 operation = null

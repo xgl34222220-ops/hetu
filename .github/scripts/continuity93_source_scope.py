@@ -24,7 +24,10 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-17: 4.4.4 (versionCode 2101) = 4.0.0 + iptables CNIP tree opt-in only, robust tree cleanup.
 # 2026-10-18: 5.0.0 (versionCode 2102) = 4.4.4 + watchdog closes only the failing node's connections, non-Mihomo
 # built-ins follow Mihomo's built-in, built-in NoJunkFilter repair, SnakeYAML chunk-edge fix.
-VERSION_CODE, VERSION_NAME = 2102, '5.0.0'
+# 2026-10-19: 5.5.5 (versionCode 2103; user: 发布5.5.5) = 5.0.0 + non-Mihomo cores start (sing-box rule-sets pre-downloaded, the
+# chosen core kept in TUN/Enhance/eBPF, follow Mihomo's selected config, Hysteria lazy), core downloads through the
+# running proxy, watchdog never cuts a node that is moving data.
+VERSION_CODE, VERSION_NAME = 2103, '5.5.5'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -419,8 +422,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2102', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "5.0.0"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2103', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "5.5.5"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'

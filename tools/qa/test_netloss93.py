@@ -76,13 +76,14 @@ SELFHEAL_VARS = ('CG_ESCAPE_GATE', 'CG_ESCAPE_V1', 'CG_ESCAPED', 'SETSID', 'SETS
                  'WD_EGRESS_LIMIT', 'WD_EGRESS_BACKOFF', 'WD_EGRESS_BACKOFF_MAX', 'WD_RESTART_MAX',
                  'WD_RESTART_WINDOW', 'WD_LOG_MAX', 'WD_PROXY_URL', 'WD_DIRECT_URLS', 'WD_HEAL_REASON',
                  'CORE_GROUP_ID', 'WIFI_HEAL_URLS', 'WIFI_HEAL_DNS', 'WIFI_HEAL_OFF', 'WIFI_HEAL_GAP', 'WIFI_HEAL_HOUR_MAX',
-                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT', 'WD_CLOSE_MAX')
+                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT', 'WD_CLOSE_MAX', 'WD_BUSY_GAP')
 HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape', 'wd_log', 'wd_log_body', 'wd_now',
            'wd_notify', 'wd_http', 'wd_dns_probe', 'wd_core_frozen', 'wd_selfheal_init', 'wd_net_sig', 'wd_net_watch',
            'wd_liveness', 'wd_restart_allowed', 'wd_restart_core', 'wd_heal_notice', 'wd_recover', 'wd_egress_target',
            'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick', 'fake_range', 'wd_session_fake_range',
            'wd_root_fake_captured', 'wd_offline_seen', 'wifi_heal_async', 'wd_uptime', 'wd_budget_start',
-           'wd_budget_left', 'wd_groups', 'wd_close_through', 'wd_node_heal', 'wd_proxy_heal', 'wd_dataplane_heal')
+           'wd_budget_left', 'wd_groups', 'wd_conn_match', 'wd_close_through', 'wd_conn_busy', 'wd_heal_chain', 'wd_node_heal',
+           'wd_proxy_heal', 'wd_dataplane_heal')
 
 
 class Controller:
@@ -97,6 +98,11 @@ class Controller:
         self.connections = []
         self.connections_code = 200
         self.closed = []
+        # Ids whose download counter grows on every GET /connections (a transfer in progress).
+        self.moving = set()
+        self.connection_reads = 0
+        # GET /proxies groups: (type, name, now, fixed); empty = 404 like the older fixture.
+        self.groups = []
         self.rules = ('{"rules":[{"index":0,"type":"RuleSet","payload":"ads","proxy":"REJECT","size":-1},'
                       '{"index":1,"type":"Domain","payload":"x.cn","proxy":"DIRECT"},'
                       '{"index":2,"type":"Match","payload":"","proxy":"\U0001F680 节点选择","extra":{"a":1}}]}')
@@ -122,7 +128,13 @@ class Controller:
                     ok = owner.direct_ok if name == 'DIRECT' else owner.proxy_ok
                     return self.reply(200, '{"delay":87}') if ok else self.reply(504, '{"message":"Timeout"}')
                 if path == '/connections' and self.command == 'GET':
-                    return self.reply(owner.connections_code, connections_json(owner.connections))
+                    owner.connection_reads += 1
+                    return self.reply(owner.connections_code, connections_json(owner.connections, owner.moving, owner.connection_reads))
+                if path == '/proxies' and owner.groups:
+                    import json
+                    body = {'proxies': {n: {'type': t, 'name': n, 'now': now, **({'fixed': fx} if t in ('URLTest', 'Fallback') else {})}
+                                        for t, n, now, fx in owner.groups}}
+                    return self.reply(200, json.dumps(body, ensure_ascii=False, separators=(',', ':')))
                 if path.startswith('/connections/') and self.command == 'DELETE':
                     owner.closed.append(unquote(path.split('/')[2]))
                     return self.reply(204, '')
@@ -150,12 +162,13 @@ class Controller:
         self.server.server_close()
 
 
-def connections_json(conns):
+def connections_json(conns, moving=(), reads=1):
     """Mihomo's GET /connections shape: metadata before chains, Go's \u0026-style HTML escapes."""
     import json
     items = [{'id': cid, 'metadata': {'network': 'tcp', 'type': 'TProxy', 'destinationIP': '203.0.113.9', 'uid': 10123,
                                       'host': 'example.test', 'process': 'com.example'},
-              'upload': 10, 'download': 20, 'start': '2026-10-18T00:00:00Z', 'chains': chains, 'rule': 'Match', 'rulePayload': ''}
+              'upload': 10, 'download': 20 + (reads * 65536 if cid in moving else 0), 'start': '2026-10-18T00:00:00Z',
+              'chains': chains, 'rule': 'Match', 'rulePayload': ''}
              for cid, chains in conns]
     body = json.dumps({'downloadTotal': 1, 'uploadTotal': 2, 'connections': items, 'memory': 1}, ensure_ascii=False, separators=(',', ':'))
     return body.replace('&', '\\u0026')
@@ -500,6 +513,51 @@ class Egress(ShellCase):
         self.assertNotIn(('DELETE', '/connections'), [(m, p) for m, p, a in c.requests])
         self.assertIn('closed 1 of 3 core connection(s) through \U0001F41F 漏网之鱼 香港 01', self.log_text())
 
+    def test_node_moving_data_is_not_healed(self):
+        # 5.1.0: a probe that timed out behind a busy download must not cut the download or re-test groups.
+        c = self.controller()
+        self.session(cp=c.port)
+        c.connections = [('dl', ['香港 01', '\U0001F41F 漏网之鱼']), ('idle', ['香港 01', '\U0001F41F 漏网之鱼'])]
+        c.moving = {'dl'}
+        body = ('COREPID=$$; wd_selfheal_init; WD_BUSY_GAP=0; WD_DP_BAD_NAMES="$(printf \'\U0001F41F 漏网之鱼\\t\')"; '
+                'WD_DP_BAD="\U0001F41F 漏网之鱼→香港 01"; wd_proxy_heal; echo "busy=$WD_CLOSE_BUSY notified=$WD_NODE_NOTIFIED"')
+        r = self.sh(body)
+        self.assertIn('busy=1 notified=0', r.stdout, r.stderr)
+        self.assertEqual(c.closed, [])
+        self.assertFalse([p for m, p, a in c.requests if p.startswith('/group/')], 'no group re-test for a working node')
+        self.assertIn('1 connection(s) through it are receiving data; nothing closed', self.log_text())
+        c.moving = set()
+        r = self.sh(body)
+        self.assertEqual(sorted(c.closed), ['dl', 'idle'], r.stderr)
+
+    def test_heal_follows_the_selection_retests_only_failing_auto_groups_and_keeps_a_pinned_node(self):
+        c = self.controller()
+        self.session(cp=c.port)
+        c.groups = [('Selector', '最终兜底', '故障转移', ''), ('Fallback', '故障转移', '香港 01', ''),
+                    ('URLTest', '节点选择', '日本 02', ''), ('URLTest', '美国节点', '美国 03', '美国 03')]
+        c.connections = [('final', ['香港 01', '故障转移', '最终兜底']), ('ms', ['香港 01', '故障转移', 'Microsoft']),
+                         ('jp', ['日本 02', '节点选择', 'Google']), ('us', ['美国 03', '美国节点'])]
+        r = self.sh('COREPID=$$; wd_selfheal_init; WD_BUSY_GAP=0; wd_node_heal "$(printf \'最终兜底\\t\')" probe')
+        self.assertEqual(sorted(c.closed), ['final', 'ms'], r.stderr)
+        retested = [unquote(p).split('/')[2] for m, p, a in c.requests if p.startswith('/group/')]
+        self.assertEqual(retested, ['故障转移'], 'only the auto group in the failing chain')
+        self.assertIn('through 最终兜底 故障转移 香港 01', self.log_text())
+        c.closed.clear(); c.requests.clear()
+        r = self.sh('COREPID=$$; wd_selfheal_init; WD_BUSY_GAP=0; wd_node_heal "$(printf \'美国节点\\t\')" probe')
+        self.assertFalse([p for m, p, a in c.requests if p.startswith('/group/')], 'a pinned url-test group is not re-tested')
+        self.assertIn('kept the pinned 美国节点→美国 03', self.log_text())
+        self.assertEqual(c.closed, ['us'])
+
+    def test_heal_without_a_failing_name_does_nothing(self):
+        c = self.controller()
+        self.session(cp=c.port)
+        c.connections = [('final', ['香港 01', '最终兜底'])]
+        r = self.sh('COREPID=$$; wd_selfheal_init; wd_node_heal "" probe; echo "notified=$WD_NODE_NOTIFIED"')
+        self.assertIn('notified=0', r.stdout, r.stderr)
+        self.assertEqual(c.closed, [])
+        self.assertFalse([1 for m, p, a in c.requests if m == 'DELETE' or p.startswith('/group/')])
+        self.assertIn('no group or node failed its own check; nothing done', self.log_text())
+
     def test_data_plane_outage_rechecks_rules_without_closing_connections(self):
         c = self.controller()
         self.session(cp=c.port)
@@ -698,8 +756,9 @@ class DataPlaneHelpers(ShellCase):
         self.assertEqual([int(x) for x in r.stdout.split()], [rc for _, _, rc in cases], r.stderr)
 
     def test_classify_every_branch(self):
+        # 5.1.0: without a failing group there is no proxy-down verdict (a probe queued behind a download).
         cases = [(('', 'G→n', '3'), 'proxy-down'), (('fail', 'G→n', '1'), 'proxy-down'), (('fail', '', '3'), 'dataplane-down'),
-                 (('ok', '', '3'), 'proxy-down'), (('', '', '0'), 'proxy-down'), (('', '', ''), 'proxy-down'),
+                 (('ok', '', '3'), 'skip'), (('', '', '0'), 'skip'), (('', '', ''), 'skip'),
                  (('', '', '3'), 'skip')]
         body = ''.join('wd_dp_classify %s %s %s\n' % tuple(shq(a) for a in args) for args, _ in cases)
         r = self.sh(body, extra=function('wd_dp_classify'))

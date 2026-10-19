@@ -472,6 +472,8 @@ internal class ToolsActions(
     val onOpenEditor: (() -> Unit)? = null,
     val loadConfigs: suspend () -> ToolsConfigSnapshot = { ToolsConfigSnapshot() },
     val selectConfig: suspend (name: String) -> Unit = {},
+    /** The host reports a switch itself (applied to the running proxy, or 下次启动生效): no “已切换到” toast here. */
+    val selectionAnnounced: Boolean = false,
     /** Starts the system “save as” flow for [name]; the host reports the outcome itself. */
     val exportConfig: (name: String) -> Unit = {},
     val renameConfig: suspend (from: String, to: String) -> Unit = { _, _ -> },

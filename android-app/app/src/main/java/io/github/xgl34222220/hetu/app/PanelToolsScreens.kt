@@ -123,6 +123,8 @@ internal fun ToolsScreen(
         ),
         onSubPageVisibleChanged = onSubPageVisibleChanged,
         onConfigChanged = { scope.launch { vm.refreshNow() } },
+        // A running proxy picks the new config up (hot reload, or the restart notice), like 设置 › 配置.
+        onConfigSelected = { name -> vm.applyConfigChange("已切换到 $name") },
         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
         requestedEntry = vm.toolsRequest,
         onRequestConsumed = { vm.toolsRequest = null },

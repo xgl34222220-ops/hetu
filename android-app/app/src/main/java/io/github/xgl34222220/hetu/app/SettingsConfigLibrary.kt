@@ -107,6 +107,8 @@ internal fun SettingsConfigPicker(
                     config.name,
                     subtitle = ht(when {
                         config.selected -> "当前配置 · 长按查看或编辑"
+                        // 5.1: a non-Mihomo built-in still on its placeholder follows Mihomo's current config at start.
+                        config.bundled && ProxyCoreConfig.kind(ProxyRuntimeProfile.load(vm.prefs).core) != ProxyCoreConfig.Kind.MIHOMO -> "内置模板 · 跟随 Mihomo 当前配置"
                         config.bundled -> "内置模板 · 需要填写订阅"
                         else -> "本地配置"
                     }),

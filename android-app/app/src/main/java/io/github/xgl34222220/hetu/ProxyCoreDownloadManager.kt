@@ -38,7 +38,7 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
 /**
  * What each downloadable core can do in Hetu's Root runtime.
  *
- * Every core runs behind the same Root TPROXY / Redirect capture (hetu-root.sh launches it with its own
+ * Every core runs behind the same Root TPROXY / Redirect / Enhance capture (hetu-root.sh launches it with its own
  * CLI from run/state/core.kind; ProxyCoreConfig writes its native config or converts the Clash/Mihomo
  * profile). Features that need Mihomo's Clash controller degrade per core with an explicit
  * "此核心不支持" state instead of a connection error:
@@ -100,9 +100,9 @@ internal object ProxyCoreSupport {
     /** One line for the core picker: modes and which panel features work. */
     @JvmStatic fun featureSummary(core: ProxyRuntimeProfile.Core): String = when {
         mihomo(core) -> ""
-        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
-        clashApi(core) -> "TPROXY / Redirect · 面板与测速经 clash_api · 不支持热重载"
-        else -> "TPROXY / Redirect · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
+        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect / Enhance · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
+        clashApi(core) -> "TPROXY / Redirect / Enhance / TUN · 面板与测速经 clash_api · 不支持热重载"
+        else -> "TPROXY / Redirect / Enhance · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
     }
 }
 
@@ -206,7 +206,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {
-                        localStatus(core, error.message ?: "检查更新失败")
+                        localStatus(core, hxErrorMessage(error, "检查更新失败"))
                     }
                 }
             }.awaitAll()
@@ -380,24 +380,58 @@ internal class ProxyCoreDownloadManager(context: Context) {
 
     private fun abiLabel(): String = Build.SUPPORTED_ABIS.joinToString("/")
 
+    /**
+     * 5.1.0: the running core's loopback HTTP listener (the egress probe Hetu adds to every core), so GitHub is
+     * reached the way the user's rules route it; Hetu's own traffic is never captured, and github.com direct is often
+     * unusably slow in mainland China. Null while the proxy is stopped; a stale hint fails fast and falls back.
+     */
+    private fun localProxy(): java.net.Proxy? {
+        if (!ProxyStatusBridge.rootProxyRunning(app)) return null
+        val port = MihomoStartupConfig.egressProbePort(uiPrefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT))
+        return java.net.Proxy(java.net.Proxy.Type.HTTP, java.net.InetSocketAddress("127.0.0.1", port))
+    }
+
     private fun readJson(url: String): Any {
-        val connection = open(url)
-        try {
-            connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.connect()
-            if (connection.responseCode !in 200..299) throw IOException("GitHub 返回 ${connection.responseCode}")
-            val text = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val trimmed = text.trim()
-            return if (trimmed.startsWith("[")) JSONArray(trimmed) else JSONObject(trimmed)
-        } finally {
-            connection.disconnect()
+        var last: IOException? = null
+        for (via in listOfNotNull(localProxy()) + listOf<java.net.Proxy?>(null)) {
+            val connection = open(url, via)
+            try {
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.connect()
+                if (connection.responseCode !in 200..299) throw IOException("GitHub 返回 ${connection.responseCode}")
+                val text = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val trimmed = text.trim()
+                return if (trimmed.startsWith("[")) JSONArray(trimmed) else JSONObject(trimmed)
+            } catch (failed: IOException) {
+                last = failed
+            } finally {
+                connection.disconnect()
+            }
         }
+        throw last ?: IOException("无法读取 GitHub 版本信息")
     }
 
     private fun download(asset: Asset, progress: (Long, Long) -> Unit): File {
         if (asset.size > MAX_DOWNLOAD) throw IOException("核心文件过大")
+        val proxy = localProxy()
+        val mirror = assetDownloadUrl(asset.url).takeIf { it != asset.url }
+        val digestKnown = asset.digest.removePrefix("sha256:").trim().length == 64
+        var last: IOException? = null
+        for ((url, viaProxy) in downloadPlan(asset.url, mirror, proxy != null, digestKnown)) {
+            if (Thread.currentThread().isInterrupted) throw IOException("下载已取消")
+            try {
+                return downloadOnce(asset, url, if (viaProxy) proxy else null, progress)
+            } catch (failed: IOException) {
+                if (failed.message == "下载已取消") throw failed
+                last = failed
+            }
+        }
+        throw last ?: IOException("下载失败")
+    }
+
+    private fun downloadOnce(asset: Asset, url: String, via: java.net.Proxy?, progress: (Long, Long) -> Unit): File {
         val target = File(app.cacheDir, "proxy-core-${asset.source.core.id}-${System.nanoTime()}.pkg")
-        val connection = open(assetDownloadUrl(asset.url))
+        val connection = open(url, via)
         try {
             connection.connectTimeout = 10_000
             connection.readTimeout = 45_000
@@ -619,9 +653,10 @@ internal class ProxyCoreDownloadManager(context: Context) {
         return candidate.takeIf { it.startsWith("https://") && it.length <= 4096 } ?: url
     }
 
-    private fun open(url: String): HttpsURLConnection {
+    private fun open(url: String, via: java.net.Proxy? = null): HttpsURLConnection {
         if (!url.startsWith("https://")) throw IOException("只允许 HTTPS 下载源")
-        val connection = URL(url).openConnection() as? HttpsURLConnection ?: throw IOException("无效下载源")
+        val connection = (if (via == null) URL(url).openConnection() else URL(url).openConnection(via)) as? HttpsURLConnection
+            ?: throw IOException("无效下载源")
         connection.instanceFollowRedirects = true
         connection.connectTimeout = 8_000
         connection.readTimeout = 15_000
@@ -630,6 +665,23 @@ internal class ProxyCoreDownloadManager(context: Context) {
     }
 
     companion object {
+        /** gh-proxy, the mirror the built-in config already uses for its dashboard. Only with a SHA-256 to check against. */
+        internal const val PUBLIC_MIRROR = "https://v6.gh-proxy.org/"
+
+        /**
+         * Where a release asset is fetched from, in order (url, through the running proxy): the user's mirror, the
+         * running proxy, direct, and, when GitHub published its SHA-256 (checked after every download), the public
+         * mirror. Before 5.1.0 a download tried one of them only.
+         */
+        internal fun downloadPlan(url: String, userMirror: String?, localProxy: Boolean, digestKnown: Boolean): List<Pair<String, Boolean>> {
+            val plan = ArrayList<Pair<String, Boolean>>()
+            if (userMirror != null && userMirror != url) plan += userMirror to false
+            if (localProxy) plan += url to true
+            plan += url to false
+            if (digestKnown && url.startsWith("https://github.com/")) plan += (PUBLIC_MIRROR + url) to false
+            return plan.distinct()
+        }
+
         /** Release asset naming per core, for one ABI tag (see [abiTag]). Pure, so it is unit tested. */
         internal fun matchesAsset(core: ProxyRuntimeProfile.Core, rawName: String, abi: String): Boolean {
             val name = rawName.lowercase(Locale.ROOT)

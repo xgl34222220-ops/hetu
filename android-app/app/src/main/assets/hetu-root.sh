@@ -190,6 +190,9 @@ WD_DP_PATH=/generate_204
 WD_DP_CN_HOSTS="www.baidu.com www.qq.com www.taobao.com"
 WD_DP_GROUP_MAX=12
 WD_DP_BUDGET=30
+# 5.1.0: before a node is healed its connections are read twice this many seconds apart; one whose
+# download counter grew means the node is moving data (a probe that timed out behind a busy download).
+WD_BUSY_GAP=2
 # 3.0.0-3.3.3 armed a 120 s post-stop REJECT of the whole fake-IP range (filter OUTPUT, every UID) in this
 # chain. It also cut off any other proxy app using the same 198.18/15 fake-IP range, and when ColorOS
 # killed the detached expiry timer the REJECT stayed until the next Hetu start. It is no longer armed:
@@ -3096,7 +3099,8 @@ wd_fetch(){
   case "$WF_L" in HTTP/*' '[1-5][0-9][0-9]*) return 0;; esac
   return 1
 }
-# Selector/URLTest/Fallback/LoadBalance groups from GET /proxies -> "$WD_TMP.groups" (type TAB name TAB now).
+# Selector/URLTest/Fallback/LoadBalance groups from GET /proxies -> "$WD_TMP.groups"
+# (type TAB name TAB now TAB fixed; fixed = the node the user pinned in an auto-select group, else empty).
 wd_groups(){
   : > "$WD_TMP.groups"
   WD_HTTP_TIMEOUT=4; wd_http GET /proxies "$WD_TMP.gr" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.gr"; return 1; }
@@ -3104,7 +3108,7 @@ wd_groups(){
     function f(k,  i, s) { i = index($0, "\"" k "\":\""); if (!i) return ""; s = substr($0, i + length(k) + 4); i = index(s, "\""); return i ? substr(s, 1, i - 1) : "" }
     function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); return x }
     { t = f("type"); n = u(f("name")); if (t !~ /^(Selector|URLTest|Fallback|LoadBalance)$/ || n == "" || n == "GLOBAL" || (n in seen)) next
-      seen[n] = 1; if (++c <= max) print t "\t" n "\t" u(f("now")) }' > "$WD_TMP.groups" 2>/dev/null
+      seen[n] = 1; if (++c <= max) print t "\t" n "\t" u(f("now")) "\t" u(f("fixed")) }' > "$WD_TMP.groups" 2>/dev/null
   rm -f "$WD_TMP.gr"
   return 0
 }
@@ -3116,7 +3120,7 @@ wd_scan_groups(){
   wd_budget_start
   while IFS= read -r WSG_L; do
     wd_budget_left || { wd_log "data-plane probe: group scan stopped (${WD_BUDGET_WHY})"; break; }
-    WSG_R=${WSG_L#*"$WD_TAB"}; WSG_G=${WSG_R%%"$WD_TAB"*}; WSG_NOW=${WSG_R#*"$WD_TAB"}
+    WSG_R=${WSG_L#*"$WD_TAB"}; WSG_G=${WSG_R%%"$WD_TAB"*}; WSG_NOW=${WSG_R#*"$WD_TAB"}; WSG_NOW=${WSG_NOW%%"$WD_TAB"*}
     case "$WSG_NOW" in DIRECT|REJECT|REJECT-DROP|PASS) continue;; esac
     wd_delay "$WSG_G" "$WD_PROXY_URL" </dev/null; WSG_RC=$?
     [ "$WSG_RC" != 2 ] || continue
@@ -3170,15 +3174,17 @@ wd_dp_probe(){
   [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
   [ -z "$WD_DP_BAD" ] || WD_DP_DETAIL="$WD_DP_DETAIL; no answer through $WD_DP_BAD"
   WD_DP_CLASS=$(wd_dp_classify "$WDP_CN" "$WD_DP_BAD" "$WD_DP_SCANNED")
-  [ "$WD_DP_CLASS" != skip ] || WD_DP_DETAIL="$WD_DP_DETAIL; no CN host with a fake IP and every proxy group answers through the controller"
+  [ "$WD_DP_CLASS" != skip ] || WD_DP_DETAIL="$WD_DP_DETAIL; every proxy group answers through the controller"
   return 0
 }
 # $1 CN fetch through the data plane (ok | fail | empty), $2 failing groups, $3 groups measured.
 # A failing group wins (proxy-down); dataplane-down only when the CN fetch failed and no group is bad.
+# 5.1.0: no failing group is no verdict (skip). Every group answering through the controller while the
+# probe timed out is what a probe queued behind a busy download looks like; 5.0.0 closed every connection
+# through the MATCH group then, the downloads included.
 wd_dp_classify(){
   if [ -n "$2" ]; then echo proxy-down
   elif [ "$1" = fail ]; then echo dataplane-down
-  elif [ "$1" = ok ] || [ "${3:-0}" = 0 ]; then echo proxy-down
   else echo skip; fi
 }
 # A whole-phone outage verdict ($1 = what failed). After WIFI_HEAL_OFFLINE_LIMIT in a row a detached wifi-heal
@@ -3196,29 +3202,37 @@ wd_offline_seen(){
 }
 wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
-# Close only the core connections whose chain passes through one of the proxies/groups named in $1
-# (tab separated): a game or a domestic app on DIRECT, and other groups' connections, stay up. The
-# connection list is read once (GET /connections, Clash API: Mihomo and sing-box) and each match is
-# closed by id; when the list cannot be read nothing is closed. WD_CLOSED / WD_CLOSE_SEEN report it.
+# Core connections whose chain passes through one of the proxies/groups named in $1 (tab separated) ->
+# $2, one "id TAB download-bytes" line each; read once (GET /connections, Clash API: Mihomo and sing-box).
+# 1 = the list cannot be read. WD_CLOSE_SEEN = connections in the list.
 WD_CLOSE_MAX=512
-wd_close_through(){
-  WD_CLOSED=0; WD_CLOSE_SEEN=-1
+wd_conn_match(){
+  WD_CLOSE_SEEN=-1; : > "$2"
   [ -n "$1" ] || return 1
   WD_HTTP_TIMEOUT=4; wd_http GET /connections "$WD_TMP.cn" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.cn"; return 1; }
-  # Objects split at "{": a connection's id and its chains sit on the same or the next line.
-  WD_CLOSE_SEEN=$(tr '{' '\n' < "$WD_TMP.cn" | awk -v names="$1" -v max="$WD_CLOSE_MAX" -v ids="$WD_TMP.ids" '
+  # Objects split at "{": a connection's id, then (after its metadata) its counters and chains.
+  WD_CLOSE_SEEN=$(tr '{' '\n' < "$WD_TMP.cn" | awk -v names="$1" -v max="$WD_CLOSE_MAX" -v ids="$2" '
     function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); gsub(/\\"/, "\"", x); return x }
     BEGIN { printf "" > ids; n = split(names, a, "\t"); for (i = 1; i <= n; i++) if (a[i] != "") want[a[i]] = 1 }
-    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; seen++ }
+    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; dl = 0; seen++ }
+      if (id != "" && (i = index($0, "\"download\":")) > 0) dl = substr($0, i + 11) + 0
       if (id != "" && (i = index($0, "\"chains\":[")) > 0) {
         s = substr($0, i + 10); j = index(s, "]"); if (j) s = substr(s, 1, j - 1)
         hit = 0; m = split(s, c, "\",\"")
         for (k = 1; k <= m; k++) { x = c[k]; gsub(/^"|"$/, "", x); if (u(x) in want) hit = 1 }
-        if (hit && closing < max) { print id > ids; closing++ }
+        if (hit && taken < max) { print id "\t" dl > ids; taken++ }
         id = "" } }
     END { print seen + 0 }')
   rm -f "$WD_TMP.cn"
-  while IFS= read -r WCT_ID; do
+  return 0
+}
+# Close only the core connections through the names in $1 (wd_conn_match): a game or a domestic app on
+# DIRECT, and other groups' connections, stay up; when the list cannot be read nothing is closed.
+# WD_CLOSED / WD_CLOSE_SEEN report it.
+wd_close_through(){
+  WD_CLOSED=0
+  wd_conn_match "$1" "$WD_TMP.ids" || { rm -f "$WD_TMP.ids"; return 1; }
+  while IFS="$WD_TAB" read -r WCT_ID WCT_DL; do
     case "$WCT_ID" in ''|*[!0-9A-Za-z-]*) continue;; esac
     wd_http DELETE "/connections/$WCT_ID" "$WD_TMP.act" </dev/null; rm -f "$WD_TMP.act"
     WD_CLOSED=$((WD_CLOSED+1))
@@ -3226,30 +3240,65 @@ wd_close_through(){
   rm -f "$WD_TMP.ids"
   return 0
 }
+# 5.1.0: WD_CLOSE_BUSY = connections through the names in $1 whose download counter grew over WD_BUSY_GAP s.
+# A node that is receiving data is not dead, whatever a probe that queued behind it says.
+wd_conn_busy(){
+  WD_CLOSE_BUSY=0
+  wd_conn_match "$1" "$WD_TMP.b1" && [ -s "$WD_TMP.b1" ] || { rm -f "$WD_TMP.b1"; return 0; }
+  sleep "$WD_BUSY_GAP" 2>/dev/null || true
+  if wd_conn_match "$1" "$WD_TMP.b2"; then
+    WD_CLOSE_BUSY=$(awk -F '\t' 'FNR == NR { a[$1] = $2; next } ($1 in a) && $2 + 0 > a[$1] + 0 { n++ } END { print n + 0 }' "$WD_TMP.b1" "$WD_TMP.b2")
+  fi
+  rm -f "$WD_TMP.b1" "$WD_TMP.b2"
+  return 0
+}
+# The names in $1 plus the group/node each named group currently uses ($WD_TMP.groups), so the auto-select
+# group and the node behind a selector are part of the outage: 最终兜底 -> 故障转移 -> 香港 01.
+wd_heal_chain(){
+  WHC_NAMES="$1"
+  [ -s "$WD_TMP.groups" ] || { printf '%s' "$WHC_NAMES"; return 0; }
+  for WHC_I in 1 2 3 4; do
+    WHC_MORE=$(awk -F '\t' -v names="$WHC_NAMES" 'BEGIN { n = split(names, a, "\t"); for (i = 1; i <= n; i++) if (a[i] != "") in_[a[i]] = 1 }
+      ($2 in in_) && $3 != "" && !($3 in in_) && $3 !~ /^(DIRECT|REJECT|REJECT-DROP|PASS|COMPATIBLE)$/ { printf "%s\t", $3; in_[$3] = 1 }' "$WD_TMP.groups")
+    [ -n "$WHC_MORE" ] || break
+    WHC_NAMES="$WHC_NAMES$WHC_MORE"
+  done
+  printf '%s' "$WHC_NAMES"
+}
 # A proxy-side outage while the core and DIRECT work ($1 = failing groups/nodes, tab separated; $2 = what
-# was seen): let url-test/fallback/load-balance groups re-measure (and switch) first, then close only the
-# connections that went through the failing names, and tell the user once per outage. The core is never
-# reloaded or restarted for this: a new core reaches the same node, and a restart drops every connection.
+# was seen). Nothing is done while connections through them still receive data. Otherwise the failing
+# url-test/fallback/load-balance groups re-measure (and switch) first, then only the connections through
+# the failing names are closed, and the user is told once per outage. A group where the user pinned a
+# node is not re-measured (Mihomo's group delay test clears the pin). The core is never reloaded or
+# restarted for this: a new core reaches the same node, and a restart drops every connection.
 wd_node_heal(){
   WNH_NAMES="$1"
+  if [ -z "$WNH_NAMES" ]; then wd_log "self-heal: proxy probe failed ($2) but no group or node failed its own check; nothing done"; return 0; fi
   [ -s "$WD_TMP.groups" ] || wd_groups || true
-  WPH_N=0
+  WNH_NAMES=$(wd_heal_chain "$WNH_NAMES")
+  WNH_SHOWN=$(printf '%s' "$WNH_NAMES" | tr '\t' ' ' | sed 's/ $//')
+  wd_conn_busy "$WNH_NAMES"
+  if [ "$WD_CLOSE_BUSY" -gt 0 ]; then
+    wd_log "self-heal: probe through $WNH_SHOWN failed ($2) but $WD_CLOSE_BUSY connection(s) through it are receiving data; nothing closed"
+    return 0
+  fi
+  WPH_N=0; WPH_PINNED=""
   if [ -s "$WD_TMP.groups" ]; then
     wd_budget_start
     while IFS= read -r WPH_L; do
       WPH_T=${WPH_L%%"$WD_TAB"*}; WPH_R=${WPH_L#*"$WD_TAB"}; WPH_G=${WPH_R%%"$WD_TAB"*}
+      WPH_F=${WPH_R#*"$WD_TAB"}; case "$WPH_F" in *"$WD_TAB"*) WPH_F=${WPH_F#*"$WD_TAB"};; *) WPH_F="";; esac
       case "$WPH_T" in URLTest|Fallback|LoadBalance) ;; *) continue;; esac
+      case "$WD_TAB$WNH_NAMES" in *"$WD_TAB$WPH_G$WD_TAB"*) ;; *) continue;; esac
+      if [ -n "$WPH_F" ]; then WPH_PINNED="${WPH_PINNED:+$WPH_PINNED, }$WPH_G→$WPH_F"; continue; fi
       wd_budget_left || { wd_log "self-heal: group re-test stopped (${WD_BUDGET_WHY})"; break; }
       WD_HTTP_TIMEOUT=8; wd_http GET "/group/$(wd_urlenc "$WPH_G")/delay?timeout=5000&url=$(wd_urlenc "$WD_PROXY_URL")" "$WD_TMP.act" hold </dev/null
       rm -f "$WD_TMP.act"; WPH_N=$((WPH_N+1))
     done < "$WD_TMP.groups"
   fi
-  # Nothing named (every group answered the controller): the rules' final group is what the probe used.
-  if [ -z "$WNH_NAMES" ] && wd_egress_target; then WNH_NAMES="$WD_EG_TARGET$WD_TAB"; fi
-  if wd_close_through "$WNH_NAMES"; then WNH_CLOSED="closed $WD_CLOSED of $WD_CLOSE_SEEN core connection(s) through $(printf '%s' "$WNH_NAMES" | tr '\t' ' ' | sed 's/ $//')"
-  elif [ -n "$WNH_NAMES" ]; then WNH_CLOSED="closed no connection (connection list unreadable)"
-  else WNH_CLOSED="closed no connection (no failing group named)"; fi
-  wd_log "self-heal: proxy node not responding ($2); re-tested $WPH_N auto-select group(s), $WNH_CLOSED"
+  if wd_close_through "$WNH_NAMES"; then WNH_CLOSED="closed $WD_CLOSED of $WD_CLOSE_SEEN core connection(s) through $WNH_SHOWN"
+  else WNH_CLOSED="closed no connection (connection list unreadable)"; fi
+  wd_log "self-heal: proxy node not responding ($2); re-tested $WPH_N auto-select group(s)${WPH_PINNED:+, kept the pinned $WPH_PINNED}, $WNH_CLOSED"
   if [ "$WD_NODE_NOTIFIED" = 0 ]; then
     WD_NODE_NOTIFIED=1
     wd_notify "proxy-down ${2:-unknown}" "代理节点无响应${2:+：$2}。已让自动选择的节点组重新测速切换，并只断开了经过该节点的连接，直连与其他节点的连接不受影响；手动选择的节点请在河图中更换。"
@@ -3281,7 +3330,9 @@ wd_dataplane_tick(){
     unavailable)
       WD_DP_ON=0; WD_EG_AT="$WD_NOW"
       wd_log "data-plane probe unavailable ($WD_DP_WHY); using the proxy-group delay check"; return 0;;
-    skip) return 0;;
+    # No verdict: logged once while it lasts; it also ends a run of failures (two in a row are needed).
+    skip) if [ -n "$WD_DP_DETAIL" ] && [ "$WD_DP_LAST" != skip ]; then wd_log "data-plane probe: no verdict ($WD_DP_DETAIL)"; fi
+      [ -z "$WD_DP_DETAIL" ] || { WD_DP_FAIL=0; WD_DP_LAST=skip; }; return 0;;
     ok)
       if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
       WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0

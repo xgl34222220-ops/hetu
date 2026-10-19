@@ -25,6 +25,10 @@ final class RootProxyManager {
     private static final String CORE_KIND=ROOT+"/run/state/core.kind";
     /** Xray/V2Fly geoip.dat + geosite.dat (XRAY_LOCATION_ASSET / V2RAY_LOCATION_ASSET). */
     private static final String CORE_ASSETS=ROOT+"/bin/assets";
+    /** sing-box rule-set files the App downloaded before start (ProxyCoreConfig.localizeSingBoxRuleSets). */
+    private static final String SING_RULESET_DIR=ROOT+"/run/ruleset/sing";
+    /** A downloaded rule-set is reused without network for its update interval (remote rule-sets: 72 h). */
+    private static final long RULESET_FRESH_MS=72L*60L*60L*1000L;
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
     private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
@@ -136,6 +140,8 @@ final class RootProxyManager {
         /** JS override scripts (覆写脚本) outcome of this preparation; empty when none is enabled. */
         String overrideNotice="";
         boolean overrideFallback;
+        /** sing-box: the rule-set files this start's config names; written by the deployment. */
+        List<ProxyCoreConfig.RuleSetFile> ruleSetFiles=Collections.emptyList();
         Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
             profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
         }
@@ -549,8 +555,10 @@ final class RootProxyManager {
         RootProxyPolicy policy=loadPolicy(profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
-        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock);
-        ProxyCoreConfig.Result built=ProxyCoreConfig.build(profile.core,source,options,this::fetchProvider);
+        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock,policy);
+        ProxyCoreConfig.Result converted=ProxyCoreConfig.build(profile.core,source,options,this::fetchProvider);
+        List<ProxyCoreConfig.RuleSetFile> ruleSetFiles=new ArrayList<>();
+        ProxyCoreConfig.Result built=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX?localRuleSets(converted,ruleSetFiles):converted;
         if(profile.adblockChain&&!built.adblockApplied){
             profile=withoutAdblock(profile);
             adblock=null;
@@ -573,18 +581,89 @@ final class RootProxyManager {
                 +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
                 +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
         writeStartupCopy(startup);
-        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature),override);
+        Prepared prepared=new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature);
+        prepared.ruleSetFiles=ruleSetFiles;
+        return withOverride(prepared,override);
     }
 
-    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock)throws IOException{
+    /**
+     * sing-box exits at start when one remote rule-set cannot be downloaded, so every remote rule-set is
+     * fetched here first and the config names the file the deployment writes (ProxyCoreConfig.localizeSingBoxRuleSets).
+     */
+    private ProxyCoreConfig.Result localRuleSets(ProxyCoreConfig.Result built,List<ProxyCoreConfig.RuleSetFile> files)throws IOException{
+        checkStartIntent();
+        final StartIntent intent=START_INTENT.get();
+        ProxyCoreConfig.LocalRuleSets local=ProxyCoreConfig.localizeSingBoxRuleSets(built.config,url->{
+            START_INTENT.set(intent);
+            try{return fetchRuleSet(url);}finally{START_INTENT.remove();}
+        },SING_RULESET_DIR,!built.nativeSource,6,30000L);
+        checkStartIntent();
+        files.addAll(local.files);
+        if(local.missing.isEmpty()&&local.files.isEmpty())return built;
+        List<String> more=new ArrayList<>();
+        if(!local.missing.isEmpty())more.add((built.nativeSource?"规则集下载失败，由 sing-box 启动时自行下载：":"规则集下载失败，本次已跳过（相关规则暂不生效，下次启动重试）：")
+                +String.join("、",local.missing));
+        return built.with(local.config,more);
+    }
+
+    /**
+     * One sing-box rule-set for localRuleSets: a copy younger than its update interval, else the URL and its
+     * mirrors (a direct fetch: Hetu's own UID is never intercepted), else the last good copy.
+     */
+    private byte[] fetchRuleSet(String url)throws IOException{
+        if(url==null||!(url.startsWith("https://")||url.startsWith("http://")))return null;
+        File dir=new File(context.getNoBackupFilesDir(),"core-ruleset-cache");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建规则集缓存目录");
+        File cache=new File(dir,ProxyCoreConfig.ruleSetFileName(url,"binary"));
+        if(cache.isFile()&&cache.length()>0&&System.currentTimeMillis()-cache.lastModified()<RULESET_FRESH_MS)
+            return Files.readAllBytes(cache.toPath());
+        for(String candidate:ProxyCoreConfig.ruleSetMirrors(url)){
+            checkStartIntent();
+            HttpURLConnection connection=null;
+            try{
+                connection=(HttpURLConnection)new URL(candidate).openConnection();
+                connection.setConnectTimeout(8000);connection.setReadTimeout(20000);
+                connection.setInstanceFollowRedirects(true);
+                int code=connection.getResponseCode();
+                if(code<200||code>299)continue;
+                ByteArrayOutputStream body=new ByteArrayOutputStream();
+                try(InputStream in=connection.getInputStream()){
+                    byte[] b=new byte[32768];int n;
+                    while((n=in.read(b))!=-1){body.write(b,0,n);if(body.size()>ProxyCoreConfig.MAX_PROVIDER_BYTES)throw new IOException("规则集过大");}
+                }
+                byte[] bytes=body.toByteArray();
+                if(!ProxyCoreConfig.ruleSetBody(bytes))continue;
+                File tmp=new File(dir,cache.getName()+".tmp");
+                try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(bytes);out.getFD().sync();}
+                if(!tmp.renameTo(cache))tmp.delete();
+                return bytes;
+            }catch(IOException next){
+                // The next mirror; the last good copy below when none answers.
+            }finally{if(connection!=null)connection.disconnect();}
+        }
+        return cache.isFile()&&cache.length()>0?Files.readAllBytes(cache.toPath()):null;
+    }
+
+    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock,RootProxyPolicy policy)throws IOException{
         ProxyCoreConfig.Options o=new ProxyCoreConfig.Options();
         o.mode=profile.mode;
         if(profile.mode==ProxyRuntimeProfile.Mode.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
-        else{
+        else if(profile.mode==ProxyRuntimeProfile.Mode.TUN){
+            // sing-box's own TUN (hetu0) takes the traffic; no netfilter listener. App scope as packages, like Mihomo's tun.
+            // The editor check (policy null) needs no packages: sing-box check does not look at them.
+            if(policy!=null){
+                List<List<String>> packages=ProxyCoreConfig.tunPackages(profile.appScope,selectedTunPackages(),policy.directPackages);
+                o.tunIncludePackages=packages.get(0);
+                o.tunExcludePackages=packages.get(1);
+            }
+        }else{
+            // Redirect, and Enhance (TCP Redirect + UDP TPROXY).
             o.redirectPort=MihomoStartupConfig.REDIRECT_PORT;
-            if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
+            if(profile.mode==ProxyRuntimeProfile.Mode.ENHANCE||profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
         }
         o.dnsPort=profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.OFF?0:MihomoStartupConfig.DNS_PORT;
+        o.loopback6=loopback6Bindable();
+        o.sharedNetwork=policy!=null&&policy.sharedNetwork;
         o.controllerPort=controllerPort;
         o.egressPort=MihomoStartupConfig.egressProbePort(controllerPort);
         o.secret=controllerSecret();
@@ -602,12 +681,58 @@ final class RootProxyManager {
             o.adblock=adblockDomains(adblock.file);
             o.adblockAllow=adblockDomains(adblock.allowFile);
         }
-        o.hostResolver=host->{
-            InetAddress[] all=InetAddress.getAllByName(host);
-            for(InetAddress a:all)if(a instanceof Inet4Address)return a.getHostAddress();
-            return all.length==0?null:all[0].getHostAddress();
-        };
+        o.hostResolver=this::resolveServerHost;
         return o;
+    }
+
+    /**
+     * ::1 exists (IPv6 is not switched off on lo): the core's DNS port also listens there (ProxyCoreConfig.dnsInTags),
+     * else a bind of ::1 would stop the core at start. The App shares the network namespace hetu-root.sh starts it in.
+     */
+    private static boolean loopback6Bindable(){
+        try(DatagramSocket probe=new DatagramSocket(new InetSocketAddress(InetAddress.getByName("::1"),0))){
+            return probe.isBound();
+        }catch(IOException|SecurityException unavailable){
+            return false;
+        }
+    }
+
+    /**
+     * Hysteria's server address (ProxyCoreConfig.resolveServer): the system resolver, unless it answers from a
+     * fake-IP pool, which it does on a restart while a fake-IP core runs (netd's query is captured) and which the
+     * new core cannot dial; then AliDNS over HTTPS from Hetu's own (never intercepted) socket.
+     */
+    private String resolveServerHost(String host)throws IOException{
+        String pools=ProxyCoreConfig.FAKE_IP_POOLS_V4+","+prefs.getString("proxyRootFakeIpV4","");
+        String v6=null;
+        try{
+            for(InetAddress a:InetAddress.getAllByName(host)){
+                String ip=a.getHostAddress();
+                if(a instanceof Inet4Address){if(!ProxyCoreConfig.inIpv4Cidrs(ip,pools))return ip;}
+                else if(v6==null&&!ip.toLowerCase(Locale.ROOT).startsWith("fdfe:dcba:9876"))v6=ip;
+            }
+        }catch(UnknownHostException unknown){
+            // The DoH answer below.
+        }
+        for(String server:new String[]{"223.5.5.5","223.6.6.6"}){
+            HttpURLConnection c=null;
+            try{
+                c=(HttpURLConnection)new URL("https://"+server+"/resolve?type=1&name="+URLEncoder.encode(host,"UTF-8")).openConnection();
+                c.setConnectTimeout(5000);c.setReadTimeout(5000);
+                if(c.getResponseCode()!=200)continue;
+                String body;
+                try(InputStream in=c.getInputStream()){byte[] b=new byte[65536];int n,t=0;while(t<b.length&&(n=in.read(b,t,b.length-t))>0)t+=n;body=new String(b,0,t,StandardCharsets.UTF_8);}
+                JSONArray answers=new JSONObject(body).optJSONArray("Answer");
+                for(int i=0;answers!=null&&i<answers.length();i++){
+                    JSONObject a=answers.optJSONObject(i);
+                    String ip=a==null?"":a.optString("data","");
+                    if(a!=null&&a.optInt("type")==1&&!ProxyCoreConfig.inIpv4Cidrs(ip,pools)&&ProxyCoreConfig.inIpv4Cidrs(ip,"0.0.0.0/0"))return ip;
+                }
+            }catch(Exception next){
+                // The other server; the IPv6 answer or the host name itself when none answers.
+            }finally{if(c!=null)c.disconnect();}
+        }
+        return v6;
     }
 
     private static List<String> adblockDomains(File file)throws IOException{
@@ -633,6 +758,9 @@ final class RootProxyManager {
     /**
      * proxy-providers / rule-providers for a conversion. Hetu's own UID is exempt from Root
      * interception, so this is a direct fetch; the last good body is kept for offline restarts.
+     * 5.1.0: a GitHub-hosted file also tries its jsDelivr / raw mirrors (ProxyCoreConfig.ruleSetMirrors), and a
+     * rule list (.list, the text form the converter reads for Xray / V2Fly) younger than its 72 h update interval
+     * is used as it is; a subscription is always fetched first.
      */
     private String fetchProvider(String url)throws IOException{
         if(url==null||!(url.startsWith("https://")||url.startsWith("http://")))return null;
@@ -641,27 +769,33 @@ final class RootProxyManager {
         File cache;
         try{cache=new File(dir,hex(MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8))));}
         catch(java.security.NoSuchAlgorithmException impossible){throw new IOException(impossible);}
-        HttpURLConnection connection=null;
-        try{
+        boolean ruleList=url.endsWith(".list");
+        if(ruleList&&cache.isFile()&&cache.length()>0&&System.currentTimeMillis()-cache.lastModified()<RULESET_FRESH_MS)
+            return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
+        for(String candidate:ProxyCoreConfig.ruleSetMirrors(url)){
             checkStartIntent();
-            connection=(HttpURLConnection)new URL(url).openConnection();
-            connection.setConnectTimeout(10000);connection.setReadTimeout(20000);
-            connection.setInstanceFollowRedirects(true);
-            connection.setRequestProperty("User-Agent","clash.meta");
-            int code=connection.getResponseCode();
-            if(code<200||code>299)throw new IOException("HTTP "+code);
-            ByteArrayOutputStream body=new ByteArrayOutputStream();
-            try(InputStream in=connection.getInputStream()){
-                byte[] b=new byte[32768];int n;
-                while((n=in.read(b))!=-1){body.write(b,0,n);if(body.size()>ProxyCoreConfig.MAX_PROVIDER_BYTES)throw new IOException("订阅内容过大");}
-            }
-            String text=new String(body.toByteArray(),StandardCharsets.UTF_8);
-            try(FileOutputStream out=new FileOutputStream(cache,false)){out.write(body.toByteArray());out.getFD().sync();}
-            return text;
-        }catch(IOException failed){
-            if(cache.isFile())return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
-            return null;
-        }finally{if(connection!=null)connection.disconnect();}
+            HttpURLConnection connection=null;
+            try{
+                connection=(HttpURLConnection)new URL(candidate).openConnection();
+                connection.setConnectTimeout(10000);connection.setReadTimeout(20000);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("User-Agent","clash.meta");
+                int code=connection.getResponseCode();
+                if(code<200||code>299)throw new IOException("HTTP "+code);
+                ByteArrayOutputStream body=new ByteArrayOutputStream();
+                try(InputStream in=connection.getInputStream()){
+                    byte[] b=new byte[32768];int n;
+                    while((n=in.read(b))!=-1){body.write(b,0,n);if(body.size()>ProxyCoreConfig.MAX_PROVIDER_BYTES)throw new IOException("订阅内容过大");}
+                }
+                String text=new String(body.toByteArray(),StandardCharsets.UTF_8);
+                try(FileOutputStream out=new FileOutputStream(cache,false)){out.write(body.toByteArray());out.getFD().sync();}
+                return text;
+            }catch(IOException failed){
+                // The next mirror; the last good body below when none answers.
+            }finally{if(connection!=null)connection.disconnect();}
+        }
+        if(cache.isFile())return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
+        return null;
     }
 
     private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
@@ -1065,6 +1199,10 @@ final class RootProxyManager {
         String requestedSettingsSignature=ProxyRuntimeSettings.captureRequest(profile,prefs);
         String requestedBaseSignature=ProxyRuntimeSettings.signature(profile,EbpfMatcher.withoutLists(prefs.getAll()));
         trace.next("configuration");
+        // A non-Mihomo core converts the profile here; sing-box also downloads its rule-sets (first start only).
+        if(ProxyCoreConfig.kind(profile.core)!=ProxyCoreConfig.Kind.MIHOMO)
+            stage(progress,ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX
+                    ?"转换配置并下载 sing-box 规则集（首次较慢，之后使用缓存）…":"转换配置并准备 "+profile.core.label+" 运行文件…");
         Prepared p;
         try{
             p=prepare(profile,restartControllerPort);
@@ -1947,7 +2085,7 @@ final class RootProxyManager {
      * answers "does this run under the selected core".
      */
     private void validateNativeText(String text,ProxyRuntimeProfile profile)throws Exception{
-        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null);
+        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null,null);
         options.hostResolver=null;
         ProxyCoreConfig.Result built=ProxyCoreConfig.build(profile.core,text,options,this::fetchProvider);
         File stage=new File(context.getCacheDir(),"hetu-config-validator");
@@ -2293,6 +2431,7 @@ final class RootProxyManager {
             if(shellDecidesCore)cmd.append("; fi");
         }
         appendCoreKind(cmd,p.profile.core);
+        appendRuleSetFiles(cmd,stage,p.ruleSetFiles);
         if(adblock!=null){
             String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
             String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
@@ -2345,6 +2484,22 @@ final class RootProxyManager {
                     .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
         }
         return cmd.toString();
+    }
+
+    /** sing-box rule-set files → run/ruleset/sing: written only when the deployed copy differs, checked before the move. */
+    private void appendRuleSetFiles(StringBuilder cmd,File stage,List<ProxyCoreConfig.RuleSetFile> files)throws Exception{
+        if(files.isEmpty())return;
+        File dir=new File(stage,"sing-ruleset");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建规则集临时目录");
+        cmd.append("; mkdir -p ").append(RootBridge.quote(SING_RULESET_DIR)).append("; chmod 700 ").append(RootBridge.quote(SING_RULESET_DIR))
+                .append("; hetu_rs(){ if [ \"$(sha256sum \"$3\" 2>/dev/null | cut -d ' ' -f 1)\" != \"$2\" ]; then cp \"$1\" \"$3.new\" && chmod 600 \"$3.new\"")
+                .append(" && chown 0:0 \"$3.new\" && test \"$(sha256sum \"$3.new\" | cut -d ' ' -f 1)\" = \"$2\" && mv -f \"$3.new\" \"$3\"; fi; }");
+        for(ProxyCoreConfig.RuleSetFile f:files){
+            File src=new File(dir,new File(f.path).getName());
+            Files.write(src.toPath(),f.body);
+            cmd.append("; hetu_rs ").append(RootBridge.quote(src.getAbsolutePath())).append(' ')
+                    .append(RootBridge.quote(hex(MessageDigest.getInstance("SHA-256").digest(f.body)))).append(' ').append(RootBridge.quote(f.path));
+        }
     }
 
     /**

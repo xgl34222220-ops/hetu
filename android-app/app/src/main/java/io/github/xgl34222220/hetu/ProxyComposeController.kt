@@ -139,10 +139,14 @@ internal data class ProxyComposeState(
 internal sealed class ProxyStartProblem(message: String, cause: Throwable? = null) : IllegalStateException(message, cause) {
     class NoConfig : ProxyStartProblem("尚未选择配置")
     class PlaceholderConfig : ProxyStartProblem(
-        "当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。",
+        "当前是河图内置占位配置，尚未填写真实订阅。请到「工具 → 配置管理」添加订阅链接，或导入一份完整可运行的 YAML 配置。",
     )
     /** 「仅所选应用代理」 with no usable selected app (RootProxyPolicy's own message is kept). */
     class AppScope(cause: Throwable) : ProxyStartProblem(cause.message ?: "当前是“仅所选应用代理”，但没有可用的已选应用", cause)
+    /** 5.5.5: the selected core was never downloaded (or was deleted): said before Root is asked, with where to fix it. */
+    class CoreMissing(label: String) : ProxyStartProblem(
+        "$label 尚未安装。请到「工具 → 核心管理」下载 $label，或在「设置 → 基础代理配置 → 代理核心」换用 Mihomo。",
+    )
 }
 
 internal class ProxyComposeController(context: Context) {
@@ -423,7 +427,8 @@ internal class ProxyComposeController(context: Context) {
         }
         val observed = ProxyComposeState(
             running = running,
-            core = profile.core.label,
+            // The core that runs, not a pick that applies on the next start.
+            core = if (running) ProxyCoreSupport.running(prefs).label else profile.core.label,
             mode = profile.mode.label,
             ipv6 = profile.ipv6.id,
             effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
@@ -497,8 +502,12 @@ internal class ProxyComposeController(context: Context) {
         LegacyAppMigrator.migrateIfNeeded(app)
         var profile = ProxyRuntimeProfile.load(prefs)
         if (!profile.capability().available) {
-            onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")
-            prefs.edit().putString("proxyBaseCore", "mihomo").putString("proxyBaseMode", "tproxy").apply()
+            // 5.1.0: keep the chosen core and change only the mode (sing-box / Xray / V2Fly / Hysteria run in TPROXY and
+            // Redirect). 5.0.0 switched the core back to Mihomo here, so after Mihomo had used TUN / Enhance / eBPF
+            // every other core "started" as Mihomo.
+            val mode = ProxyRuntimeProfile.runnableMode(profile.core, profile.mode)
+            onProgress("${profile.core.label} 不支持 ${profile.mode.label} 模式，改用 ${mode.label} 启动…")
+            prefs.edit().putString("proxyBaseMode", mode.id).apply()
             profile = ProxyRuntimeProfile.load(prefs)
         }
         if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
@@ -506,6 +515,7 @@ internal class ProxyComposeController(context: Context) {
             prefs.edit().putString("proxyBaseCore", "mihomo").apply()
             profile = ProxyRuntimeProfile.load(prefs)
         }
+        requireInstalled(profile.core)
         configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
         // The subscription is checked where the start reads it: an unedited built-in template follows Mihomo's built-in.
         val source = configs.source(profile.core) ?: throw ProxyStartProblem.NoConfig()
@@ -531,6 +541,7 @@ internal class ProxyComposeController(context: Context) {
     suspend fun startLastGood(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
+        requireInstalled(profile.core)
         LastGoodConfig.info(prefs, profile.core.id)
             ?: throw IOException("${profile.core.label} 还没有上次可启动的配置")
         val source = LastGoodConfig.read(app, profile.core.id)
@@ -540,6 +551,11 @@ internal class ProxyComposeController(context: Context) {
         } catch (scope: RootProxyManager.AppScopeException) {
             throw ProxyStartProblem.AppScope(scope)
         }
+    }
+
+    /** Mihomo ships in the App; every other core must have been downloaded (ProxyCoreStore). */
+    private fun requireInstalled(core: ProxyRuntimeProfile.Core) {
+        if (core != ProxyRuntimeProfile.Core.MIHOMO && !ProxyCoreStore(app).installed(core)) throw ProxyStartProblem.CoreMissing(core.label)
     }
 
     suspend fun reload(): String = withContext(Dispatchers.IO) {
@@ -642,8 +658,10 @@ internal class ProxyComposeController(context: Context) {
     )
 
     fun setCore(id: String) {
-        configs.adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(id))
-        prefs.edit().putString("proxyBaseCore", id).apply()
+        val core = ProxyRuntimeProfile.Core.from(id)
+        configs.adoptTemplateOnCoreSelect(core)
+        val mode = ProxyRuntimeProfile.modeForPick(prefs, core, ProxyRuntimeProfile.load(prefs).mode)
+        prefs.edit().putString("proxyBaseCore", id).putString("proxyBaseMode", mode.id).apply()
     }
     fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
     fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }

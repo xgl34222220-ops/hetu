@@ -274,7 +274,7 @@ internal fun LazyListScope.providerListItems(vm: HetuViewModel, query: String = 
     if (showSearch) item(key = "providers-search") { HxSearchField(query, onQuery, "搜索订阅", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp), autoFocus = true) }
     val providers = if (query.isBlank()) vm.providers else vm.providers.filter { p -> p.name.contains(query, true) || p.nodes.any { it.contains(query, true) } }
     if (providers.isEmpty()) {
-        item(key = "providers-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (query.isBlank()) "没有在线订阅" else "没有匹配的订阅", if (query.isBlank()) "在「设置 → 配置与订阅」中添加订阅链接" else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
+        item(key = "providers-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (query.isBlank()) "没有在线订阅" else "没有匹配的订阅", if (query.isBlank()) "在「工具 → 配置管理」中添加订阅链接" else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
     }
     itemsIndexed(providers, key = { _, item -> "pv:" + item.name }) { _, p ->
         ProviderCard(

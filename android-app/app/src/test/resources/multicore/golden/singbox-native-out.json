@@ -22,8 +22,23 @@
     {
       "type": "direct",
       "tag": "hetu-dns-in",
+      "listen": "127.0.0.1",
+      "listen_port": 11053,
+      "reuse_addr": true
+    },
+    {
+      "type": "direct",
+      "tag": "hetu-dns-in6",
+      "listen": "::1",
+      "listen_port": 11053,
+      "reuse_addr": true
+    },
+    {
+      "type": "direct",
+      "tag": "hetu-dns-lan",
       "listen": "::",
-      "listen_port": 11053
+      "listen_port": 11053,
+      "reuse_addr": true
     },
     {
       "type": "http",
@@ -52,11 +67,11 @@
   "route": {
     "rules": [
       {
-        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in"],
+        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
         "action": "sniff"
       },
       {
-        "inbound": ["hetu-dns-in"],
+        "inbound": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
         "action": "hijack-dns"
       },
       {

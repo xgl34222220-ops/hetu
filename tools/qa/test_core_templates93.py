@@ -171,10 +171,13 @@ class CoreTemplates93Test(unittest.TestCase):
         self.assertIn('selected(core)!=null)return null;', body, 'an existing own selection is kept')
         self.assertIn('select(core,name)', body)
         settings = (PKG / 'app/SettingsScreen.kt').read_text()
-        pick = settings.index('ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(it))')
+        pick = settings.index('ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(picked)')
         self.assertLess(pick, settings.index('putString("proxyBaseCore", it)', pick), 'template selected before the core is saved')
+        # 5.1.0: a mode the picked core cannot run in (TUN / Enhance / eBPF) becomes TPROXY with the pick.
+        self.assertLess(settings.index('ProxyRuntimeProfile.modeForPick(prefs, picked, profile.mode)', pick), settings.index('putString("proxyBaseCore", it)', pick))
         controller = (PKG / 'ProxyComposeController.kt').read_text()
-        self.assertIn('configs.adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(id))', controller)
+        self.assertIn('configs.adoptTemplateOnCoreSelect(core)', controller)
+        self.assertIn('ProxyRuntimeProfile.modeForPick(prefs, core, ProxyRuntimeProfile.load(prefs).mode)', controller)
 
     def test_wave_budget_scales_and_keeps_floor_and_concurrency(self):
         budget = (PKG / 'LatencyProbeBudget.java').read_text()

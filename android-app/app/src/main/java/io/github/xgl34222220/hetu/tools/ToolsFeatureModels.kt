@@ -97,6 +97,8 @@ internal data class ToolsCore(
     /** False for cores whose runtime backend is not wired up: “仅下载管理”. */
     val runnable: Boolean = true,
     val canDownload: Boolean = true,
+    /** Why the card offers no download or no latest version (no build for this ABI, the check failed); else empty. */
+    val notice: String = "",
 ) {
     val versionLine: String get() = "当前 $installed" + if (latest.isNotBlank() && updateAvailable) " · 最新 $latest" else ""
 }

@@ -176,11 +176,17 @@ class ProxyCoreConfigGoldenTest {
         assertNotNull(error)
         assertTrue(error is IOException)
         assertTrue(error!!.message!!.contains("Clash/Mihomo"))
+        // 5.5.5: sing-box runs its own TUN; Xray has none, and eBPF stays Mihomo-only.
         val tun = runCatching {
-            ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, resource("singbox-native.json"),
+            ProxyCoreConfig.build(ProxyRuntimeProfile.Core.XRAY, resource("xray-native.json"),
                 options().apply { mode = ProxyRuntimeProfile.Mode.TUN }) { null }
         }.exceptionOrNull()
         assertTrue(tun!!.message!!.contains("TPROXY"))
+        val ebpf = runCatching {
+            ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, resource("singbox-native.json"),
+                options().apply { mode = ProxyRuntimeProfile.Mode.EBPF }) { null }
+        }.exceptionOrNull()
+        assertTrue(ebpf!!.message!!.contains("TUN"))
     }
 
     @Test fun adblockAllowListIsSubtractedForXray() {

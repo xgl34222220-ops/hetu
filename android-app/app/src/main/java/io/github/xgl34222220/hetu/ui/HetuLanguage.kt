@@ -994,6 +994,9 @@ private val vocabularyConnection = """
 配置选择|Configurations|設定選擇|Конфигурации
 当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
 内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
+内置模板 · 跟随 Mihomo 当前配置|Bundled template · follows the current Mihomo config|內建範本 · 跟隨 Mihomo 目前設定|Встроенный шаблон · следует текущей конфигурации Mihomo
+仅 Mihomo 可用|Mihomo only|僅 Mihomo 可用|Только Mihomo
+仅 Mihomo / sing-box 可用|Mihomo / sing-box only|僅 Mihomo / sing-box 可用|Только Mihomo / sing-box
 尚无配置|No configurations yet|尚無設定|Конфигураций пока нет
 在 工具 › 配置管理 导入配置后会显示在这里|Configurations imported in Tools › Configurations appear here|在 工具 › 設定管理 匯入設定後會顯示在這裡|Импортированные в «Инструменты › Конфигурации» появятся здесь
 只读查看 · 点右上角编辑|Read-only · tap edit at the top right|唯讀檢視 · 點右上角編輯|Только чтение · нажмите «Изменить» справа вверху

@@ -25,6 +25,28 @@
     },
     {
       "tag": "hetu-dns-in",
+      "listen": "127.0.0.1",
+      "port": 11053,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "1.1.1.1",
+        "port": 53,
+        "network": "tcp,udp"
+      }
+    },
+    {
+      "tag": "hetu-dns-in6",
+      "listen": "::1",
+      "port": 11053,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "1.1.1.1",
+        "port": 53,
+        "network": "tcp,udp"
+      }
+    },
+    {
+      "tag": "hetu-dns-lan",
       "listen": "::",
       "port": 11053,
       "protocol": "dokodemo-door",
@@ -90,7 +112,7 @@
     "rules": [
       {
         "type": "field",
-        "inboundTag": ["hetu-dns-in"],
+        "inboundTag": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
         "outboundTag": "hetu-dns-out"
       },
       {
@@ -113,6 +135,9 @@
   },
   "dns": {
     "servers": ["1.1.1.1", "223.5.5.5"],
-    "queryStrategy": "UseIP"
+    "queryStrategy": "UseIP",
+    "hosts": {
+      "hetu-liveness.invalid": "127.0.0.1"
+    }
   }
 }
