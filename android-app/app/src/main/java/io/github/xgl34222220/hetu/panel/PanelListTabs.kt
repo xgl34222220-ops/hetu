@@ -383,7 +383,7 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(panelHighlight(set.name, query), Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accentText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(if (set.ruleCount >= 0) ht("%d 条规则").fill(set.ruleCount) else ht("规则数未知"), color = c.accentText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text(set.meta, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     when (val state = set.update) {
@@ -393,10 +393,10 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
                             Modifier.homeTap(onClickLabel = ht(if (showReason) "收起" else "查看完整原因"), role = Role.Button) { showReason = !showReason },
                             color = c.badText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium),
                             maxLines = if (showReason) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
-                        PanelUpdate.Idle -> Text(ht("更新于 %s").fill(set.updatedAt ?: HomeFormat.Dash), color = c.t1, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        PanelUpdate.Idle -> Text(if (set.updatable) ht("更新于 %s").fill(set.updatedAt ?: HomeFormat.Dash) else ht(set.fixedNote), color = c.t1, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                when (set.update) {
+                if (set.updatable) when (set.update) {
                     PanelUpdate.Updating -> Box(Modifier.size(HomeDims.touch), contentAlignment = Alignment.Center) { HomeSpinner(size = 24.dp, strokeWidth = 2.5.dp) }
                     is PanelUpdate.Failed -> Box(
                         Modifier.heightIn(min = HomeDims.touch).clip(HomeDims.controlShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onUpdate(set.name) }.padding(horizontal = 12.dp),

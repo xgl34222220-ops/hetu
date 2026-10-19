@@ -204,7 +204,7 @@ private fun RuleSetCard(set: DashboardRuleSetUi, task: HxTask?, onUpdate: () -> 
                     )
                     Spacer(Modifier.width(7.dp))
                     Text(
-                        "${set.ruleCount} 条规则",
+                        if (set.ruleCount >= 0) "${set.ruleCount} 条规则" else "规则数未知",
                         style = MaterialTheme.typography.labelLarge.merge(HxNumberStyle),
                         color = c.accent,
                         maxLines = 1,

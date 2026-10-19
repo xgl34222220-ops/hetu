@@ -27,7 +27,9 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-19: 5.5.5 (versionCode 2103; user: 发布5.5.5) = 5.0.0 + non-Mihomo cores start (sing-box rule-sets pre-downloaded, the
 # chosen core kept in TUN/Enhance/eBPF, follow Mihomo's selected config, Hysteria lazy), core downloads through the
 # running proxy, watchdog never cuts a node that is moving data.
-VERSION_CODE, VERSION_NAME = 2103, '5.5.5'
+# 2026-10-19: 6.0.0 (versionCode 2104; user: 下一个版本是6.0.0) = 5.5.5 + ColorOS eBPF Google block cleanup (hetu-bpf
+# vendor-uid), sing-box 订阅 / 规则集 from Hetu's own record (rule-set files hot-replaced), sing-box fake-IP TTL 1 s.
+VERSION_CODE, VERSION_NAME = 2104, '6.0.0'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -73,13 +75,13 @@ EBPF_FILES = frozenset('android-app/app/src/main/' + name for name in EBPF_PAYLO
 EBPF_SOURCE_SHA256 = {
     'native/ebpf/build.sh': '84c7baabc89b9b64a40075168af19f3f271ee0e09b3205542c3cf755811b4b31',
     'native/ebpf/hetu_match.c': '6894382415e89690e1bd339668f22e03894c1902065f10d969034e59017aecc9',
-    'native/ebpf/loader/bpf.go': 'eb9b49f5279da3825983ceda86a1ffee12b94dfabb35d794b5e117790dc1c89f',
+    'native/ebpf/loader/bpf.go': '4e000618fc3471ce5fb8aeb6681b37fd280207215a00bbc4b309c6e14bd99e87',
     'native/ebpf/loader/elf.go': '8fc8439405d069481d8290d91e90e8729ffd4d6a352a025adde1e8123f7b39cc',
     'native/ebpf/loader/elf_test.go': '679d1e5720d4edea6bc8b824e911ec1d518daa017aa14a80f3743d3c16b3d00b',
     'native/ebpf/loader/go.mod': 'f83b045d0d732bf55b3bb67502faf67bbc3f90e393327dfefc7dcd4a4556522b',
     'native/ebpf/loader/lists.go': 'bbc2ab8d07e1946f09f59ebc75849e9fa9f3f4be5c6713d68a32bae7a335c2bf',
-    'native/ebpf/loader/lists_test.go': '07067656ef3e889b28c1c560bdaabb45ebb2c95e28ae9c10ac7aabc988956eab',
-    'native/ebpf/loader/main.go': '887c8eda7989fc7e1201d232b1694969ae8f71bc7ee90e0fc21642ebfe1964d3',
+    'native/ebpf/loader/lists_test.go': '81d122bdcebf94920e46cb328b5fc28f5f2aa07539dfedddae2989cb44154ec0',
+    'native/ebpf/loader/main.go': '5e6056935a146914c105af275f669a499b1ad90d0c33366223b17181f5d719a3',
     'native/ebpf/loader/sys_amd64.go': 'e3bd41140ed61c27c5f68357e28c3fb3540b195b501e45729e18f6e444f54dc7',
     'native/ebpf/loader/sys_arm64.go': 'bbee487efa05311c8be7f8103706c99a96576e441ecfc38331d3d823c2c51fb5',
 }
@@ -422,8 +424,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2103', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "5.5.5"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2104', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "6.0.0"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'

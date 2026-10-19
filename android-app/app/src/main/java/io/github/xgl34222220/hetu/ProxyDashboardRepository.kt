@@ -11,6 +11,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import io.github.xgl34222220.hetu.panel.SingBoxPanelStore
 import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,6 +60,7 @@ internal class ProxyDashboardRepository(context: Context) {
     }
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
+    private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     private val controller = ProxyComposeController(app)
     // Keep credentials private and out of generated data-class toString output.
     internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long,
@@ -284,14 +286,38 @@ internal class ProxyDashboardRepository(context: Context) {
 
     /** Only real remote HTTP providers belong on the subscription page. */
     suspend fun providers(): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
-        remoteProviders(api.proxyProviders())
+        if (ProxyCoreSupport.localProviders(prefs)) SingBoxPanelStore.providers(singBoxPanel())
+        else remoteProviders(api.proxyProviders())
     }
 
     suspend fun ruleSets(): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
-        parseRuleSets(api.ruleProviders())
+        if (ProxyCoreSupport.localProviders(prefs)) SingBoxPanelStore.ruleSets(singBoxPanel())
+        else parseRuleSets(api.ruleProviders())
+    }
+
+    /** sing-box: what Hetu recorded for the running start (RootProxyManager.recordSingBoxPanel). */
+    private fun singBoxPanel() = SingBoxPanelStore.load(RootProxyManager.singBoxPanelDir(app))
+
+    /** Every remote item of a sing-box list, three at a time; one failure does not stop the others. */
+    private suspend fun <T> refreshLocal(names: List<String>, refresh: (String) -> Unit, read: () -> List<T>): List<T> {
+        for (chunk in names.chunked(3)) coroutineScope {
+            chunk.map { name ->
+                async {
+                    try { refresh(name) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { }
+                }
+            }.awaitAll()
+        }
+        return read()
     }
 
     suspend fun refreshSubscriptions(ticket: SelectionTicket = captureSelection()): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) {
+            val root = RootProxyManager(app)
+            return@withContext refreshLocal(SingBoxPanelStore.providers(singBoxPanel()).map { it.name },
+                { root.refreshSingBoxProvider(it) }) { SingBoxPanelStore.providers(singBoxPanel()) }
+        }
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         val before = remoteProviders(operationApi.proxyProviders())
@@ -316,6 +342,11 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     suspend fun refreshRuleSets(ticket: SelectionTicket = captureSelection()): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) {
+            val root = RootProxyManager(app)
+            return@withContext refreshLocal(SingBoxPanelStore.ruleSets(singBoxPanel()).filter { it.vehicleType.equals("HTTP", true) }.map { it.name },
+                { root.refreshSingBoxRuleSet(it) }) { SingBoxPanelStore.ruleSets(singBoxPanel()) }
+        }
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         val before = parseRuleSets(operationApi.ruleProviders())
@@ -632,6 +663,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
     suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) return@withContext SingBoxPanelStore.provider(RootProxyManager(app).refreshSingBoxProvider(name))
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         operationApi.updateProxyProvider(name)
@@ -640,6 +672,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
     suspend fun refreshRuleSet(name: String, ticket: SelectionTicket = captureSelection()): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) return@withContext SingBoxPanelStore.ruleSet(RootProxyManager(app).refreshSingBoxRuleSet(name))
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         operationApi.updateRuleProvider(name)

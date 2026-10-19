@@ -154,13 +154,13 @@ class CoreRuntimeSupport93Test {
             assertTrue(tabs.all { gate(core).supports(it) }); assertTrue(gate(core).latency)
             assertTrue(ProxyCoreSupport.providers(core)); assertTrue(ProxyCoreSupport.trafficMode(core))
         }
-        // sing-box clash_api (1.14.3): proxies, group delay, connections and rules work; providers do not.
+        // sing-box clash_api (1.14.3): proxies, group delay, connections and rules work; providers do not,
+        // and 6.0.0 fills 订阅 / 规则集 from Hetu's own record of the start (SingBoxPanelStore): no tab is gated.
         listOf(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND).forEach { core ->
             val g = gate(core)
-            assertEquals(setOf(io.github.xgl34222220.hetu.panel.PanelTab.Subscriptions, io.github.xgl34222220.hetu.panel.PanelTab.RuleSets), g.features.keys)
-            assertTrue(g.latency)
-            assertEquals(io.github.xgl34222220.hetu.panel.PanelTab.Groups, g.fallbackFor(io.github.xgl34222220.hetu.panel.PanelTab.Subscriptions))
-            assertEquals(io.github.xgl34222220.hetu.panel.PanelTab.Rules, g.fallbackFor(io.github.xgl34222220.hetu.panel.PanelTab.RuleSets))
+            assertEquals(io.github.xgl34222220.hetu.panel.PanelCoreGate.Full, g)
+            assertTrue(tabs.all { g.supports(it) }); assertTrue(g.latency)
+            assertFalse(ProxyCoreSupport.providers(core))
             assertFalse(ProxyCoreSupport.trafficMode(core))
         }
         // No Clash controller: every controller tab is gated, 日志 still works, no latency.

@@ -20,6 +20,7 @@ const (
 	cmdProgLoad      = 5
 	cmdObjPin        = 6
 	cmdObjGet        = 7
+	cmdObjGetInfo    = 15
 )
 
 const (
@@ -186,6 +187,21 @@ func objGet(path string) (int, error) {
 		return -1, fmt.Errorf("open pinned %s: %w", path, err)
 	}
 	return fd, nil
+}
+
+// mapKeySize reads key_size from struct bpf_map_info (type, id, key_size, ...) of an open map.
+func mapKeySize(fd int) (uint32, error) {
+	info := make([]byte, 40)
+	attr := attrBuf(16)
+	binary.NativeEndian.PutUint32(attr[0:], uint32(fd))
+	binary.NativeEndian.PutUint32(attr[4:], uint32(len(info)))
+	binary.NativeEndian.PutUint64(attr[8:], uint64(uintptr(unsafe.Pointer(&info[0]))))
+	_, err := bpf(cmdObjGetInfo, attr)
+	keepAlive(info)
+	if err != nil {
+		return 0, fmt.Errorf("map info: %w", err)
+	}
+	return binary.NativeEndian.Uint32(info[8:]), nil
 }
 
 func trimZero(b []byte) []byte {

@@ -22,6 +22,16 @@ import java.util.Locale
 object CnipFakeIp {
     const val PREF_V4 = "proxyCnIpKernelV4"
     const val PREF_V6 = "proxyCnIpKernelV6"
+    /**
+     * 6.0.0 (domestic video calls lagging), default on: while the full kernel bypass above is off, UDP to CN
+     * addresses (voice/video calls, games, P2P) skips the core's userspace relay. TCP keeps going through the
+     * core's rules, and no DNS answer changes (no fake-ip-filter entries are added for it).
+     */
+    const val PREF_UDP_DIRECT = "proxyCnIpUdpDirect"
+
+    /** policy/cnip for [PREF_UDP_DIRECT]: both families, UDP only, AUTO = runs without it where the kernel cannot. */
+    @JvmStatic
+    fun udpPolicyBody(forceUids: String): String = "V4=1\nV6=1\nFORCE=$forceUids\nTCPONLY=0\nUDPONLY=1\nAUTO=1\n"
     const val GEOSITE_ENTRY = "geosite:cn"
     const val GEOSITE_RULE = "GEOSITE,cn,real-ip"
 

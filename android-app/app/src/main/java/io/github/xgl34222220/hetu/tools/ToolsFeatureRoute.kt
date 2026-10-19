@@ -360,9 +360,11 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         val loader = actions.loadCnIp ?: return@LaunchedEffect
         state = try {
             val kernel = actions.loadCnIpKernel?.invoke()
+            val udp = actions.loadCnIpUdp?.invoke()
             if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
             else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries,
-                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false)
+                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false,
+                udpDirect = udp?.first ?: true, kernelUdpOnly = udp?.second ?: false)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -393,6 +395,14 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
             state = state.copy(kernelTcpOnly = on)
             scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
                 actions.setCnIpTcpOnly(on)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
+        onUdpDirectChange = if (actions.loadCnIpUdp == null) null else { on ->
+            val previous = state
+            state = state.copy(udpDirect = on)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpUdp(on)
                 actions.onMessage("已保存；重启代理后生效")
             }
         },

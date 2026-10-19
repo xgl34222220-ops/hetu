@@ -11,8 +11,8 @@ import zipfile
 # pinned here; any other added payload, or any other byte, is rejected.
 EBPF_PAYLOADS = {
     'assets/hetu-bpf/hetu_match.o': '096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de',
-    'assets/hetu-bpf/arm64-v8a/hetu-bpf': '72cd1b8e59d62d0d04bb09f674cbea415036d22f3f6ffec571048d6b49ad8046',
-    'assets/hetu-bpf/x86_64/hetu-bpf': '3dd6a2246ee8b4f34d2ab4dcffef8c5d288a1432b7aa0d2b1cd9df111c5b7968',
+    'assets/hetu-bpf/arm64-v8a/hetu-bpf': 'dc671038dc008f468ff69a68c83fffc925207c8565f319ca9ce23891d166fa08',
+    'assets/hetu-bpf/x86_64/hetu-bpf': 'ed3f241d2d8ad9b4867325083090d6b580c15d36b3873e44a61a389e887ae779',
 }
 AUTOSTART = 'assets/hetu-autostart.sh'
 ALLOWED_ADDED = ([], [AUTOSTART], sorted(EBPF_PAYLOADS), [AUTOSTART, *sorted(EBPF_PAYLOADS)])

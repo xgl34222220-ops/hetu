@@ -81,6 +81,27 @@ class EbpfMatcherApp105Test {
         } finally { dir.deleteRecursively() }
     }
 
+    /** 6.0.0: the ColorOS Google check needs bin/hetu-bpf while the matcher (and its object) stays off. */
+    @Test fun loaderAloneIsInstalledForTheColorOsGoogleCheck() {
+        val dir = Files.createTempDirectory("hetu-ebpf-loader").toFile()
+        try {
+            val loader = File(dir, "stage-loader").apply { writeBytes("loader-only".toByteArray()) }
+            val bin = File(dir, "bin")
+            assertEquals(0, run(dir, EbpfMatcher.loaderCommand(bin.absolutePath, loader.absolutePath, sha(loader.readBytes()), ".new.3")))
+            val tool = File(bin, "hetu-bpf")
+            assertArrayEquals(loader.readBytes(), tool.readBytes())
+            assertEquals("rwx------", mode(tool))
+            assertFalse(File(bin, "hetu_match.o").exists())
+            assertNotEquals(0, run(dir, EbpfMatcher.loaderCommand(bin.absolutePath, loader.absolutePath, "0".repeat(64), ".new.4")))
+            val manager = File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").readText()
+            assertTrue(manager.contains("else if(prefs.getBoolean(\"proxyVendorFirewallCleanup\",false)||colorOsFamily())appendEbpfLoader(cmd,stage,deploySuffix);"))
+            // The start passes the Google app IDs whether the cleanup is on or not (the check needs them).
+            assertTrue(manager.contains("cmd.append(\"export HETU_GMS_APPIDS=\").append(RootBridge.quote(gmsAppIds())).append(\"; \");"))
+            assertFalse(manager.contains("if(prefs.getBoolean(\"proxyVendorFirewallCleanup\",false))\n                cmd.append(\"export HETU_GMS_APPIDS="))
+            assertTrue(manager.contains("\"com.google.android.configupdater\""))
+        } finally { dir.deleteRecursively() }
+    }
+
     @Test fun aDigestMismatchFailsTheDeploymentAndLeavesNoTarget() {
         val dir = Files.createTempDirectory("hetu-ebpf-mismatch").toFile()
         try {
@@ -194,7 +215,9 @@ class EbpfMatcherApp105Test {
         val manager = File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").readText()
         assertTrue(manager.contains("boolean ebpf=prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false);"))
         assertTrue(manager.contains("cmd.append(EbpfMatcher.policyCommand(policyDir,ebpf));"))
-        assertTrue(manager.contains("if(ebpf)appendEbpfPayloads(cmd,stage,deploySuffix);"))
+        // 6.0.0: CNIP uses the object's CN programs where ipset is missing, so a CNIP policy deploys it too;
+        // whether the matcher itself runs stays gated by policy/ebpf above.
+        assertTrue(manager.contains("if(ebpf||!cnipBody.isEmpty())appendEbpfPayloads(cmd,stage,deploySuffix);"))
         val controller = File("src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt").readText()
         assertTrue(controller.contains(".putString(EbpfMatcher.PREF_STATE, status.optString(\"ebpf\", \"\"))"))
         assertTrue(controller.contains("root.ebpfHotUpdate(profile)"))

@@ -14,6 +14,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 import java.security.MessageDigest;
+import io.github.xgl34222220.hetu.panel.SingBoxPanelStore;
 
 /** Root transparent-proxy control plane plus private localhost Clash API bootstrap. */
 final class RootProxyManager {
@@ -563,6 +564,7 @@ final class RootProxyManager {
             profile=withoutAdblock(profile);
             adblock=null;
         }
+        if(ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX)recordSingBoxPanel(built.providers,built.config,ruleSetFiles);
         prefs.edit().putString("proxyCoreConversionWarnings",built.warningText())
                 .putBoolean("proxyCoreConversionNative",built.nativeSource)
                 .putInt("proxyCoreConversionNodes",built.nodes)
@@ -610,13 +612,15 @@ final class RootProxyManager {
      * One sing-box rule-set for localRuleSets: a copy younger than its update interval, else the URL and its
      * mirrors (a direct fetch: Hetu's own UID is never intercepted), else the last good copy.
      */
-    private byte[] fetchRuleSet(String url)throws IOException{
+    private byte[] fetchRuleSet(String url)throws IOException{return fetchRuleSet(url,false);}
+
+    /** force (a 规则集 update): always downloads, and null instead of the last good copy when no mirror answers. */
+    private byte[] fetchRuleSet(String url,boolean force)throws IOException{
         if(url==null||!(url.startsWith("https://")||url.startsWith("http://")))return null;
-        File dir=new File(context.getNoBackupFilesDir(),"core-ruleset-cache");
-        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建规则集缓存目录");
-        File cache=new File(dir,ProxyCoreConfig.ruleSetFileName(url,"binary"));
-        if(cache.isFile()&&cache.length()>0&&System.currentTimeMillis()-cache.lastModified()<RULESET_FRESH_MS)
+        File cache=ruleSetCache(url);
+        if(!force&&cache.isFile()&&cache.length()>0&&System.currentTimeMillis()-cache.lastModified()<RULESET_FRESH_MS)
             return Files.readAllBytes(cache.toPath());
+        File dir=cache.getParentFile();
         for(String candidate:ProxyCoreConfig.ruleSetMirrors(url)){
             checkStartIntent();
             HttpURLConnection connection=null;
@@ -641,7 +645,13 @@ final class RootProxyManager {
                 // The next mirror; the last good copy below when none answers.
             }finally{if(connection!=null)connection.disconnect();}
         }
-        return cache.isFile()&&cache.length()>0?Files.readAllBytes(cache.toPath()):null;
+        return !force&&cache.isFile()&&cache.length()>0?Files.readAllBytes(cache.toPath()):null;
+    }
+
+    private File ruleSetCache(String url)throws IOException{
+        File dir=new File(context.getNoBackupFilesDir(),"core-ruleset-cache");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建规则集缓存目录");
+        return new File(dir,ProxyCoreConfig.ruleSetFileName(url,"binary"));
     }
 
     private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock,RootProxyPolicy policy)throws IOException{
@@ -762,13 +772,12 @@ final class RootProxyManager {
      * rule list (.list, the text form the converter reads for Xray / V2Fly) younger than its 72 h update interval
      * is used as it is; a subscription is always fetched first.
      */
-    private String fetchProvider(String url)throws IOException{
+    private String fetchProvider(String url)throws IOException{return fetchProvider(url,true);}
+
+    /** lastGood false (a 订阅 update): null instead of the last good body when the download fails. */
+    private String fetchProvider(String url,boolean lastGood)throws IOException{
         if(url==null||!(url.startsWith("https://")||url.startsWith("http://")))return null;
-        File dir=new File(context.getCacheDir(),"core-provider-cache");
-        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建订阅缓存目录");
-        File cache;
-        try{cache=new File(dir,hex(MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8))));}
-        catch(java.security.NoSuchAlgorithmException impossible){throw new IOException(impossible);}
+        File cache=providerCache(url);
         boolean ruleList=url.endsWith(".list");
         if(ruleList&&cache.isFile()&&cache.length()>0&&System.currentTimeMillis()-cache.lastModified()<RULESET_FRESH_MS)
             return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
@@ -789,13 +798,152 @@ final class RootProxyManager {
                 }
                 String text=new String(body.toByteArray(),StandardCharsets.UTF_8);
                 try(FileOutputStream out=new FileOutputStream(cache,false)){out.write(body.toByteArray());out.getFD().sync();}
+                // Traffic and expiry of this download, for the sing-box 订阅 tab (Mihomo reads its own).
+                writeProviderInfo(cache,connection.getHeaderField("subscription-userinfo"));
                 return text;
             }catch(IOException failed){
                 // The next mirror; the last good body below when none answers.
             }finally{if(connection!=null)connection.disconnect();}
         }
-        if(cache.isFile())return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
+        if(lastGood&&cache.isFile())return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
         return null;
+    }
+
+    private File providerCache(String url)throws IOException{
+        File dir=new File(context.getCacheDir(),"core-provider-cache");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建订阅缓存目录");
+        try{return new File(dir,hex(MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8))));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IOException(impossible);}
+    }
+
+    private static void writeProviderInfo(File cache,String header){
+        File info=new File(cache.getPath()+".info");
+        if(header==null||header.trim().isEmpty()){info.delete();return;}
+        try{Files.write(info.toPath(),header.trim().getBytes(StandardCharsets.UTF_8));}catch(IOException ignored){info.delete();}
+    }
+
+    private static String readProviderInfo(File cache){
+        File info=new File(cache.getPath()+".info");
+        try{return info.isFile()?new String(Files.readAllBytes(info.toPath()),StandardCharsets.UTF_8).trim():"";}catch(IOException e){return "";}
+    }
+
+    // ------------------------------------------------------------------ sing-box 订阅 / 规则集
+
+    private static final Object SING_PANEL_LOCK=new Object();
+
+    static File singBoxPanelDir(Context c){return new File(c.getNoBackupFilesDir(),"core-panel");}
+
+    /**
+     * What the panel's 订阅 / 规则集 tabs show for sing-box (panel.SingBoxPanelStore): the converted
+     * proxy-providers with their nodes and last download, and every rule_set of the config this start
+     * deploys. A failure here never fails the start.
+     */
+    private void recordSingBoxPanel(List<ProxyCoreConfig.ProviderInfo> providers,String config,List<ProxyCoreConfig.RuleSetFile> files){
+        try{
+            JSONArray list=new JSONArray();
+            for(ProxyCoreConfig.ProviderInfo p:providers){
+                JSONObject o=new JSONObject().put("name",p.name).put("type",p.type).put("url",p.url)
+                        .put("nodes",new JSONArray(p.nodes)).put("fetchedNodes",-1);
+                if("http".equals(p.type)&&!p.url.isEmpty()){
+                    File cache=providerCache(p.url);
+                    if(cache.isFile())o.put("updatedAt",cache.lastModified()).put("info",readProviderInfo(cache));
+                }
+                list.put(o);
+            }
+            Map<String,ProxyCoreConfig.RuleSetFile> byTag=new HashMap<>();
+            for(ProxyCoreConfig.RuleSetFile f:files)byTag.put(f.tag,f);
+            JSONArray sets=new JSONArray();
+            JSONObject route=new JSONObject(config).optJSONObject("route");
+            JSONArray entries=route==null?null:route.optJSONArray("rule_set");
+            for(int i=0;entries!=null&&i<entries.length();i++){
+                JSONObject e=entries.optJSONObject(i);
+                if(e==null||e.optString("tag").isEmpty())continue;
+                String type=e.optString("type","local"),format=e.optString("format","binary");
+                JSONObject o=new JSONObject().put("tag",e.optString("tag")).put("type",type).put("format",format).put("rules",-1);
+                ProxyCoreConfig.RuleSetFile f=byTag.get(e.optString("tag"));
+                if(f!=null){
+                    File cache=ruleSetCache(f.url);
+                    o.put("url",f.url).put("path",f.path).put("rules",SingBoxPanelStore.ruleCount(f.body,format))
+                            .put("updatedAt",cache.isFile()?cache.lastModified():System.currentTimeMillis());
+                }else if("inline".equals(type))o.put("rules",SingBoxPanelStore.rulesCount(e.optJSONArray("rules")));
+                else if("remote".equals(type))o.put("url",e.optString("url"));
+                else o.put("path",e.optString("path"));
+                sets.put(o);
+            }
+            synchronized(SING_PANEL_LOCK){
+                SingBoxPanelStore.save(singBoxPanelDir(context),new JSONObject().put("providers",list).put("ruleSets",sets));
+            }
+        }catch(Exception ignored){}
+    }
+
+    /**
+     * 订阅 update for a sing-box core: downloads the subscription again (traffic, expiry, node count) into
+     * the cache the next start reads; the running core keeps its outbounds until then.
+     */
+    JSONObject refreshSingBoxProvider(String name)throws IOException{
+        RootBridge.requireWorkerThread();
+        JSONObject entry=SingBoxPanelStore.entry(SingBoxPanelStore.load(singBoxPanelDir(context)),"providers","name",name);
+        if(entry==null)throw new IOException("订阅不在当前运行的配置中，请刷新后重试");
+        String url=entry.optString("url");
+        if(!"http".equals(entry.optString("type"))||url.isEmpty())throw new IOException("此订阅写在配置文件里，无需在线更新");
+        String body=fetchProvider(url,false);
+        if(body==null)throw new IOException("订阅下载失败，请检查网络或订阅链接");
+        int nodes=ProxyCoreConfig.ProviderParser.parse(body).size();
+        File cache=providerCache(url);
+        synchronized(SING_PANEL_LOCK){
+            JSONObject meta=SingBoxPanelStore.load(singBoxPanelDir(context));
+            JSONObject e=SingBoxPanelStore.entry(meta,"providers","name",name);
+            if(e==null)throw new IOException("订阅不在当前运行的配置中，请刷新后重试");
+            try{e.put("updatedAt",cache.lastModified()).put("info",readProviderInfo(cache)).put("fetchedNodes",nodes);}
+            catch(org.json.JSONException impossible){throw new IOException(impossible);}
+            SingBoxPanelStore.save(singBoxPanelDir(context),meta);
+            return e;
+        }
+    }
+
+    /**
+     * 规则集 update for a sing-box core: downloads a rule-set Hetu deployed and replaces its file
+     * (temporary name, digest check, mv). sing-box reloads a changed local rule-set by itself, so the
+     * new rules apply at once without a restart.
+     */
+    JSONObject refreshSingBoxRuleSet(String tag)throws IOException{
+        RootBridge.requireWorkerThread();
+        JSONObject entry=SingBoxPanelStore.entry(SingBoxPanelStore.load(singBoxPanelDir(context)),"ruleSets","tag",tag);
+        if(entry==null)throw new IOException("规则集不在当前运行的配置中，请刷新后重试");
+        String type=entry.optString("type"),url=entry.optString("url"),path=entry.optString("path"),format=entry.optString("format","binary");
+        if("inline".equals(type))throw new IOException("内联规则集写在配置里，随配置生效，无需在线更新");
+        if("remote".equals(type))throw new IOException("此规则集由 sing-box 自行下载，重启代理时更新");
+        if(url.isEmpty())throw new IOException("本地规则集文件修改后由 sing-box 自动重新加载，无需在线更新");
+        String name=path.startsWith(SING_RULESET_DIR+"/")?path.substring(SING_RULESET_DIR.length()+1):"";
+        if(!name.equals(ProxyCoreConfig.ruleSetFileName(url,format)))throw new IOException("规则集文件位置异常，请重启代理后再试");
+        byte[] body=fetchRuleSet(url,true);
+        if(body==null)throw new IOException("规则集下载失败，请检查网络后重试");
+        if(!ProxyCoreConfig.ruleSetBody(body,format))throw new IOException("下载的内容不是有效的 sing-box 规则集");
+        File dir=new File(context.getCacheDir(),"hetu-root-stage/sing-ruleset-update");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建规则集临时目录");
+        File src=new File(dir,name);
+        Files.write(src.toPath(),body);
+        String sha;
+        try{sha=hex(MessageDigest.getInstance("SHA-256").digest(body));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IOException(impossible);}
+        String tmp=path+".new."+Long.toHexString(System.nanoTime());
+        RootBridge.Result r;
+        try{
+            r=boundedRootShell(context,"cp "+RootBridge.quote(src.getAbsolutePath())+" "+RootBridge.quote(tmp)
+                    +" && chmod 600 "+RootBridge.quote(tmp)+" && chown 0:0 "+RootBridge.quote(tmp)
+                    +" && test \"$(sha256sum "+RootBridge.quote(tmp)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(sha)
+                    +" && mv -f "+RootBridge.quote(tmp)+" "+RootBridge.quote(path)+" || { rm -f "+RootBridge.quote(tmp)+"; exit 1; }",15000L);
+        }finally{src.delete();}
+        if(!r.ok())throw new IOException("无法写入规则集文件："+r.output.trim());
+        synchronized(SING_PANEL_LOCK){
+            JSONObject meta=SingBoxPanelStore.load(singBoxPanelDir(context));
+            JSONObject e=SingBoxPanelStore.entry(meta,"ruleSets","tag",tag);
+            if(e==null)throw new IOException("规则集不在当前运行的配置中，请刷新后重试");
+            try{e.put("updatedAt",System.currentTimeMillis()).put("rules",SingBoxPanelStore.ruleCount(body,format));}
+            catch(org.json.JSONException impossible){throw new IOException(impossible);}
+            SingBoxPanelStore.save(singBoxPanelDir(context),meta);
+            return e;
+        }
     }
 
     private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
@@ -2032,7 +2180,9 @@ final class RootProxyManager {
             validateWithCoreCli(CONFIG,core,"最终启动配置");
             return;
         }
-        String cmd="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
+        // 6.0.0: exec, so the root timeout signals the check itself. A check left running after its shell was
+        // killed keeps run/cache.db locked; a core started meanwhile runs without its fake-IP records.
+        String cmd="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && exec "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
         RootBridge.Result r=boundedRootShell(context,cmd,30000L);
         if(r.ok())return;
         String d=r.output==null?"":r.output.trim().replace('\n',' ');
@@ -2174,9 +2324,9 @@ final class RootProxyManager {
             // The App answers what `settings get global private_dns_mode` would (a Java process
             // on the device, 0.3-0.8 s); boot/autostart starts without it still ask settings.
             cmd.append("export HETU_PRIVATE_DNS_MODE=").append(RootBridge.quote(privateDnsMode())).append("; ");
-            // Vendor GMS firewall cleanup: app IDs from PackageManager instead of pm/cmd package.
-            if(prefs.getBoolean("proxyVendorFirewallCleanup",false))
-                cmd.append("export HETU_GMS_APPIDS=").append(RootBridge.quote(gmsAppIds())).append("; ");
+            // Vendor GMS firewall cleanup, or with it off the read-only ColorOS eBPF check: app IDs
+            // from PackageManager instead of pm/cmd package.
+            cmd.append("export HETU_GMS_APPIDS=").append(RootBridge.quote(gmsAppIds())).append("; ");
         }
         cmd.append("exec ").append(RootBridge.quote(SCRIPT));
         for(String a:args)cmd.append(' ').append(RootBridge.quote(a==null?"":a));
@@ -2262,11 +2412,11 @@ final class RootProxyManager {
         return out.toString();
     }
 
-    /** App IDs (uid % 100000) of GMS, Play Store and GSF; "0" when none is installed. */
+    /** App IDs (uid % 100000) of GMS, Play Store, GSF and ConfigUpdater; "0" when none is installed. */
     private String gmsAppIds(){
         StringBuilder out=new StringBuilder();
         android.content.pm.PackageManager pm=context.getPackageManager();
-        for(String name:new String[]{"com.google.android.gms","com.android.vending","com.google.android.gsf"}){
+        for(String name:new String[]{"com.google.android.gms","com.android.vending","com.google.android.gsf","com.google.android.configupdater"}){
             try{
                 int app=pm.getApplicationInfo(name,0).uid%100000;
                 if(app>=10000&&app<=19999)out.append(out.length()==0?"":",").append(app);
@@ -2393,10 +2543,15 @@ final class RootProxyManager {
         // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
         String cnipPolicy=policyDir+"/cnip";
         boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
-        if(cnipV4||cnipV6){
-            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
-                    +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n";
-            cmd.append("; printf %s ").append(RootBridge.quote(body)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
+        // 6.0.0 (domestic video calls lagging): with the full bypass off, UDP to CN addresses skips the core's
+        // userspace relay by default; TCP still goes through the core's rules. AUTO: a kernel that can do it
+        // neither with ipset nor with the eBPF CN programs simply runs without it.
+        boolean cnUdp=!(cnipV4||cnipV6)&&prefs.getBoolean(CnipFakeIp.PREF_UDP_DIRECT,true);
+        String cnipBody=cnipV4||cnipV6?"V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
+                +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n"
+                :cnUdp?CnipFakeIp.udpPolicyBody(cnipForceUids()):"";
+        if(!cnipBody.isEmpty()){
+            cmd.append("; printf %s ").append(RootBridge.quote(cnipBody)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
                     .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
                     .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
         }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
@@ -2418,7 +2573,12 @@ final class RootProxyManager {
         // object are deployed only while it is on (hetu-root.sh ignores them when it is off).
         boolean ebpf=prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false);
         cmd.append(EbpfMatcher.policyCommand(policyDir,ebpf));
-        if(ebpf)appendEbpfPayloads(cmd,stage,deploySuffix);
+        // 6.0.0: CNIP uses the object's CN programs on kernels without ipset, so it is deployed whenever CNIP is on.
+        if(ebpf||!cnipBody.isEmpty())appendEbpfPayloads(cmd,stage,deploySuffix);
+        // The loader alone also reads and clears ColorOS's eBPF block list for the Google apps
+        // (google_firewall_ebpf): wherever the cleanup is on, and on OPPO / OnePlus / realme for
+        // the read-only check. It never loads the matcher while policy/ebpf is absent.
+        else if(prefs.getBoolean("proxyVendorFirewallCleanup",false)||colorOsFamily())appendEbpfLoader(cmd,stage,deploySuffix);
         if(deployCore){
             if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
                     .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
@@ -2517,6 +2677,21 @@ final class RootProxyManager {
         }catch(FileNotFoundException missing){return;}
         cmd.append(EbpfMatcher.payloadCommand(ROOT+"/bin",loader.getAbsolutePath(),RuntimeCompatibility14.sha256(loader),
                 object.getAbsolutePath(),RuntimeCompatibility14.sha256(object),deploySuffix));
+    }
+
+    /** OPPO, OnePlus and realme ship ColorOS (or a system built on it) with netd's eBPF block list. */
+    private static boolean colorOsFamily(){
+        String maker=(Build.MANUFACTURER+" "+Build.BRAND).toLowerCase(Locale.ROOT);
+        return maker.contains("oppo")||maker.contains("oneplus")||maker.contains("realme");
+    }
+
+    /** {@link #appendEbpfPayloads} without the matcher object: bin/hetu-bpf only. */
+    private void appendEbpfLoader(StringBuilder cmd,File stage,String deploySuffix)throws IOException{
+        String loaderAsset=EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS,this::packagedAsset);
+        if(loaderAsset==null)return;
+        File loader=new File(stage,EbpfMatcher.LOADER_NAME);
+        try{copyAsset(loaderAsset,loader,true);}catch(FileNotFoundException missing){return;}
+        cmd.append(EbpfMatcher.loaderCommand(ROOT+"/bin",loader.getAbsolutePath(),RuntimeCompatibility14.sha256(loader),deploySuffix));
     }
 
     /** hetu-root.sh reads which CLI bin/core speaks from this file (absent = Mihomo). */

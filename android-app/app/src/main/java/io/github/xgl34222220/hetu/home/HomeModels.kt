@@ -145,14 +145,32 @@ internal data class HomeConnectionObservation(
     val runtimeMessage: String = "",
     /** A generate_204 answered through the running core's policy listener for this runtime. */
     val egressVerified: Boolean = false,
+    /**
+     * 6.0.0: the Root watchdog's latest verdict for a request sent the way apps send it (fake IP, TPROXY):
+     * ok | proxy-down | dataplane-down | route-down | fakeip-lost | offline, blank before its first probe.
+     * The policy listener can answer while app traffic fails, so a failing verdict outranks [egressVerified].
+     */
+    val watchdogVerdict: String = "",
 ) {
+    /** The sentence the home card shows for a failing watchdog verdict, else blank. */
+    val egressFault: String get() = homeEgressFault(watchdogVerdict)
+
     val health: HomeConnectionHealth get() = when {
         controllerReadFailed -> HomeConnectionHealth.ControllerUnavailable
         takeoverHealthy == false -> HomeConnectionHealth.TakeoverDegraded
         !controllerReady || takeoverHealthy == null -> HomeConnectionHealth.Unconfirmed
-        egressVerified -> HomeConnectionHealth.Verified
+        egressVerified && egressFault.isEmpty() -> HomeConnectionHealth.Verified
         else -> HomeConnectionHealth.LocalReady
     }
+}
+
+/** 6.0.0: user-facing meaning of a failing Root watchdog data-plane verdict (blank for ok, offline or unknown). */
+internal fun homeEgressFault(verdict: String): String = when (verdict) {
+    "fakeip-lost" -> "外网异常：核心的假 IP 记录失效，河图正在自动重启核心"
+    "dataplane-down" -> "外网异常：请求没能经过核心，河图正在重查规则并重启核心"
+    "route-down" -> "外网异常：按当前规则访问外网失败，节点测速却正常，原因见通知"
+    "proxy-down" -> "外网异常：代理节点无响应，已让自动选择的节点组重新测速"
+    else -> ""
 }
 
 internal enum class HomeConnectionHealth(val caption: String) {

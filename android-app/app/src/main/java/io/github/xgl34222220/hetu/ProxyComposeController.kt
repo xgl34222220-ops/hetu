@@ -116,6 +116,8 @@ internal data class ProxyComposeState(
     val watchdog: Boolean = false,
     val dataPlaneHealthy: Boolean = false,
     val healthObserved: Boolean = false,
+    /** 6.0.0: the Root watchdog's latest data-plane verdict for the running core (status "egress"). */
+    val egressVerdict: String = "",
     val trafficMode: String = "",
     // Ephemeral authority from this read only; cached UI/health hints never arm
     // Android service recovery. This is independent from dataPlaneHealthy.
@@ -288,6 +290,7 @@ internal class ProxyComposeController(context: Context) {
                     .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                     .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                     .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
+                    .put("egress", prefs.getString("proxyRootEgressVerdict", "") ?: "")
                 else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
             }
         } else {
@@ -306,6 +309,7 @@ internal class ProxyComposeController(context: Context) {
                 .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                 .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                 .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
+                .put("egress", prefs.getString("proxyRootEgressVerdict", "") ?: "")
         }
         // A completed status observation supersedes the cached fast hint, including
         // a confirmed stopped core. Missing/failed observations keep only the hint.
@@ -334,6 +338,7 @@ internal class ProxyComposeController(context: Context) {
                     .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
                     .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
                     .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
+                    .putString("proxyRootEgressVerdict", status.optString("egress", ""))
                     // What 高级代理配置 shows under its switches: how DNS is really captured,
                     // and what the last vendor-firewall pass and resource tuning did.
                     .putString("proxyRootSystemDns", status.optString("systemDns", ""))
@@ -342,6 +347,7 @@ internal class ProxyComposeController(context: Context) {
                     .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
                     .putString("proxyRootIpv6DnsPolicy", status.optString("ipv6DnsPolicy", ""))
                     .putBoolean("proxyCnIpKernelTcpOnlyActive", status.optBoolean("cnipTcpOnly", false))
+                    .putBoolean("proxyCnIpKernelUdpOnlyActive", status.optBoolean("cnipUdpOnly", false))
                     .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
                     .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
                     .putString("proxyRootTuning", status.optString("tuning", ""))
@@ -476,6 +482,7 @@ internal class ProxyComposeController(context: Context) {
             watchdog = status.optBoolean("watchdog", false),
             dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
             healthObserved = healthObserved,
+            egressVerdict = if (running) status.optString("egress", "") else "",
             trafficMode = trafficMode,
             continuityRootObserved = continuityRootObserved,
             continuityAutomationOnly = continuityAutomationOnly,

@@ -40,6 +40,8 @@ internal class ToolsAdblockChain(
     val ipv6DnsPolicy: String = "",
     val cnip: String = "",
     val cnipTcpOnly: Boolean = false,
+    /** 6.0.0: the session bypasses only UDP to CN addresses (the default 国内 UDP 内核直连). */
+    val cnipUdpOnly: Boolean = false,
     /** The selected subscription has its own dns: block. */
     val sourceHasDns: Boolean = true,
     val recommendedDns: Boolean = false,
@@ -178,6 +180,7 @@ internal object ToolsRuntimeBridge {
             ipv6DnsPolicy = prefs.getString("proxyRootIpv6DnsPolicy", "").orEmpty(),
             cnip = if (running) prefs.getString("proxyCnIpKernelStatus", "").orEmpty() else "",
             cnipTcpOnly = prefs.getBoolean("proxyCnIpKernelTcpOnlyActive", false),
+            cnipUdpOnly = prefs.getBoolean("proxyCnIpKernelUdpOnlyActive", false),
             sourceHasDns = source == null || MihomoStartupConfig.sourceHasDns(source),
             recommendedDns = prefs.getBoolean("proxyRecommendedDns", false),
             appScope = profile.appScope.id,

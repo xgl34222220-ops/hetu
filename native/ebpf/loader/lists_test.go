@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"net/netip"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -80,5 +82,78 @@ func TestShippedCNSnapshotsFitTheMaps(t *testing.T) {
 		if err != nil || len(got) > 65536 {
 			t.Fatalf("%s: %d %v", c.file, len(got), err)
 		}
+	}
+}
+
+func TestVendorMapLabelNamesTheNetworkType(t *testing.T) {
+	for in, want := range map[string]string{
+		"/sys/fs/bpf/map_oplus-netd_app_wlan_socket_uid_limit_map": "wlan",
+		"/sys/fs/bpf/map_oplus-netd_app_qcom_socket_uid_limit_map": "qcom",
+		"/sys/fs/bpf/map_oplus-netd_app__socket_uid_limit_map":     "map",
+	} {
+		if got := vendorMapLabel(in); got != want {
+			t.Fatalf("%s: %q", in, got)
+		}
+	}
+	if got := vendorUID(nil, []uint32{10100}, true); got != "maps=0 present=0 removed=0 failed=0 names=-" {
+		t.Fatalf("no maps: %s", got)
+	}
+}
+
+// A real pinned map, where this host lets the test create one (root, bpffs): only the given
+// UIDs leave it, every other entry (the user's own per-app blocks) stays.
+func TestVendorUIDDeletesOnlyTheGivenUIDs(t *testing.T) {
+	if os.Geteuid() != 0 || !onBPFFS("/sys/fs/bpf") {
+		t.Skip("needs root and /sys/fs/bpf")
+	}
+	dir, err := os.MkdirTemp("/sys/fs/bpf", "hetu-vendor-test-")
+	if err != nil {
+		t.Skip("cannot pin: ", err)
+	}
+	defer os.RemoveAll(dir)
+	pin := func(name string, keySize uint32, keys ...uint32) string {
+		fd, err := mapCreate(1, keySize, 4, 16, 0, "hetu_vtest")
+		if err != nil {
+			t.Skip("bpf unavailable: ", err)
+		}
+		defer syscall.Close(fd)
+		for _, k := range keys {
+			key := make([]byte, keySize)
+			putNative32(key, k)
+			if err := mapUpdate(fd, key, []byte{1, 0, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		path := dir + "/" + name
+		if err := objPin(fd, path); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	wlan := pin("map_oplus-netd_app_wlan_socket_uid_limit_map", 4, 10100, 10200, 1010300)
+	odd := pin("map_oplus-netd_app_odd_socket_uid_limit_map", 8, 10100)
+	paths := []string{wlan, odd}
+	if got := vendorUID(paths, []uint32{10100, 1010300, 10999}, false); got != "maps=1 present=2 removed=0 failed=1 names=wlan" {
+		t.Fatalf("check: %s", got)
+	}
+	if got := vendorUID(paths, []uint32{10100, 1010300, 10999}, true); got != "maps=1 present=2 removed=2 failed=1 names=wlan" {
+		t.Fatalf("unblock: %s", got)
+	}
+	fd, err := objGet(wlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Close(fd)
+	keys, err := mapKeys(fd, 4)
+	if err != nil || len(keys) != 1 || binary.NativeEndian.Uint32(keys[0]) != 10200 {
+		t.Fatalf("left %v %v", keys, err)
+	}
+	ofd, err := objGet(odd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Close(ofd)
+	if left, err := mapKeys(ofd, 8); err != nil || len(left) != 1 {
+		t.Fatalf("a map with another key layout was touched: %v %v", left, err)
 	}
 }

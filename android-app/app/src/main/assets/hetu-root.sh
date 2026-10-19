@@ -112,6 +112,13 @@ CN4_ON=0
 CN6_ON=0
 CN_FORCE=""
 CN_TCPONLY=0
+# 6.0.0: UDPONLY = only UDP to CN addresses skips the core (video/voice calls, games); AUTO = the App's
+# default rather than a switch the user turned on, so a kernel that cannot do it simply runs without it.
+CN_UDPONLY=0
+CN_AUTO=0
+# 6.0.0: families cnip_prepare left for the eBPF backend (no ipset), installed by cnip_bpf_install.
+CN_BPF4=0
+CN_BPF6=0
 CN_CHAIN=""
 CNIP_STATE=off
 CNIP_REASON=""
@@ -134,6 +141,8 @@ EBPF_PIN=/sys/fs/bpf/hetu
 EBPF_TOOL="$BASE/bin/hetu-bpf"
 EBPF_OBJECT="$BASE/bin/hetu_match.o"
 EBPF_LISTS="$RUN/state/ebpf-lists"
+# Where ColorOS pins netd's per-UID network block maps (hetu-bpf vendor-uid reads them there).
+GOOGLE_VENDOR_BPF=/sys/fs/bpf
 EBPF_STATE=off
 EBPF_REASON=""
 # 1 only while capture rules are built for an active matcher; the Kill Switch guard never uses it.
@@ -190,6 +199,10 @@ WD_DP_PATH=/generate_204
 WD_DP_CN_HOSTS="www.baidu.com www.qq.com www.taobao.com"
 WD_DP_GROUP_MAX=12
 WD_DP_BUDGET=30
+# 6.0.0: Hetu's loopback HTTP listener in every core sits this far above the controller port
+# (MihomoStartupConfig.EGRESS_PROBE_PORT_OFFSET). The probe request sent through it takes the core's own
+# rules, groups and nodes with no TPROXY and no fake IP: it tells a capture / fake-IP fault from a routing one.
+WD_DP_EGRESS_OFFSET=60
 # 5.1.0: before a node is healed its connections are read twice this many seconds apart; one whose
 # download counter grew means the node is moving data (a probe that timed out behind a busy download).
 WD_BUSY_GAP=2
@@ -1132,6 +1145,55 @@ stopcore(){
   [ "$STOP_REMAIN" = 0 ] || return 1
   rm -f "$PIDFILE" "$MODEFILE"
 }
+# 6.0.0 (field report: only foreign sites fail, node delays are fine, stop/start does not help). Mihomo opens
+# $RUN/cache.db (selected nodes, the persisted fake-IP pool) with a 1 s lock wait and, when another process
+# still holds the lock, runs without it: every fake-IP connection then fails for the core's whole life while
+# real-IP traffic and node delay tests keep working. sing-box refuses to start instead. Host-reproduced with
+# Mihomo v1.19.31 and sing-box 1.14.3. PIDs holding a lock on file $1 (/proc/locks by inode, then checked
+# against the holder's open files).
+cache_lock_pids(){
+  CLP_I=$(ls -i "$1" 2>/dev/null | awk 'NR == 1 {print $1}')
+  case "$CLP_I" in ''|*[!0-9]*) return 0;; esac
+  for CLP_P in $(awk -v ino="$CLP_I" '{ for (i = 2; i <= NF; i++) if ($i ~ /^[0-9a-fA-F]+:[0-9a-fA-F]+:[0-9]+$/) { split($i, a, ":"); if (a[3] == ino && $(i-1) ~ /^[0-9]+$/) print $(i-1); break } }' "${CACHE_LOCKS:-/proc/locks}" 2>/dev/null | sort -u); do
+    for CLP_FD in "${CORE_PROCFS:-/proc}/$CLP_P/fd/"*; do
+      if [ "$CLP_FD" -ef "$1" ]; then printf '%s\n' "$CLP_P"; break; fi
+    done
+  done
+}
+# Before a Mihomo or sing-box core starts: Hetu's own core processes still holding $RUN/cache.db (a leftover
+# core, a config check) end; a lock that stays held moves the file aside (cache.db.held-<time>, kept) so the
+# new core starts on a fresh one. CACHE_GUARD_NOTE reports it for the start message.
+core_cache_guard(){
+  CACHE_GUARD_NOTE=""
+  case "${START_KIND:-mihomo}" in mihomo|sing-box) ;; *) return 0;; esac
+  CCG_F="$RUN/cache.db"; [ -f "$CCG_F" ] || return 0
+  CCG_P=$(cache_lock_pids "$CCG_F" | tr '\n' ' '); CCG_P=${CCG_P% }
+  [ -n "$CCG_P" ] || return 0
+  CCG_OWN=""
+  for CCG_X in $CCG_P; do
+    case "$(readlink "${CORE_PROCFS:-/proc}/$CCG_X/exe" 2>/dev/null)" in "$BASE/bin/core"|"$BASE/bin/core (deleted)") CCG_OWN="$CCG_OWN $CCG_X"; kill "$CCG_X" 2>/dev/null || true;; esac
+  done
+  CCG_N=0
+  while [ -n "$CCG_OWN" ] && [ "$CCG_N" -lt 40 ]; do
+    [ -n "$(cache_lock_pids "$CCG_F")" ] || break
+    [ "$CCG_N" != 20 ] || for CCG_X in $CCG_OWN; do kill -9 "$CCG_X" 2>/dev/null || true; done
+    sleep 0.05; CCG_N=$((CCG_N+1))
+  done
+  CCG_LEFT=$(cache_lock_pids "$CCG_F" | tr '\n' ' '); CCG_LEFT=${CCG_LEFT% }
+  if [ -z "$CCG_LEFT" ]; then
+    wd_log "start: $CCG_F was locked by Hetu's own process(es)$CCG_OWN; ended them"
+    return 0
+  fi
+  CCG_TO="$RUN/cache.db.held-$(date +%s)"
+  if mv "$CCG_F" "$CCG_TO" 2>/dev/null; then
+    wd_log "start: $CCG_F stays locked by pid(s) $CCG_LEFT; moved to $CCG_TO, the core starts with a new one"
+    CACHE_GUARD_NOTE="核心缓存文件被其他进程（PID $CCG_LEFT）占用，已换用新的缓存文件，之前选择的节点可能恢复为默认"
+  else
+    wd_log "start: $CCG_F stays locked by pid(s) $CCG_LEFT and could not be moved"
+    CACHE_GUARD_NOTE="核心缓存文件被其他进程（PID $CCG_LEFT）占用且无法替换，外网连接可能失败；请重启手机"
+  fi
+  return 0
+}
 
 # procfs reports a zero stat size even when this file contains IPv6 addresses.
 # Install the selected IPv6 policy whenever the kernel supports IPv6, including
@@ -1586,7 +1648,7 @@ bypass6(){
 # ---------------------------------------------------------------- CNIP (ipset)
 cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
 cnip_load_policy(){
-  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0
+  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0; CN_UDPONLY=0; CN_AUTO=0
   [ -r "$BASE/policy/cnip" ] || return 1
   # The iptables CIDR tree (no ipset binary) is opt-in only: on ColorOS it left ~1000 mangle
   # chains behind and slowed every later iptables call until starts timed out (4.0.0).
@@ -1594,6 +1656,9 @@ cnip_load_policy(){
   CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
   # Optional (default off): only TCP to CN addresses bypasses the core; UDP/QUIC still reaches it.
   [ "$(cnip_policy_value TCPONLY)" = 1 ] && CN_TCPONLY=1
+  # 6.0.0: only UDP (the App's default, AUTO=1: video/voice calls and games skip the core's userspace relay).
+  if [ "$CN_TCPONLY" != 1 ] && [ "$(cnip_policy_value UDPONLY)" = 1 ]; then CN_UDPONLY=1; fi
+  [ "$(cnip_policy_value AUTO)" != 1 ] || CN_AUTO=1
   bool "$CNP_V4" || CNP_V4=0; bool "$CNP_V6" || CNP_V6=0
   split_safe_uids "$CN_FORCE" || CN_FORCE=""
   [ "$CNP_V4" = 1 ] || [ "$CNP_V6" = 1 ]
@@ -1601,9 +1666,10 @@ cnip_load_policy(){
 # What the running session installed (watchdog Kill Switch, status, reload read it back).
 cnip_load_session(){
   CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
-  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
-  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || return 0
+  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0; CN_UDPONLY=0
+  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ] || return 0
   [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
+  [ "$(sed -n 's/^CNIP_UDPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_UDPONLY=1
   [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
   [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
   CN_FORCE=$(sed -n 's/^CNIP_FORCE=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -1668,21 +1734,33 @@ cnip_import(){
 }
 # Start: decide which families bypass in the kernel. Never fails the start; degrades instead.
 cnip_prepare(){
-  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""
+  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""; CN_BPF4=0; CN_BPF6=0
   cnip_load_policy || { CN_FORCE=""; return 0; }
-  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; return 0;; esac
+  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; cnip_auto_off; return 0;; esac
   if ! cnip_capable; then
     # No ipset: the iptables CIDR tree (installed by cnip_xt_install after the start's cleanup).
     CNIP_REASON=ipset-unavailable
-    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; return 0; fi
-    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; return 0; fi
+    # 6.0.0: otherwise the CN programs of hetu_match.o (one xt_bpf rule per chain backed by LPM maps), set up by
+    # cnip_bpf_install after the start's cleanup; until then nothing references them (CN4_ON/CN6_ON stay 0).
+    if [ "$CN_XT" != 1 ] && [ -x "$EBPF_TOOL" ] && [ -r "$EBPF_OBJECT" ]; then
+      if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN_BPF4=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
+      if [ "$CNP_V6" = 1 ]; then
+        if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then
+          if [ -s "$CN_FILE6" ]; then CN_BPF6=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
+        else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
+      fi
+      if [ "$CN_BPF4" = 1 ] || [ "$CN_BPF6" = 1 ]; then CNIP_STATE=ebpf; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
+      return 0
+    fi
+    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; return 0; fi
+    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; cnip_auto_off; return 0; fi
     if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN4_ON=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
     if [ "$CNP_V6" = 1 ]; then
       if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables && has ip6tables-restore; then
         if [ -s "$CN_FILE6" ]; then CN6_ON=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
       else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
     fi
-    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; fi
+    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
     return 0
   fi
   if [ "$CNP_V4" = 1 ]; then cnip_import 4 && CN4_ON=1; fi
@@ -1690,7 +1768,35 @@ cnip_prepare(){
     if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then cnip_import 6 && CN6_ON=1
     else CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v6-mode-$START_V6"; fi
   fi
-  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; fi
+  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
+}
+# 6.0.0: the App's default (AUTO=1) is not a switch the user turned on: a kernel that cannot do it runs without
+# it (CNIP off, the reason kept for diagnostics) instead of reporting a degraded CNIP.
+cnip_auto_off(){ [ "$CN_AUTO" = 1 ] || return 0; CNIP_STATE=off; CN_FORCE=""; CN4_ON=0; CN6_ON=0; }
+# 6.0.0: what cnip_prepare chose for a kernel without ipset, after the start's cleanup (which drops stale pins)
+# and before any capture rule: hetu_match.o is loaded here unless the opt-in matcher already loaded it, xt_bpf
+# must accept the CN program and the LPM map takes the CN list (hetu-bpf sync-cn, same bounds as ipset).
+# Any failure leaves CNIP degraded (off for the App's default) with nothing referencing a pin.
+cnip_bpf_install(){
+  [ "$CNIP_STATE" = ebpf ] || return 0
+  if [ "$EBPF_STATE" != active ]; then
+    CBI_OUT=$(ebpf_tool load "$EBPF_OBJECT" "$EBPF_PIN" 2>/dev/null) || { cnip_bpf_fail "$(ebpf_reason "$CBI_OUT")"; return 0; }
+  fi
+  for CBI_F in 4 6; do
+    if [ "$CBI_F" = 4 ]; then [ "$CN_BPF4" = 1 ] || continue; CBI_FILE="$CN_FILE4"; CBI_XT=xt4; else [ "$CN_BPF6" = 1 ] || continue; CBI_FILE="$CN_FILE6"; CBI_XT=xt6; fi
+    if ! ebpf_xt_probe "$CBI_XT" "hetu_cn$CBI_F"; then CNIP_REASON="$CNIP_REASON,v$CBI_F-xt-bpf-unsupported"; continue; fi
+    CBI_OUT=$(ebpf_tool sync-cn "$EBPF_PIN" "$CBI_F" "$CBI_FILE" 2>/dev/null) || { CNIP_REASON="$CNIP_REASON,v$CBI_F-$(ebpf_reason "$CBI_OUT")"; continue; }
+    if [ "$CBI_F" = 4 ]; then CN4_ON=1; else CN6_ON=1; fi
+    printf '%s\n' "$CBI_OUT" | sed -n "s/^cn$CBI_F=//p" > "$RUN/state/cnip-bpf$CBI_F.count" 2>/dev/null || true
+    cnip_file_sig "$CBI_FILE" > "$RUN/state/cnip-bpf$CBI_F.stamp" 2>/dev/null || true
+  done
+  [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ] || cnip_bpf_fail unusable
+  return 0
+}
+cnip_bpf_fail(){
+  CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}bpf-${1:-error}"; CNIP_STATE=degraded; CN_FORCE=""; CN4_ON=0; CN6_ON=0
+  [ "$EBPF_STATE" = active ] || ebpf_unload || true
+  cnip_auto_off
 }
 # After the bypass/LAN returns of a capture or guard chain: CN destinations RETURN (no proxy, no
 # guard). $4: owner = local chain, exempt UIDs jump with -g to "<chain>_T" which holds every
@@ -1699,9 +1805,15 @@ cnip_prepare(){
 cn_split(){
   CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
   case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
-  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
+  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"; [ "$CN_UDPONLY" != 1 ] || CS_P="-p udp"
   # ipset: the set match; iptables tree: the CN verdict bit HETU_CNC stored on the connection.
   CS_M="-m set --match-set $CS_SET dst"; [ "$CNIP_STATE" != iptables ] || CS_M="-m connmark --mark $CN_CT_CN/$CN_CT_CN"
+  if [ "$CNIP_STATE" = ebpf ]; then
+    # 6.0.0 eBPF backend. The Kill Switch guard outlives the session's pins (they go at stop): it never
+    # references one, so with this backend it keeps CN destinations blocked like every other one.
+    case "$CS_C" in "$KOUT"|"$KOUT"_*|"$KFWD"|"$KFWD"_*) return 0;; esac
+    case "$CS_BIN" in xt6*) CS_M="-m bpf --object-pinned $EBPF_PIN/prog_hetu_cn6";; *) CS_M="-m bpf --object-pinned $EBPF_PIN/prog_hetu_cn4";; esac
+  fi
   if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
     CS_TAIL="${CS_C}_T"
     if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
@@ -1753,6 +1865,7 @@ cnip_reload(){ (
   trap 'release_lock' EXIT
   cnip_load_session
   [ "$CNIP_STATE" != iptables ] || cnip_xt_reload
+  [ "$CNIP_STATE" != ebpf ] || cnip_bpf_reload
   if [ "$CNIP_STATE" != ipset ]; then printf '{"ok":true,"reloaded":false,"cnip":"%s","message":"内核 CNIP 未生效，数据已保存，下次启动使用"}\n' "$CNIP_STATE"; exit 0; fi
   CR_DUE=0
   if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
@@ -1910,6 +2023,28 @@ cnip_xt_install(){
   if [ "$CN6_ON" = 1 ]; then cnip_xt_build 6 || CN6_ON=0; else cnip_xt_drop 6 || true; fi
   if [ "$CN4_ON" != 1 ] && [ "$CN6_ON" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; fi
   return 0
+}
+# 6.0.0: new CN data into the running session's LPM maps (hetu-bpf validates it first; invalid data keeps the map).
+cnip_bpf_reload(){
+  # Unchanged data (same cksum as the stamp of the last sync) leaves the maps alone: the watchdog asks every ~12 s.
+  CR_DUE=0
+  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-bpf4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-bpf6.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CR_DUE" = 0 ]; then printf '{"ok":true,"reloaded":false,"cnip":"ebpf","message":"CNIP 数据未变化"}\n'; exit 0; fi
+  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
+  CR_FAILED=0; CNIP_REASON=""
+  for CR_F in 4 6; do
+    if [ "$CR_F" = 4 ]; then [ "$CN4_ON" = 1 ] || continue; CR_FILE="$CN_FILE4"; else [ "$CN6_ON" = 1 ] || continue; CR_FILE="$CN_FILE6"; fi
+    [ "$(cnip_file_sig "$CR_FILE")" != "$(cat "$RUN/state/cnip-bpf$CR_F.stamp" 2>/dev/null)" ] || continue
+    if CR_OUT=$(ebpf_tool sync-cn "$EBPF_PIN" "$CR_F" "$CR_FILE" 2>/dev/null); then
+      printf '%s\n' "$CR_OUT" | sed -n "s/^cn$CR_F=//p" > "$RUN/state/cnip-bpf$CR_F.count" 2>/dev/null || true
+      cnip_file_sig "$CR_FILE" > "$RUN/state/cnip-bpf$CR_F.stamp" 2>/dev/null || true
+    else CR_FAILED=1; CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CR_F-$(ebpf_reason "$CR_OUT")"; fi
+  done
+  printf '%s cnip-reload(ebpf) failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
+  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ebpf","message":"CNIP eBPF 映射已热更新"}\n'
+  else printf '{"ok":false,"reloaded":false,"cnip":"ebpf","message":"CNIP 新数据无效或写入失败，继续使用原映射"}\n'; fi
+  exit 0
 }
 cnip_xt_reload(){
   CR_DUE=0
@@ -2837,8 +2972,8 @@ wd_selfheal_init(){
   # uid 0: the uid 0-9999 RETURN rules let it go direct unless owner_return added `! -d <fake range>`,
   # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
   # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
-  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BAD_NAMES=""
-  WD_OFF_N=0; WD_OFF_NEXT=0
+  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BAD_NAMES=""
+  WD_OFF_N=0; WD_OFF_NEXT=0; WD_CACHE_SEEN=0
   WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
   WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
   if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
@@ -3032,6 +3167,16 @@ wd_selfheal_tick(){
     fi
   fi
   [ "$WD_LIVE_FAIL" = 0 ] || return 0
+  # 6.0.0: a Mihomo that could not open its cache.db at start (another process held the lock) keeps no
+  # fake-IP record for its whole life when the pool is persisted; checked once per core, at its first tick.
+  if [ "$WD_CACHE_SEEN" = 0 ]; then
+    WD_CACHE_SEEN=1
+    if wd_cache_lost && grep -Eq '^[[:space:]]*store-fake-ip:[[:space:]]*true' "$WD_CFG" 2>/dev/null; then
+      WD_DP_DETAIL="core log: cache file could not be opened at start"; wd_egress_state fakeip-lost
+      wd_log "core $COREPID runs without its cache file; fake-IP connections cannot be mapped back"
+      wd_fakeip_heal; return 0
+    fi
+  fi
   # The controller answers but the DNS listener may still be wedged.
   if [ "$WD_CP" != 0 ] && [ "$WD_NOW" -ge "$WD_DNS_AT" ]; then
     WD_DNS_AT=$((WD_NOW+WD_DNS_EVERY)); WD_HTTP_TIMEOUT=3; wd_dns_probe; WDT_RC=$?
@@ -3098,6 +3243,68 @@ wd_fetch(){
   WF_L=$(head -n 1 "$WF_O" 2>/dev/null); rm -f "$WF_O"
   case "$WF_L" in HTTP/*' '[1-5][0-9][0-9]*) return 0;; esac
   return 1
+}
+# 6.0.0: HTTP GET http://$1$2 through the core's loopback HTTP listener on port $3. 0 = the site answered,
+# 1 = no answer within WD_DP_TIMEOUT or a 5xx (Mihomo and sing-box answer 502 when their dial fails or a
+# rule rejects), 2 = no tool.
+wd_fetch_proxied(){
+  WFP_T="$WD_DP_TIMEOUT"; WFP_C=""
+  if has curl; then
+    WFP_C=$(curl -sS -m "$WFP_T" -o /dev/null -w '%{http_code}' -x "http://127.0.0.1:$3" "http://$1$2" 2>/dev/null)
+  else
+    WFP_BB=""
+    for WFP_B in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do [ -x "$WFP_B" ] && { WFP_BB="$WFP_B"; break; }; done
+    if [ -n "$WFP_BB" ]; then
+      WFP_C=$(http_proxy="http://127.0.0.1:$3" timeout "$((WFP_T+1))" "$WFP_BB" wget -S -q -T "$WFP_T" -O /dev/null "http://$1$2" 2>&1 | awk '$1 ~ /^HTTP\// {c=$2} END {print c}')
+    else
+      has nc || return 2
+      WFP_O="${WD_TMP:-/tmp/.hetu-wf.$$}.pfetch"; : > "$WFP_O" 2>/dev/null || return 1
+      { printf 'GET http://%s%s HTTP/1.0\r\nHost: %s\r\nUser-Agent: hetu-watchdog\r\nConnection: close\r\n\r\n' "$1" "$2" "$1"
+        WFP_I=0; while [ "$WFP_I" -lt $((WFP_T*5)) ] && [ ! -s "$WFP_O" ]; do sleep 0.2 2>/dev/null || sleep 1; WFP_I=$((WFP_I+1)); done
+        [ ! -s "$WFP_O" ] || sleep 0.2 2>/dev/null || true; } 2>/dev/null \
+        | timeout "$((WFP_T+1))" nc -w "$WFP_T" 127.0.0.1 "$3" > "$WFP_O" 2>/dev/null
+      WFP_C=$(head -n 1 "$WFP_O" 2>/dev/null | awk '$1 ~ /^HTTP\// {print $2}'); rm -f "$WFP_O"
+    fi
+  fi
+  case "$WFP_C" in [1-4][0-9][0-9]) return 0;; esac
+  return 1
+}
+# 6.0.0: what the core log says about the probe host $1 after byte $2 of $LOG (written while the request
+# through the core's own listener ran). WD_ROUTE_VIA = the rule's target (group or DIRECT/REJECT), WD_ROUTE_NODE
+# = the outbound actually used when logged, WD_ROUTE_RULE = the rule, WD_ROUTE_ERR = the dial error. Mihomo:
+#   [TCP] dial G (match Domain/x) src --> host:80 error: ...      [TCP] src --> host:80 match R(x) using G[node]
+# sing-box: open connection to host:80 using outbound/socks[tag]: ...
+wd_route_seen(){
+  WD_ROUTE_VIA=""; WD_ROUTE_NODE=""; WD_ROUTE_RULE=""; WD_ROUTE_ERR=""
+  [ -r "$LOG" ] || return 1
+  WRS_L=$(tail -c +"$(( ${2:-0} + 1 ))" "$LOG" 2>/dev/null | grep -F -e "--> $1:" -e "connection to $1:" | tail -n 1 | sed 's/^time="[^"]*" level=[a-z]* msg="//; s/"$//')
+  [ -n "$WRS_L" ] || return 1
+  case "$WRS_L" in
+    *'] dial '*' (match '*') '*' --> '*' error: '*)
+      WRS_R=${WRS_L#*'] dial '}; WD_ROUTE_VIA=${WRS_R%%' (match '*}
+      WRS_R=${WRS_R#*' (match '}; WD_ROUTE_RULE=${WRS_R%%') '*}; WD_ROUTE_ERR=${WRS_L#*' error: '};;
+    *'] dial '*' --> '*' error: '*)
+      WRS_R=${WRS_L#*'] dial '}; WD_ROUTE_VIA=${WRS_R%% *}; WD_ROUTE_ERR=${WRS_L#*' error: '};;
+    *' match '*' using '*)
+      WRS_R=${WRS_L#*' match '}; WD_ROUTE_RULE=${WRS_R%%' using '*}; WRS_R=${WRS_L##*' using '}
+      case "$WRS_R" in *'['*']') WD_ROUTE_VIA=${WRS_R%%'['*}; WD_ROUTE_NODE=${WRS_R#*'['}; WD_ROUTE_NODE=${WD_ROUTE_NODE%']'};; *) WD_ROUTE_VIA="$WRS_R";; esac;;
+    *' using outbound/'*)
+      WRS_R=${WRS_L#*' using outbound/'}; WRS_R=${WRS_R#*'['}; WD_ROUTE_VIA=${WRS_R%%']'*}
+      case "$WRS_L" in *"]: "*) WD_ROUTE_ERR=${WRS_L#*"$WD_ROUTE_VIA]: "};; esac;;
+    *' outbound/'*']: outbound connection to '*)
+      WRS_R=${WRS_L#*' outbound/'}; WRS_R=${WRS_R#*'['}; WD_ROUTE_VIA=${WRS_R%%']'*};;
+    *) return 1;;
+  esac
+  WD_ROUTE_RULE=${WD_ROUTE_RULE%/}; WD_ROUTE_ERR=$(printf '%s' "$WD_ROUTE_ERR" | cut -c1-160)
+  [ -n "$WD_ROUTE_VIA" ]
+}
+# 6.0.0: 0 when this core's log says Mihomo could not open $RUN/cache.db (another process held its lock for more
+# than Mihomo's 1 s wait). Mihomo then runs without it for its whole life and its persisted fake-IP pool keeps no
+# record: every fake-IP connection fails while real-IP traffic and node delay tests still work. The log is
+# emptied at each start, so a line belongs to the running core.
+wd_cache_lost(){
+  [ -r "$LOG" ] || return 1
+  grep -F '[CacheFile] ' "$LOG" 2>/dev/null | grep -q "can't open cache file"
 }
 # Selector/URLTest/Fallback/LoadBalance groups from GET /proxies -> "$WD_TMP.groups"
 # (type TAB name TAB now TAB fixed; fixed = the node the user pinned in an auto-select group, else empty).
@@ -3173,18 +3380,52 @@ wd_dp_probe(){
   # The controller refused the secret meanwhile: no verdict to act on.
   [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
   [ -z "$WD_DP_BAD" ] || WD_DP_DETAIL="$WD_DP_DETAIL; no answer through $WD_DP_BAD"
-  WD_DP_CLASS=$(wd_dp_classify "$WDP_CN" "$WD_DP_BAD" "$WD_DP_SCANNED")
-  [ "$WD_DP_CLASS" != skip ] || WD_DP_DETAIL="$WD_DP_DETAIL; every proxy group answers through the controller"
+  # 6.0.0: the same name again. A core that lost its fake-IP store hands out a new address on every query
+  # and maps none of them back (host-reproduced: Mihomo with its cache.db locked by another process).
+  WDP_LOST=0
+  if wd_resolve "$WD_DP_HOST" && wd_in_cidr "$WD_RES_IP" "$WD_FAKE4" && [ "$WD_RES_IP" != "$WDP_IP" ]; then
+    WDP_LOST=1; WD_DP_DETAIL="$WD_DP_DETAIL; $WD_DP_HOST now resolves to $WD_RES_IP (fake-IP record lost)"
+  fi
+  if wd_cache_lost; then WDP_LOST=1; WD_DP_DETAIL="$WD_DP_DETAIL; core log: cache file could not be opened"; fi
+  # 6.0.0: the same request through the core's own HTTP listener (rules -> group -> node; no TPROXY, no fake
+  # IP). Answering there means captured requests do not get through; failing there too, while every group
+  # answers its delay test, means the rules send the site somewhere else (DIRECT, a reject, an unscanned group).
+  WDP_EX=""; WD_ROUTE_VIA=""; WD_ROUTE_NODE=""; WD_ROUTE_RULE=""; WD_ROUTE_ERR=""
+  if [ -z "$WD_DP_BAD" ] && [ "$WDP_CN" != fail ] && [ "$WDP_LOST" = 0 ]; then
+    WDP_AT=$(wc -c < "$LOG" 2>/dev/null | tr -d ' '); case "$WDP_AT" in ''|*[!0-9]*) WDP_AT=0;; esac
+    wd_fetch_proxied "$WD_DP_HOST" "$WD_DP_PATH" "$((WD_CP+WD_DP_EGRESS_OFFSET))"
+    case "$?" in
+      0) WDP_EX=ok; WD_DP_DETAIL="$WD_DP_DETAIL; through the core's own listener it answers";;
+      1) WDP_EX=fail; WD_DP_DETAIL="$WD_DP_DETAIL; through the core's own listener it fails too"
+         if wd_route_seen "$WD_DP_HOST" "$WDP_AT"; then
+           WD_DP_DETAIL="$WD_DP_DETAIL (${WD_ROUTE_RULE:+rule $WD_ROUTE_RULE, }via $WD_ROUTE_VIA${WD_ROUTE_NODE:+[$WD_ROUTE_NODE]}${WD_ROUTE_ERR:+: $WD_ROUTE_ERR})"
+         fi;;
+    esac
+  fi
+  WD_DP_CLASS=$(wd_dp_classify "$WDP_CN" "$WD_DP_BAD" "$WD_DP_SCANNED" "$WDP_EX" "$WDP_LOST")
+  # A probe that queued behind busy downloads looks the same (5.1.0): while proxied connections still receive
+  # data there is no verdict.
+  if [ "$WDP_CN" != fail ]; then
+    case "$WD_DP_CLASS" in dataplane-down|route-down)
+      wd_conn_busy "*proxied*"
+      if [ "$WD_CLOSE_BUSY" -gt 0 ]; then WD_DP_CLASS=skip; WD_DP_DETAIL="$WD_DP_DETAIL; $WD_CLOSE_BUSY proxied connection(s) receiving data"; fi;;
+    esac
+  fi
+  [ "$WD_DP_CLASS" != skip ] || [ -n "$WDP_EX" ] || WD_DP_DETAIL="$WD_DP_DETAIL; every proxy group answers through the controller"
   return 0
 }
-# $1 CN fetch through the data plane (ok | fail | empty), $2 failing groups, $3 groups measured.
-# A failing group wins (proxy-down); dataplane-down only when the CN fetch failed and no group is bad.
-# 5.1.0: no failing group is no verdict (skip). Every group answering through the controller while the
-# probe timed out is what a probe queued behind a busy download looks like; 5.0.0 closed every connection
-# through the MATCH group then, the downloads included.
+# $1 CN fetch through the data plane (ok | fail | empty), $2 failing groups, $3 groups measured,
+# $4 (6.0.0) the probe through the core's own HTTP listener (ok | fail | empty), $5 (6.0.0) 1 = fake-IP record lost.
+# A lost fake-IP record wins (fakeip-lost: only a new core helps), then a failing group (proxy-down);
+# dataplane-down when the CN fetch failed or the core's own listener reached the site; route-down when that
+# failed too. 5.1.0: without any of these there is no verdict (skip): every group answering through the
+# controller while the probe timed out is what a probe queued behind a busy download looks like.
 wd_dp_classify(){
-  if [ -n "$2" ]; then echo proxy-down
+  if [ "${5:-0}" = 1 ]; then echo fakeip-lost
+  elif [ -n "$2" ]; then echo proxy-down
   elif [ "$1" = fail ]; then echo dataplane-down
+  elif [ "${4:-}" = ok ]; then echo dataplane-down
+  elif [ "${4:-}" = fail ]; then echo route-down
   else echo skip; fi
 }
 # A whole-phone outage verdict ($1 = what failed). After WIFI_HEAL_OFFLINE_LIMIT in a row a detached wifi-heal
@@ -3213,13 +3454,15 @@ wd_conn_match(){
   # Objects split at "{": a connection's id, then (after its metadata) its counters and chains.
   WD_CLOSE_SEEN=$(tr '{' '\n' < "$WD_TMP.cn" | awk -v names="$1" -v max="$WD_CLOSE_MAX" -v ids="$2" '
     function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); gsub(/\\"/, "\"", x); return x }
-    BEGIN { printf "" > ids; n = split(names, a, "\t"); for (i = 1; i <= n; i++) if (a[i] != "") want[a[i]] = 1 }
+    BEGIN { printf "" > ids; anyp = (names == "*proxied*"); n = split(names, a, "\t"); for (i = 1; i <= n; i++) if (a[i] != "") want[a[i]] = 1 }
     { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; dl = 0; seen++ }
       if (id != "" && (i = index($0, "\"download\":")) > 0) dl = substr($0, i + 11) + 0
       if (id != "" && (i = index($0, "\"chains\":[")) > 0) {
         s = substr($0, i + 10); j = index(s, "]"); if (j) s = substr(s, 1, j - 1)
         hit = 0; m = split(s, c, "\",\"")
-        for (k = 1; k <= m; k++) { x = c[k]; gsub(/^"|"$/, "", x); if (u(x) in want) hit = 1 }
+        # 6.0.0 "*proxied*": every connection whose outbound (first chain entry) is not direct or a reject.
+        if (anyp) { x = c[1]; gsub(/^"|"$/, "", x); hit = (x != "" && x !~ /^(DIRECT|direct|REJECT|REJECT-DROP|PASS|COMPATIBLE|block|reject)$/) }
+        for (k = 1; k <= m && !anyp; k++) { x = c[k]; gsub(/^"|"$/, "", x); if (u(x) in want) hit = 1 }
         if (hit && taken < max) { print id "\t" dl > ids; taken++ }
         id = "" } }
     END { print seen + 0 }')
@@ -3321,7 +3564,70 @@ wd_dataplane_heal(){
     if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
   else
     wd_log "self-heal: data plane still down; restart limit reached ($WD_RESTART_MAX per ${WD_RESTART_WINDOW}s), waiting"
+    # 6.0.0: re-checked rules and restarted cores did not help; say so once, with what else takes the traffic.
+    if [ "$WD_DP_NOTIFIED" = 0 ]; then
+      WD_DP_NOTIFIED=1
+      WDH_OTHER=$(foreign_tun_links 2>/dev/null | tr '\n' ' '); WDH_OTHER=${WDH_OTHER% }
+      wd_notify "dataplane-down restart-limit" "外网请求没能经过河图核心：已重新检查透明代理规则并重启核心 $WD_RESTART_MAX 次，仍未恢复。${WDH_OTHER:+检测到其他 VPN/TUN 接口在线（$WDH_OTHER），它可能抢先接管了流量，请先关闭该应用。}请在河图中停止后重新启动代理；如果还不行，请重启手机。"
+    fi
   fi
+}
+# 6.0.0 (field report: only foreign sites fail, node delays are fine, stop/start and restarts do not help).
+# The core lost its fake-IP records: a new address for the same name on every query, or the log says its
+# cache.db could not be opened. Every fake-IP connection fails until a new core runs; the start that restarts
+# it first ends Hetu's own processes holding the file and moves a file that stays locked aside
+# (core_cache_guard). No second probe and no backoff: the verdict is unambiguous.
+wd_fakeip_heal(){
+  if wd_restart_allowed; then
+    wd_log "self-heal: the core lost its fake-IP records ($WD_DP_DETAIL); restarting the core"
+    if wd_restart_core; then
+      wd_notify "fakeip-lost restarted" "河图核心的假 IP 记录失效（核心缓存文件被占用），走代理的外网连接全部失败，节点测速却正常。已自动重启核心并换用可用的缓存文件。"
+      rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0
+    fi
+  else
+    wd_log "self-heal: the core lost its fake-IP records; restart limit reached ($WD_RESTART_MAX per ${WD_RESTART_WINDOW}s), waiting"
+  fi
+  if [ "$WD_FAKEIP_NOTIFIED" = 0 ]; then
+    WD_FAKEIP_NOTIFIED=1
+    wd_notify "fakeip-lost restart-failed" "河图核心的假 IP 记录失效，走代理的外网连接全部失败，节点测速却正常；自动重启核心没有成功。请在河图中停止后重新启动代理；如果还不行，请重启手机。"
+  fi
+}
+# 6.0.0: the probe site fails through the core's own listener too while every scanned group answers its delay
+# test, so the rules send it somewhere the scan did not cover. Where the core log names a proxy group or node it
+# is healed like a dead node (its auto-select groups re-test, only its connections close). DIRECT, a reject or
+# an empty group (COMPATIBLE) is the configuration's choice: it is reported once per outage with the rule, and
+# nothing is changed. Without a log line only the finding is reported.
+wd_route_heal(){
+  WRH_END="$WD_ROUTE_NODE"
+  if [ -z "$WRH_END" ] && [ -n "$WD_ROUTE_VIA" ]; then
+    # Follow the groups' current choice from the rule's target to the outbound actually used.
+    [ -s "$WD_TMP.groups" ] || wd_groups || true
+    WRH_END="$WD_ROUTE_VIA"; WRH_I=0
+    while [ "$WRH_I" -lt 6 ]; do
+      WRH_NEXT=$(awk -F '\t' -v g="$WRH_END" '$2 == g {print $3; exit}' "$WD_TMP.groups" 2>/dev/null)
+      [ -n "$WRH_NEXT" ] && [ "$WRH_NEXT" != "$WRH_END" ] || break
+      WRH_END="$WRH_NEXT"; WRH_I=$((WRH_I+1))
+    done
+  fi
+  case "$WRH_END" in
+    DIRECT|direct) WRH_WHAT="直连（DIRECT）";;
+    REJECT|REJECT-DROP|block|reject) WRH_WHAT="拒绝（REJECT）";;
+    COMPATIBLE) WRH_WHAT="空策略组（组里没有可用节点，等同直连）";;
+    '') WRH_WHAT="";;
+    *) wd_node_heal "$WD_ROUTE_VIA$WD_TAB${WD_ROUTE_NODE:+$WD_ROUTE_NODE$WD_TAB}" "$WD_DP_DETAIL"; return 0;;
+  esac
+  if [ -n "$WRH_WHAT" ]; then
+    wd_log "self-heal: $WD_DP_HOST is routed to $WRH_END (${WD_ROUTE_RULE:+rule $WD_ROUTE_RULE, }target $WD_ROUTE_VIA); configuration choice, nothing changed"
+    if [ "$WRH_END" = "$WD_ROUTE_VIA" ]; then
+      WRH_MSG="外网不通：配置里的规则${WD_ROUTE_RULE:+「$WD_ROUTE_RULE」}把外网请求直接设为$WRH_WHAT，所以外网打不开，节点测速却正常。请检查当前配置的规则，或换用其他配置。"
+    else
+      WRH_MSG="外网不通：配置的规则${WD_ROUTE_RULE:+「$WD_ROUTE_RULE」}把外网请求分到了「$WD_ROUTE_VIA」，它现在实际走的是$WRH_WHAT，所以外网打不开，节点测速却正常。请在河图「面板 › 策略组」里把「$WD_ROUTE_VIA」改选为代理节点，或检查订阅是否为空。"
+    fi
+  else
+    wd_log "self-heal: $WD_DP_HOST fails through the core's own listener too while every scanned group answers ($WD_DP_DETAIL); nothing changed"
+    WRH_MSG="外网不通：直接通过河图核心访问 $WD_DP_HOST 也失败，但各策略组测速都正常。可能是规则把外网分到了直连、拒绝，或分到了未参与测速的策略组。请在河图「面板 › 策略组」里检查外网用的策略组当前选择。"
+  fi
+  if [ "$WD_ROUTE_NOTIFIED" = 0 ]; then WD_ROUTE_NOTIFIED=1; wd_notify "route-down ${WRH_END:-unknown}" "$WRH_MSG"; fi
 }
 wd_dataplane_tick(){
   WD_DP_AT=$((WD_NOW+WD_DP_EVERY))
@@ -3335,7 +3641,7 @@ wd_dataplane_tick(){
       [ -z "$WD_DP_DETAIL" ] || { WD_DP_FAIL=0; WD_DP_LAST=skip; }; return 0;;
     ok)
       if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
-      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
+      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
       wd_egress_state ok; return 0;;
     offline)
       [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
@@ -3344,6 +3650,11 @@ wd_dataplane_tick(){
       WD_DP_AT=$((WD_NOW+WD_DP_RETRY)); wd_offline_seen "$WD_DP_DETAIL"; return 0;;
   esac
   WD_OFF_N=0
+  # 6.0.0: lost fake-IP records need a new core at once (wd_fakeip_heal: restart budget, no backoff).
+  if [ "$WDT_C" = fakeip-lost ]; then
+    WD_DP_FAIL=0; WD_DP_LAST="$WDT_C"; wd_egress_state "$WDT_C"; WD_DP_AT=$((WD_NOW+WD_DP_RETRY))
+    wd_log "data-plane probe: $WDT_C ($WD_DP_DETAIL)"; wd_fakeip_heal; return 0
+  fi
   if [ "$WDT_C" = "$WD_DP_LAST" ]; then WD_DP_FAIL=$((WD_DP_FAIL+1)); else WD_DP_FAIL=1; WD_DP_LAST="$WDT_C"; fi
   wd_egress_state "$WDT_C"
   wd_log "data-plane probe: $WDT_C ($WD_DP_DETAIL) $WD_DP_FAIL/$WD_DP_LIMIT"
@@ -3352,7 +3663,7 @@ wd_dataplane_tick(){
   WD_DP_FAIL=0; WD_DP_AT=$((WD_NOW+WD_DP_EVERY))
   if [ "$WD_NOW" -lt "$WD_DP_NEXT" ]; then wd_log "data-plane probe: $WDT_C persists; next self-heal action in $((WD_DP_NEXT-WD_NOW))s (backoff)"; return 0; fi
   WD_DP_NEXT=$((WD_NOW+WD_DP_BACKOFF)); WD_DP_BACKOFF=$((WD_DP_BACKOFF*2)); [ "$WD_DP_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_DP_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
-  if [ "$WDT_C" = proxy-down ]; then wd_proxy_heal; else wd_dataplane_heal; fi
+  case "$WDT_C" in proxy-down) wd_proxy_heal;; route-down) wd_route_heal;; *) wd_dataplane_heal;; esac
 }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; WD_GENERATION="${11:-}"
@@ -3376,7 +3687,7 @@ watchdog(){
     if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
       MISS=0; H_TICK=$((H_TICK+1))
       if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
-        case "$CNIP_STATE" in ipset|iptables) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
+        case "$CNIP_STATE" in ipset|iptables|ebpf) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
       wd_selfheal_tick
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
@@ -3620,19 +3931,57 @@ google_firewall_uids(){
   for GF_USER in $GF_USERS; do
     (cmd package list packages -U --user "$GF_USER" 2>/dev/null ||
       pm list packages -U --user "$GF_USER" 2>/dev/null) |
-      awk '$1=="package:com.google.android.gms" || $1=="package:com.android.vending" || $1=="package:com.google.android.gsf" {
+      awk '$1=="package:com.google.android.gms" || $1=="package:com.android.vending" || $1=="package:com.google.android.gsf" || $1=="package:com.google.android.configupdater" {
         for(i=2;i<=NF;i++) if($i ~ /^uid:[0-9]+$/) {sub(/^uid:/,"",$i); if($i>=10000) print $i}
       }'
   done | sort -nu
+}
+# ColorOS / Oplus netd lists the Google apps in its cgroup eBPF per-UID block maps (one per
+# network type) while a transparent proxy runs, out of sight of iptables, and lists them again at
+# boot and within seconds of an interface change. hetu-bpf deletes exactly the given UIDs there;
+# every other entry is the user's own per-app "no WLAN / no mobile data" switch and stays.
+google_firewall_vendor_maps(){
+  [ -x "$EBPF_TOOL" ] || return 1
+  ls "$GOOGLE_VENDOR_BPF" 2>/dev/null | grep -q '^map_oplus-netd_app_.*_socket_uid_limit_map$'
+}
+# google_firewall_ebpf check|unblock <uids, one per line>: run-file google-firewall-ebpf keeps the
+# last pass (listed = Google entries found before deleting) and the session's removals so far.
+# It is rewritten only when that changes, not on every quiet watchdog pass.
+google_firewall_ebpf(){
+  GE_MODE="$1"
+  google_firewall_vendor_maps || return 0
+  GE_LIST=$(printf '%s\n' "$2" | grep -E '^[0-9]+$' | tr '\n' ','); GE_LIST="${GE_LIST%,}"
+  [ -n "$GE_LIST" ] || return 0
+  GE_OUT=$(timeout -s TERM -k 1 5 "$EBPF_TOOL" vendor-uid "$GE_MODE" "$GE_LIST" 2>/dev/null | head -n 1 | tr -cd 'a-z0-9=, ')
+  GE_MAPS=0; GE_PRESENT=0; GE_REMOVED=0; GE_FAILED=1; GE_NAMES=-
+  for GE_F in $GE_OUT; do
+    case "$GE_F" in
+      maps=[0-9]*) GE_MAPS="${GE_F#maps=}";; present=[0-9]*) GE_PRESENT="${GE_F#present=}";;
+      removed=[0-9]*) GE_REMOVED="${GE_F#removed=}";; failed=[0-9]*) GE_FAILED="${GE_F#failed=}";;
+      names=?*) GE_NAMES="${GE_F#names=}";;
+    esac
+  done
+  GE_OLD=$(head -n 1 "$RUN/google-firewall-ebpf" 2>/dev/null)
+  GE_TOTAL=$(printf '%s\n' "$GE_OLD" | sed -n 's/.*bpfremoved=\([0-9][0-9]*\).*/\1/p')
+  GE_TOTAL=$((${GE_TOTAL:-0}+GE_REMOVED))
+  GE_LINE="bpfmode=$GE_MODE bpfmaps=$GE_MAPS bpfnames=$GE_NAMES bpflisted=$GE_PRESENT bpfremoved=$GE_TOTAL bpffailed=$GE_FAILED"
+  [ "${GE_OLD% bpfat=*}" != "$GE_LINE" ] || return 0
+  GE_AT=$(date '+%Y-%m-%dT%H:%M:%S%z')
+  printf '%s bpfat=%s\n' "$GE_LINE" "$GE_AT" > "$RUN/google-firewall-ebpf" 2>/dev/null || true
+  [ "$GE_REMOVED" = 0 ] || printf '%s ebpf %s removed=%s\n' "$GE_AT" "$GE_NAMES" "$GE_REMOVED" >> "$RUN/google-firewall.log"
 }
 google_firewall_cleanup(){
   # Caller owns the existing Root transaction lock. Never flush a system chain.
   GF_UIDS=$(google_firewall_uids)
   GF_PRESENT=""
   if [ -z "$GF_UIDS" ]; then
+    rm -f "$RUN/google-firewall-uids"
     printf 'uids=0 chains= at=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$RUN/google-firewall-detail" 2>/dev/null || true
     return 0
   fi
+  # The watchdog's quick eBPF pass between two full passes reuses these instead of asking pm.
+  [ "$(cat "$RUN/google-firewall-uids" 2>/dev/null)" = "$GF_UIDS" ] || printf '%s\n' "$GF_UIDS" > "$RUN/google-firewall-uids" 2>/dev/null || true
+  google_firewall_ebpf unblock "$GF_UIDS"
   GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
   GF_FILE="$RUN/.google-firewall.$$"
   for GF_TOOL in xt4q xt6q; do
@@ -3675,22 +4024,43 @@ google_firewall_cleanup(){
     tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
   fi
 }
+# Switch on: a full pass (pm UIDs, vendor iptables chains, eBPF maps) once a minute and the eBPF
+# maps alone with the cached UIDs on every other watchdog pass (~12 s), since ColorOS lists the
+# Google apps again within seconds. Switch off: only a read-only eBPF check once a minute, with the
+# UIDs the start resolved, so the settings page can say the restriction is there.
 google_firewall_maintain(){ (
   trap 'release_lock' EXIT
   GF_PID="${1:-}"
-  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
+  GF_CLEAN=$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)
+  case "$GF_CLEAN" in 1) ;; 0) [ -s "$RUN/google-firewall-uids" ] || exit 0;; *) exit 0;; esac
   [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
   monotonic_seconds || exit 0
   GF_NOW="$MONO_SECONDS"; GF_LAST=$(cat "$RUN/google-firewall-at" 2>/dev/null || true)
+  GF_DUE=1
   case "$GF_LAST" in ''|*[!0-9]*) ;; *)
-    if [ "$GF_NOW" -ge "$GF_LAST" ] && [ $((GF_NOW-GF_LAST)) -lt 60 ]; then exit 0; fi;;
+    if [ "$GF_NOW" -ge "$GF_LAST" ] && [ $((GF_NOW-GF_LAST)) -lt 60 ]; then GF_DUE=0; fi;;
   esac
+  if [ "$GF_DUE" = 0 ]; then
+    # Only Google's own entries leave a system map: no Hetu state changes, so no transaction lock.
+    [ "$GF_CLEAN" = 1 ] && [ -s "$RUN/google-firewall-uids" ] || exit 0
+    google_firewall_ebpf unblock "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"
+    exit 0
+  fi
   acquire_lock || exit 0
   [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
-  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
+  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = "$GF_CLEAN" ] || exit 0
   printf '%s\n' "$GF_NOW" > "$RUN/google-firewall-at"
-  google_firewall_cleanup
+  if [ "$GF_CLEAN" = 1 ]; then google_firewall_cleanup
+  else google_firewall_ebpf check "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"; fi
 ); }
+# Switch off: one read-only look at the eBPF maps at start, with the App's app IDs (no pm call).
+google_firewall_detect(){
+  [ -n "${START_GMS_APPIDS:-}" ] && google_firewall_vendor_maps || return 0
+  GD_UIDS=$(google_firewall_uids)
+  [ -n "$GD_UIDS" ] || return 0
+  printf '%s\n' "$GD_UIDS" > "$RUN/google-firewall-uids" 2>/dev/null || true
+  google_firewall_ebpf check "$GD_UIDS"
+}
 
 install_capture_rules(){
   start_stage "install-ipv4-tproxy"
@@ -3848,6 +4218,7 @@ start(){
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
+  core_cache_guard
   : > "$LOG" || fail "无法准备核心日志"; start_log_notices "$START_CFG"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
   core_identity_confirm "$START_PID" || { rm -f "$RUN/state/identity.cache" 2>/dev/null; fail "核心隔离身份验证失败"; }
   start_stage "wait-listeners"
@@ -3875,6 +4246,7 @@ start(){
   ebpf_prepare
   # CNIP without ipset: the iptables tree goes in before any capture rule tests its verdict bit.
   start_stage "cnip-chain"
+  cnip_bpf_install
   cnip_xt_install
   start_stage "install-capture-batch"
   xt_batch_begin || fail "无法准备防火墙批量规则"
@@ -3904,7 +4276,7 @@ start(){
   # Finish the immutable session before its integrity snapshot. Updating it after
   # health_record would invalidate every status check and disable owned-rule repair.
   printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\nCNIP_UDPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && echo "$CN_TCPONLY" || echo 0)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && echo "$CN_UDPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
   printf 'EBPF_MATCH=%s\nEBPF_REASON=%s\n' "$EBPF_STATE" "$EBPF_REASON" >> "$SESSION" || { fail "无法记录 eBPF 匹配状态，已停止本次启动"; }
   printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
@@ -3924,8 +4296,9 @@ start(){
   health_record || { fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
   start_selfheal_record "$@"
-  rm -f "$RUN/google-firewall-at"
+  rm -f "$RUN/google-firewall-at" "$RUN/google-firewall-ebpf" "$RUN/google-firewall-uids"
   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
+  [ "$START_VENDOR_CLEAN" = 1 ] || google_firewall_detect
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
   transaction_current || fail "启动事务已撤销"
   # Optional session daemon (network match / traffic); its failure never fails the start.
@@ -3935,6 +4308,7 @@ start(){
   net_recover_async start
   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE,ebpf=$EBPF_STATE${EBPF_REASON:+,ebpfReason=$EBPF_REASON}"
   [ -z "$FOREIGN_WARN" ] || DESC="$DESC；注意：$FOREIGN_WARN"
+  [ -z "${CACHE_GUARD_NOTE:-}" ] || DESC="$DESC；注意：$CACHE_GUARD_NOTE"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
 
@@ -4020,6 +4394,7 @@ status(){
   DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
   PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
   GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
+  GFEV=$(head -n 1 "$RUN/google-firewall-ebpf" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -'); [ -z "$GFEV" ] || GFDV="${GFDV:+$GFDV }$GFEV"
   TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
   case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
@@ -4151,11 +4526,15 @@ status(){
     if [ "$CN6_ON" = 1 ]; then CNIP6N=$(cat "$RUN/state/cnip-xt6.count" 2>/dev/null); xt6q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v6-chain-missing"; fi
     case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
     case "$CNIPR" in *chain-missing*) CNIP_STATE=degraded;; esac
+  elif [ "$CNIP_STATE" = ebpf ]; then
+    [ "$CN4_ON" != 1 ] || CNIP4N=$(cat "$RUN/state/cnip-bpf4.count" 2>/dev/null); [ "$CN6_ON" != 1 ] || CNIP6N=$(cat "$RUN/state/cnip-bpf6.count" 2>/dev/null)
+    case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
+    if { [ "$CN4_ON" = 1 ] && [ ! -e "$EBPF_PIN/prog_hetu_cn4" ]; } || { [ "$CN6_ON" = 1 ] && [ ! -e "$EBPF_PIN/prog_hetu_cn6" ]; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}pins-missing"; fi
   fi
   ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
-  # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | offline), else empty.
+  # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | route-down | fakeip-lost | offline), else empty.
   EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"cnipUdpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_UDPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.

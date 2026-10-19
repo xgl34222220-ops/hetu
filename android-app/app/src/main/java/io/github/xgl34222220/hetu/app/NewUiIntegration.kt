@@ -71,6 +71,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
             takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
             runtimeMessage = vm.state.message,
             egressVerified = vm.state.running && vm.egressVerified,
+            watchdogVerdict = if (vm.state.running) vm.state.egressVerdict else "",
         ),
         lastGood = lastGood,
         lastGoodRunning = lastGoodRunning,

@@ -185,6 +185,7 @@ internal fun HetuPanelV2(
                     val fresh = repo.refreshProvider(name)
                     if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
                     subscriptionUpdates.remove(name)
+                    if (io.github.xgl34222220.hetu.ProxyCoreSupport.localProviders(prefs)) say("订阅已更新，重启代理后使用新的节点列表")
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
@@ -195,7 +196,10 @@ internal fun HetuPanelV2(
         onUpdateAllSubscriptions = {
             providers.forEach { subscriptionUpdates[it.name] = PanelUpdate.Updating }
             scope.launch {
-                try { providers = repo.refreshSubscriptions(); say("订阅已更新") }
+                try {
+                    providers = repo.refreshSubscriptions()
+                    say(if (io.github.xgl34222220.hetu.ProxyCoreSupport.localProviders(prefs)) "订阅已更新，重启代理后使用新的节点列表" else "订阅已更新")
+                }
                 catch (cancel: CancellationException) { throw cancel }
                 catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, "订阅更新失败")) }
                 finally { subscriptionUpdates.clear() }
@@ -219,7 +223,7 @@ internal fun HetuPanelV2(
             }
         },
         onUpdateAllRuleSets = {
-            ruleSets.forEach { ruleSetUpdates[it.name] = PanelUpdate.Updating }
+            ruleSets.filter { it.vehicleType.equals("HTTP", true) }.forEach { ruleSetUpdates[it.name] = PanelUpdate.Updating }
             scope.launch {
                 try { ruleSets = repo.refreshRuleSets(); say("规则集已更新") }
                 catch (cancel: CancellationException) { throw cancel }

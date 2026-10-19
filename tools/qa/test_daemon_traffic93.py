@@ -229,13 +229,17 @@ class DaemonTraffic93(unittest.TestCase):
         self.assertTrue(json.loads(r.stdout.strip().splitlines()[-1])['ok'], r.stdout)
 
     def monitor_pids(self):
-        out = []
+        found = {}
         for proc in Path('/proc').iterdir():
             if not proc.name.isdigit(): continue
-            try: argv = (proc / 'cmdline').read_bytes().split(b'\0')
-            except OSError: continue
-            if str(self.script).encode() in argv and b'monitor' in argv: out.append(int(proc.name))
-        return out
+            try:
+                argv = (proc / 'cmdline').read_bytes().split(b'\0')
+                ppid = int(next(l for l in (proc / 'status').read_text().splitlines() if l.startswith('PPid:')).split()[1])
+            except (OSError, StopIteration, ValueError): continue
+            if str(self.script).encode() in argv and b'monitor' in argv: found[int(proc.name)] = ppid
+        # A running monitor's own command substitutions are forks with the same argv: only
+        # processes whose parent is not a monitor are monitor instances.
+        return [pid for pid, ppid in found.items() if ppid not in found]
 
     def procs_with(self, needle):
         out = []

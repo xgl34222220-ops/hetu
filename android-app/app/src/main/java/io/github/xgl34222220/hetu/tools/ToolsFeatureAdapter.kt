@@ -259,6 +259,14 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                 prefs.edit().putBoolean("proxyCnIpKernelTcpOnly", on).putBoolean("proxyRootSettingsDirty", true).apply()
                 changed()
             },
+            loadCnIpUdp = {
+                prefs.getBoolean(io.github.xgl34222220.hetu.CnipFakeIp.PREF_UDP_DIRECT, true) to
+                    prefs.getBoolean("proxyCnIpKernelUdpOnlyActive", false)
+            },
+            setCnIpUdp = { on ->
+                prefs.edit().putBoolean(io.github.xgl34222220.hetu.CnipFakeIp.PREF_UDP_DIRECT, on).putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },

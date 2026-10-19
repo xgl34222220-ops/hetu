@@ -483,6 +483,10 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
 当前配置没有 rule-providers|This configuration has no rule-providers|目前設定沒有 rule-providers|В конфигурации нет rule-providers
 没有匹配的规则集|No matching rule sets|沒有符合的規則集|Нет подходящих наборов правил
 %d 条规则|%d rules|%d 條規則|Правил: %d
+规则数未知|Rule count unknown|規則數未知|Число правил неизвестно
+写在配置中，随配置生效|Written in the config; applies with it|寫在設定中，隨設定生效|Записан в конфигурации и действует вместе с ней
+本地文件，修改后自动生效|Local file; changes apply automatically|本機檔案，修改後自動生效|Локальный файл; изменения применяются автоматически
+由核心自行下载，重启代理时更新|Downloaded by the core; updates when the proxy restarts|由核心自行下載，重新啟動代理時更新|Загружается ядром; обновляется при перезапуске прокси
 更新规则集|Update rule set|更新規則集|Обновить набор правил
 没有匹配的日志|No matching logs|沒有符合的日誌|Нет подходящих записей
 当前等级下暂无日志|No logs at this level yet|目前等級下暫無日誌|На этом уровне записей пока нет
@@ -888,6 +892,7 @@ Mihomo DNS 转发|Mihomo DNS forwarding|Mihomo DNS 轉送|Пересылка DNS
 内存限制|Memory limit|記憶體限制|Ограничение памяти
 厂商防火墙|Vendor firewall|廠商防火牆|Брандмауэр производителя
 启动时清理|Clear on start|啟動時清理|Очищать при запуске
+清理 Google 联网限制|Clear Google network blocks|清理 Google 連網限制|Снимать сетевые ограничения Google
 性能模式|Performance mode|效能模式|Режим производительности
 磁盘 I/O 权重|Disk I/O weight|磁碟 I/O 權重|Вес дискового ввода-вывода
 资源限制|Resource limits|資源限制|Ограничения ресурсов
@@ -978,6 +983,9 @@ eBPF 重定向到 TUN|eBPF redirect into TUN|eBPF 重新導向至 TUN|Перен
 Go 运行时的软上限：接近时更积极回收，不会结束核心；不低于 32M|A soft limit for the Go runtime: it collects harder near the limit and never kills the core; at least 32M|Go 執行階段的軟上限：接近時更積極回收，不會結束核心；不低於 32M|Мягкий предел для среды Go: у предела память освобождается активнее, ядро не завершается; не менее 32M
 0 最优先，7 最靠后|0 is the highest priority, 7 the lowest|0 最優先，7 最靠後|0 — высший приоритет, 7 — низший
 删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用|Removes vendor firewall rules that block Google services; only useful on systems that have such chains|刪除廠商防火牆裡攔截 Google 服務的規則，只在帶有這類規則鏈的系統上有用|Удаляет правила файрвола производителя, блокирующие сервисы Google; полезно только там, где такие цепочки есть
+解除系统对 Google Play 服务、Play 商店、GSF 和 ConfigUpdater 的联网限制：OPPO、一加、中兴的厂商规则链，以及 ColorOS 的 eBPF 联网限制名单。只删这几个 Google 应用的条目，你给其它应用设的联网开关不受影响。默认关闭，重启代理后生效|Lifts system network blocks on Google Play services, the Play Store, GSF and ConfigUpdater: the vendor chains of OPPO, OnePlus and ZTE, and the ColorOS eBPF block list. Only these Google apps' entries are removed; network switches you set for other apps stay. Off by default; takes effect after restarting the proxy|解除系統對 Google Play 服務、Play 商店、GSF 和 ConfigUpdater 的連網限制：OPPO、一加、中興的廠商規則鏈，以及 ColorOS 的 eBPF 連網限制名單。只刪這幾個 Google 應用程式的條目，你給其它應用程式設的連網開關不受影響。預設關閉，重新啟動代理後生效|Снимает системные сетевые ограничения для сервисов Google Play, Play Маркета, GSF и ConfigUpdater: цепочки производителя OPPO, OnePlus и ZTE, а также список блокировок eBPF в ColorOS. Удаляются только записи этих приложений Google; сетевые запреты, заданные вами для других приложений, остаются. По умолчанию выключено, действует после перезапуска прокси
+检测到 ColorOS 正在限制 Google 服务联网，Play 商店会因此提示“出了点问题”。打开后重启代理即可解除|ColorOS is blocking Google services from the network, which makes the Play Store show "Something went wrong". Turn this on and restart the proxy to lift it|偵測到 ColorOS 正在限制 Google 服務連網，Play 商店會因此提示「發生錯誤」。開啟後重新啟動代理即可解除|ColorOS блокирует сеть для сервисов Google, из-за этого Play Маркет пишет «Что-то пошло не так». Включите и перезапустите прокси, чтобы снять блокировку
+本机有 ColorOS 的 eBPF 联网限制名单，运行中约每 12 秒检查一次。本次已解除 %s 条 Google 限制|This device has the ColorOS eBPF block list; it is checked about every 12 seconds while running. %s Google blocks lifted this session|本機有 ColorOS 的 eBPF 連網限制名單，執行中約每 12 秒檢查一次。本次已解除 %s 條 Google 限制|На устройстве есть список блокировок eBPF ColorOS; во время работы он проверяется примерно раз в 12 секунд. Снято блокировок Google за сеанс: %s
 没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
 本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
 本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
@@ -991,6 +999,10 @@ private val vocabularyConnection = """
 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
 接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
+外网异常：核心的假 IP 记录失效，河图正在自动重启核心|Internet trouble: the core lost its fake-IP records; Hetu is restarting the core|外網異常：核心的假 IP 記錄失效，河圖正在自動重新啟動核心|Сбой интернета: ядро потеряло записи fake-IP; Hetu перезапускает ядро
+外网异常：请求没能经过核心，河图正在重查规则并重启核心|Internet trouble: requests do not get through the core; Hetu is re-checking the rules and restarting the core|外網異常：請求沒能經過核心，河圖正在重查規則並重新啟動核心|Сбой интернета: запросы не проходят через ядро; Hetu проверяет правила и перезапускает ядро
+外网异常：按当前规则访问外网失败，节点测速却正常，原因见通知|Internet trouble: sites fail under the current rules while node delays are fine; see the notification|外網異常：按目前規則存取外網失敗，節點測速卻正常，原因見通知|Сбой интернета: сайты не открываются по текущим правилам, хотя задержка узлов в норме; подробности в уведомлении
+外网异常：代理节点无响应，已让自动选择的节点组重新测速|Internet trouble: a proxy node does not answer; auto-select groups are re-testing|外網異常：代理節點無回應，已讓自動選擇的節點組重新測速|Сбой интернета: узел не отвечает; группы автовыбора перепроверяются
 配置选择|Configurations|設定選擇|Конфигурации
 当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
 内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
@@ -1388,6 +1400,14 @@ private val vocabularyCnipSpeed = """
 国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
 内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
 内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)
+内核 eBPF 生效（本机没有 ipset）|Kernel eBPF active (this device has no ipset)|核心 eBPF 生效（本機沒有 ipset）|eBPF в ядре активен (на устройстве нет ipset)
+国内 UDP 内核直连|Domestic UDP direct in the kernel|國內 UDP 核心直連|Внутренний UDP напрямую в ядре
+已开启内核绕过：国内 TCP 和 UDP 都不经过核心|Kernel bypass is on: domestic TCP and UDP both skip the core|已開啟核心繞過：國內 TCP 和 UDP 都不經過核心|Обход в ядре включён: внутренний TCP и UDP идут мимо ядра прокси
+视频 / 语音通话、游戏发往国内 IP 的 UDP 不经过核心，减少卡顿；TCP 仍经核心规则。默认开启|UDP to domestic IPs (video / voice calls, games) skips the core to reduce lag; TCP still follows the core rules. On by default|視訊 / 語音通話、遊戲發往國內 IP 的 UDP 不經過核心，減少卡頓；TCP 仍經核心規則。預設開啟|UDP к внутренним IP (видео- и голосовые звонки, игры) идёт мимо ядра прокси, чтобы меньше тормозило; TCP по-прежнему по правилам ядра. Включено по умолчанию
+国内 UDP 内核直连生效（eBPF）|Domestic UDP direct active (eBPF)|國內 UDP 核心直連生效（eBPF）|Внутренний UDP напрямую активен (eBPF)
+国内 UDP 内核直连生效（ipset）|Domestic UDP direct active (ipset)|國內 UDP 核心直連生效（ipset）|Внутренний UDP напрямую активен (ipset)
+本机内核不支持国内 UDP 直连，UDP 仍经核心（%s）|This kernel cannot send domestic UDP direct; UDP still goes through the core (%s)|本機核心不支援國內 UDP 直連，UDP 仍經核心（%s）|Ядро устройства не умеет отправлять внутренний UDP напрямую; UDP по-прежнему идёт через ядро прокси (%s)
+设备没有 ipset，eBPF 也不可用，已降级为核心内规则（%s）|This device has no ipset and eBPF is unavailable; the core rules handle it instead (%s)|裝置沒有 ipset，eBPF 也無法使用，已降級為核心內規則（%s）|На устройстве нет ipset, и eBPF недоступен; вместо этого работают правила ядра прокси (%s)
 IPv4 %s 段|IPv4 %s ranges|IPv4 %s 段|IPv4: %s диапазонов
 IPv6 %s 段|IPv6 %s ranges|IPv6 %s 段|IPv6: %s диапазонов
 IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs IPv6 mode "Enable / Strict"|IPv6 未生效：需要 IPv6「啟用／嚴格」模式|IPv6 не применён: нужен режим IPv6 «Включить / Строгий»
