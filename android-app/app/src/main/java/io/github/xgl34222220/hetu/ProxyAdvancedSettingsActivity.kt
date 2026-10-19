@@ -197,12 +197,18 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
             SettingsSection {
                 SettingsGroup(title = ht("厂商防火墙")) {
                     val cleanup = prefs.getBoolean("proxyVendorFirewallCleanup", false)
-                    val about = ht("删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用")
+                    val about = ht("解除系统对 Google Play 服务、Play 商店、GSF 和 ConfigUpdater 的联网限制：OPPO、一加、中兴的厂商规则链，以及 ColorOS 的 eBPF 联网限制名单。只删这几个 Google 应用的条目，你给其它应用设的联网开关不受影响。默认关闭，重启代理后生效")
+                    val bpfMaps = live.firewallField("bpfmaps")?.toIntOrNull() ?: 0
+                    val bpfListed = live.firewallField("bpflisted")?.toIntOrNull() ?: 0
                     OtherSwitch(
-                        "启动时清理", cleanup, icon = HxIcons.BrushCleaning,
+                        "清理 Google 联网限制", cleanup, icon = HxIcons.BrushCleaning,
                         subtitle = when {
-                            !cleanup || !live.running || live.firewallDetail.isBlank() -> about
+                            !live.running || live.firewallDetail.isBlank() -> about
+                            !cleanup && live.firewallField("bpfmode") == "check" && bpfListed > 0 ->
+                                ht("检测到 ColorOS 正在限制 Google 服务联网，Play 商店会因此提示“出了点问题”。打开后重启代理即可解除")
+                            !cleanup -> about
                             live.firewallField("uids") == "0" -> ht("没有找到已安装的 Google 服务，本次没有可清理的对象")
+                            bpfMaps > 0 -> ht("本机有 ColorOS 的 eBPF 联网限制名单，运行中约每 12 秒检查一次。本次已解除 %s 条 Google 限制").fill(live.firewallField("bpfremoved") ?: "0")
                             live.firewallField("chains").isNullOrBlank() -> ht("本机没有这类厂商规则链，这个开关在这台设备上不起作用")
                             else -> ht("本机有这类规则链。本次检查 %s 条，删除 %s 条").fill(live.firewallCount("checked"), live.firewallCount("removed"))
                         },

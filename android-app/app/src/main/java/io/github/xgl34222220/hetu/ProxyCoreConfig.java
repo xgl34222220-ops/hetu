@@ -167,12 +167,24 @@ final class ProxyCoreConfig {
         String warningText() { return String.join("；", warnings); }
         /** Dangling group/outbound references removed before start (also contained in warnings). */
         List<String> cleanupNotices = Collections.emptyList();
+        /** The converted profile's proxy-providers, for the panel's 订阅 tab (none for a native config). */
+        List<ProviderInfo> providers = Collections.emptyList();
         /** The same result for a rewritten config, with more warnings. */
         Result with(String rewritten, List<String> more) {
             List<String> all = new ArrayList<>(warnings); all.addAll(more);
             Result r = new Result(rewritten, nativeSource, all, nodes, fakeIpV4, fakeIpV6, adblockApplied);
             r.cleanupNotices = cleanupNotices;
+            r.providers = providers;
             return r;
+        }
+    }
+
+    /** One proxy-provider of a converted profile: its type (http / inline / file), URL and the node names it added. */
+    static final class ProviderInfo {
+        final String name, type, url;
+        final List<String> nodes;
+        ProviderInfo(String name, String type, String url, List<String> nodes) {
+            this.name = name; this.type = type; this.url = url; this.nodes = Collections.unmodifiableList(new ArrayList<>(nodes));
         }
     }
 
@@ -286,6 +298,7 @@ final class ProxyCoreConfig {
             default: throw new IOException("未知核心");
         }
         if (cleaned.changed) converted.cleanupNotices = cleaned.notices;
+        converted.providers = Collections.unmodifiableList(new ArrayList<>(profile.providerInfos));
         return converted;
     }
 
@@ -461,6 +474,8 @@ final class ProxyCoreConfig {
         final LinkedHashMap<String, Group> groups = new LinkedHashMap<>();
         final List<Rule> rules = new ArrayList<>();
         final Map<String, RuleProvider> ruleProviders = new LinkedHashMap<>();
+        /** proxy-providers in source order, each with the nodes it added (empty when it could not be read). */
+        final List<ProviderInfo> providerInfos = new ArrayList<>();
         String matchTarget = TAG_DIRECT;
         boolean fakeIp; String fakeIpRange = DEFAULT_FAKE_IP_V4;
         final List<String> fakeIpFilter = new ArrayList<>();
@@ -495,8 +510,12 @@ final class ProxyCoreConfig {
             for (Object o : asList(root.get("proxies"))) p.addNode(asMap(o), warnings, "");
             LinkedHashMap<String, List<String>> providerNodes = new LinkedHashMap<>();
             Map<String, Object> providers = asMap(root.get("proxy-providers"));
-            if (providers != null) for (Map.Entry<String, Object> e : providers.entrySet())
-                providerNodes.put(e.getKey(), p.loadProvider(e.getKey(), asMap(e.getValue()), fetcher, warnings));
+            if (providers != null) for (Map.Entry<String, Object> e : providers.entrySet()) {
+                Map<String, Object> m = asMap(e.getValue());
+                List<String> added = p.loadProvider(e.getKey(), m, fetcher, warnings);
+                providerNodes.put(e.getKey(), added);
+                if (m != null) p.providerInfos.add(new ProviderInfo(e.getKey(), str(m, "type").toLowerCase(Locale.ROOT), str(m, "url"), added));
+            }
             // Groups: two passes so forward references resolve.
             List<Map<String, Object>> rawGroups = new ArrayList<>();
             for (Object o : asList(root.get("proxy-groups"))) { Map<String, Object> g = asMap(o); if (g != null && !str(g, "name").isEmpty()) rawGroups.add(g); }
@@ -1340,7 +1359,7 @@ final class ProxyCoreConfig {
                     r.put("action", "route"); r.put("server", "dns-remote");
                     rules.add(r);
                 }
-                rules.add(map("query_type", Arrays.asList("A", "AAAA"), "action", "route", "server", "dns-fake"));
+                rules.add(map("query_type", Arrays.asList("A", "AAAA"), "action", "route", "server", "dns-fake", "rewrite_ttl", 1));
             }
             LinkedHashMap<String, Object> dns = new LinkedHashMap<>();
             dns.put("servers", servers);
@@ -2229,6 +2248,27 @@ final class ProxyCoreConfig {
         return host;
     }
 
+    /**
+     * Fake-IP answers live 1 s, as Mihomo's do (sing-box 1.14.3 answers 600 s): an app then holds a fake address
+     * no longer than the core that issued it, so a stop or a restart does not leave cached fake addresses
+     * unreachable for minutes. A rule that sets its own rewrite_ttl keeps it.
+     */
+    static void shortFakeIpTtl(Map<String, Object> dns) {
+        if (dns == null) return;
+        Set<String> fake = new HashSet<>();
+        for (Object s : asList(dns.get("servers"))) {
+            Map<String, Object> m = asMap(s);
+            if (m != null && ("fakeip".equals(str(m, "type")) || "fakeip".equals(str(m, "address")))) fake.add(str(m, "tag"));
+        }
+        if (fake.isEmpty()) return;
+        for (Object r : asList(dns.get("rules"))) {
+            Map<String, Object> m = asMap(r);
+            if (m == null || !fake.contains(str(m, "server")) || m.containsKey("rewrite_ttl")) continue;
+            String action = str(m, "action");
+            if (action.isEmpty() || action.equals("route")) m.put("rewrite_ttl", 1);
+        }
+    }
+
     static Result nativeSingBox(String source, Options o, List<String> warnings) throws IOException {
         Map<String, Object> root = CoreJson.parseObject(source);
         List<String> cleanup = ConfigReferenceCleaner.singBox(root);
@@ -2257,6 +2297,7 @@ final class ProxyCoreConfig {
             warnings.add("TUN 模式已开启 route.auto_detect_interface（否则核心自己的出站会绕回 TUN）");
         }
         if (!route.containsKey("auto_detect_interface")) route.put("auto_detect_interface", true);
+        shortFakeIpTtl(asMap(root.get("dns")));
         if (!root.containsKey("dns")) {
             root.put("dns", map("servers", Arrays.asList(SingBox.dnsServer(DEFAULT_DIRECT_DNS, "dns-direct", null), SingBox.dnsServer(DEFAULT_REMOTE_DNS, "dns-remote", null)), "final", "dns-remote"));
             if (!route.containsKey("default_domain_resolver")) route.put("default_domain_resolver", "dns-direct");

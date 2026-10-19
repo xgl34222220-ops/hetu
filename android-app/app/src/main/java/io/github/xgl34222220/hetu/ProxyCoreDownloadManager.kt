@@ -71,6 +71,14 @@ internal object ProxyCoreSupport {
      */
     @JvmStatic fun trafficMode(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
 
+    /**
+     * 订阅 / 规则集 of a running sing-box come from what Hetu itself fetched and deployed for it
+     * (panel.SingBoxPanelStore): its clash_api has no provider endpoints. A downloaded subscription
+     * applies on the next start; a replaced rule-set file at once. False with an external Clash API.
+     */
+    @JvmStatic fun localProviders(prefs: android.content.SharedPreferences): Boolean =
+        !prefs.getBoolean("proxyCustomApiEnabled", false) && ProxyCoreConfig.kind(running(prefs)) == ProxyCoreConfig.Kind.SING_BOX
+
     /** What the 面板 tabs can show for the running core; an external Clash API is never gated. */
     @JvmStatic fun panelGate(prefs: android.content.SharedPreferences): io.github.xgl34222220.hetu.panel.PanelCoreGate {
         val core = running(prefs)

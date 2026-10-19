@@ -92,6 +92,13 @@ final class EbpfMatcher {
         return cmd.toString();
     }
 
+    /** {@link #payloadCommand} for the loader alone (0700), as the ColorOS Google check uses it. */
+    static String loaderCommand(String binDir, String loaderSource, String loaderSha256, String suffix) {
+        StringBuilder cmd = new StringBuilder("; mkdir -p ").append(quote(binDir));
+        install(cmd, loaderSource, loaderSha256, binDir + "/" + LOADER_NAME, suffix, "700");
+        return cmd.toString();
+    }
+
     private static void install(StringBuilder cmd, String source, String sha, String target, String suffix, String mode) {
         if (!sha.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("eBPF 载荷摘要无效");
         String tmp = target + suffix;

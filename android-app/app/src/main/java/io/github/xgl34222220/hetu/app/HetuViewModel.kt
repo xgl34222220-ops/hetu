@@ -1598,6 +1598,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
                 if (fresh != null) HxSubscriptionAlerts.check(app, providers)
                 providerTasks[name] = HxTask(ok = true, message = "已更新")
+                restartForSubscriptions(1)
                 refreshNow()
             } catch (cancel: CancellationException) {
                 if (providerTaskOwners[name] == owner) providerTasks.remove(name)
@@ -1676,6 +1677,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     lastProviderRefreshAt = SystemClock.elapsedRealtime()
                 }
                 toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
+                restartForSubscriptions(ok)
                 refreshNow()
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -1689,6 +1691,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (providersUpdateAllOwner == owner) { providersUpdateAllOwner = null; providersUpdatingAll = false }
             }
         }
+    }
+
+    /** sing-box keeps its outbounds until the next start: after [updated] downloaded subscriptions, offer 重启代理. */
+    private fun restartForSubscriptions(updated: Int) {
+        if (updated <= 0 || !ProxyCoreSupport.localProviders(prefs)) return
+        val core = runningCore()
+        coreNotice = CoreFeatureNotice(core.label, "热重载",
+            "订阅已重新下载。${core.label} 不能在运行中替换节点，重启代理后使用新的节点列表，网络会短暂中断几秒。", offerRestart = true)
     }
 
     /** Hot-reload the running core after a config change, or just report it's saved. */

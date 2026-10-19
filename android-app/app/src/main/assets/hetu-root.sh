@@ -134,6 +134,8 @@ EBPF_PIN=/sys/fs/bpf/hetu
 EBPF_TOOL="$BASE/bin/hetu-bpf"
 EBPF_OBJECT="$BASE/bin/hetu_match.o"
 EBPF_LISTS="$RUN/state/ebpf-lists"
+# Where ColorOS pins netd's per-UID network block maps (hetu-bpf vendor-uid reads them there).
+GOOGLE_VENDOR_BPF=/sys/fs/bpf
 EBPF_STATE=off
 EBPF_REASON=""
 # 1 only while capture rules are built for an active matcher; the Kill Switch guard never uses it.
@@ -3620,19 +3622,57 @@ google_firewall_uids(){
   for GF_USER in $GF_USERS; do
     (cmd package list packages -U --user "$GF_USER" 2>/dev/null ||
       pm list packages -U --user "$GF_USER" 2>/dev/null) |
-      awk '$1=="package:com.google.android.gms" || $1=="package:com.android.vending" || $1=="package:com.google.android.gsf" {
+      awk '$1=="package:com.google.android.gms" || $1=="package:com.android.vending" || $1=="package:com.google.android.gsf" || $1=="package:com.google.android.configupdater" {
         for(i=2;i<=NF;i++) if($i ~ /^uid:[0-9]+$/) {sub(/^uid:/,"",$i); if($i>=10000) print $i}
       }'
   done | sort -nu
+}
+# ColorOS / Oplus netd lists the Google apps in its cgroup eBPF per-UID block maps (one per
+# network type) while a transparent proxy runs, out of sight of iptables, and lists them again at
+# boot and within seconds of an interface change. hetu-bpf deletes exactly the given UIDs there;
+# every other entry is the user's own per-app "no WLAN / no mobile data" switch and stays.
+google_firewall_vendor_maps(){
+  [ -x "$EBPF_TOOL" ] || return 1
+  ls "$GOOGLE_VENDOR_BPF" 2>/dev/null | grep -q '^map_oplus-netd_app_.*_socket_uid_limit_map$'
+}
+# google_firewall_ebpf check|unblock <uids, one per line>: run-file google-firewall-ebpf keeps the
+# last pass (listed = Google entries found before deleting) and the session's removals so far.
+# It is rewritten only when that changes, not on every quiet watchdog pass.
+google_firewall_ebpf(){
+  GE_MODE="$1"
+  google_firewall_vendor_maps || return 0
+  GE_LIST=$(printf '%s\n' "$2" | grep -E '^[0-9]+$' | tr '\n' ','); GE_LIST="${GE_LIST%,}"
+  [ -n "$GE_LIST" ] || return 0
+  GE_OUT=$(timeout -s TERM -k 1 5 "$EBPF_TOOL" vendor-uid "$GE_MODE" "$GE_LIST" 2>/dev/null | head -n 1 | tr -cd 'a-z0-9=, ')
+  GE_MAPS=0; GE_PRESENT=0; GE_REMOVED=0; GE_FAILED=1; GE_NAMES=-
+  for GE_F in $GE_OUT; do
+    case "$GE_F" in
+      maps=[0-9]*) GE_MAPS="${GE_F#maps=}";; present=[0-9]*) GE_PRESENT="${GE_F#present=}";;
+      removed=[0-9]*) GE_REMOVED="${GE_F#removed=}";; failed=[0-9]*) GE_FAILED="${GE_F#failed=}";;
+      names=?*) GE_NAMES="${GE_F#names=}";;
+    esac
+  done
+  GE_OLD=$(head -n 1 "$RUN/google-firewall-ebpf" 2>/dev/null)
+  GE_TOTAL=$(printf '%s\n' "$GE_OLD" | sed -n 's/.*bpfremoved=\([0-9][0-9]*\).*/\1/p')
+  GE_TOTAL=$((${GE_TOTAL:-0}+GE_REMOVED))
+  GE_LINE="bpfmode=$GE_MODE bpfmaps=$GE_MAPS bpfnames=$GE_NAMES bpflisted=$GE_PRESENT bpfremoved=$GE_TOTAL bpffailed=$GE_FAILED"
+  [ "${GE_OLD% bpfat=*}" != "$GE_LINE" ] || return 0
+  GE_AT=$(date '+%Y-%m-%dT%H:%M:%S%z')
+  printf '%s bpfat=%s\n' "$GE_LINE" "$GE_AT" > "$RUN/google-firewall-ebpf" 2>/dev/null || true
+  [ "$GE_REMOVED" = 0 ] || printf '%s ebpf %s removed=%s\n' "$GE_AT" "$GE_NAMES" "$GE_REMOVED" >> "$RUN/google-firewall.log"
 }
 google_firewall_cleanup(){
   # Caller owns the existing Root transaction lock. Never flush a system chain.
   GF_UIDS=$(google_firewall_uids)
   GF_PRESENT=""
   if [ -z "$GF_UIDS" ]; then
+    rm -f "$RUN/google-firewall-uids"
     printf 'uids=0 chains= at=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$RUN/google-firewall-detail" 2>/dev/null || true
     return 0
   fi
+  # The watchdog's quick eBPF pass between two full passes reuses these instead of asking pm.
+  [ "$(cat "$RUN/google-firewall-uids" 2>/dev/null)" = "$GF_UIDS" ] || printf '%s\n' "$GF_UIDS" > "$RUN/google-firewall-uids" 2>/dev/null || true
+  google_firewall_ebpf unblock "$GF_UIDS"
   GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
   GF_FILE="$RUN/.google-firewall.$$"
   for GF_TOOL in xt4q xt6q; do
@@ -3675,22 +3715,43 @@ google_firewall_cleanup(){
     tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
   fi
 }
+# Switch on: a full pass (pm UIDs, vendor iptables chains, eBPF maps) once a minute and the eBPF
+# maps alone with the cached UIDs on every other watchdog pass (~12 s), since ColorOS lists the
+# Google apps again within seconds. Switch off: only a read-only eBPF check once a minute, with the
+# UIDs the start resolved, so the settings page can say the restriction is there.
 google_firewall_maintain(){ (
   trap 'release_lock' EXIT
   GF_PID="${1:-}"
-  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
+  GF_CLEAN=$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)
+  case "$GF_CLEAN" in 1) ;; 0) [ -s "$RUN/google-firewall-uids" ] || exit 0;; *) exit 0;; esac
   [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
   monotonic_seconds || exit 0
   GF_NOW="$MONO_SECONDS"; GF_LAST=$(cat "$RUN/google-firewall-at" 2>/dev/null || true)
+  GF_DUE=1
   case "$GF_LAST" in ''|*[!0-9]*) ;; *)
-    if [ "$GF_NOW" -ge "$GF_LAST" ] && [ $((GF_NOW-GF_LAST)) -lt 60 ]; then exit 0; fi;;
+    if [ "$GF_NOW" -ge "$GF_LAST" ] && [ $((GF_NOW-GF_LAST)) -lt 60 ]; then GF_DUE=0; fi;;
   esac
+  if [ "$GF_DUE" = 0 ]; then
+    # Only Google's own entries leave a system map: no Hetu state changes, so no transaction lock.
+    [ "$GF_CLEAN" = 1 ] && [ -s "$RUN/google-firewall-uids" ] || exit 0
+    google_firewall_ebpf unblock "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"
+    exit 0
+  fi
   acquire_lock || exit 0
   [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
-  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
+  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = "$GF_CLEAN" ] || exit 0
   printf '%s\n' "$GF_NOW" > "$RUN/google-firewall-at"
-  google_firewall_cleanup
+  if [ "$GF_CLEAN" = 1 ]; then google_firewall_cleanup
+  else google_firewall_ebpf check "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"; fi
 ); }
+# Switch off: one read-only look at the eBPF maps at start, with the App's app IDs (no pm call).
+google_firewall_detect(){
+  [ -n "${START_GMS_APPIDS:-}" ] && google_firewall_vendor_maps || return 0
+  GD_UIDS=$(google_firewall_uids)
+  [ -n "$GD_UIDS" ] || return 0
+  printf '%s\n' "$GD_UIDS" > "$RUN/google-firewall-uids" 2>/dev/null || true
+  google_firewall_ebpf check "$GD_UIDS"
+}
 
 install_capture_rules(){
   start_stage "install-ipv4-tproxy"
@@ -3924,8 +3985,9 @@ start(){
   health_record || { fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
   start_selfheal_record "$@"
-  rm -f "$RUN/google-firewall-at"
+  rm -f "$RUN/google-firewall-at" "$RUN/google-firewall-ebpf" "$RUN/google-firewall-uids"
   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
+  [ "$START_VENDOR_CLEAN" = 1 ] || google_firewall_detect
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
   transaction_current || fail "启动事务已撤销"
   # Optional session daemon (network match / traffic); its failure never fails the start.
@@ -4020,6 +4082,7 @@ status(){
   DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
   PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
   GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
+  GFEV=$(head -n 1 "$RUN/google-firewall-ebpf" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -'); [ -z "$GFEV" ] || GFDV="${GFDV:+$GFDV }$GFEV"
   TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
   case "$CPV" in ''|*[!0-9]*) CPV=0;; esac

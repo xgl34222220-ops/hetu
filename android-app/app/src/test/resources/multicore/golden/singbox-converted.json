@@ -32,7 +32,8 @@
       {
         "query_type": ["A", "AAAA"],
         "action": "route",
-        "server": "dns-fake"
+        "server": "dns-fake",
+        "rewrite_ttl": 1
       }
     ],
     "final": "dns-remote"

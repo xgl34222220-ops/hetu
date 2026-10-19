@@ -174,6 +174,14 @@ internal data class PanelRuleSet(
     val update: PanelUpdate = PanelUpdate.Idle,
 ) {
     val meta: String get() = listOf(behavior, format, vehicle).filter { it.isNotBlank() }.joinToString(" / ")
+    /** Inline sets live in the config; sing-box local files reload by themselves and remote ones download in the core. */
+    val updatable: Boolean get() = vehicle !in setOf("Inline", "Local", "Remote")
+    /** Why there is no 更新 for a set that is not [updatable]. */
+    val fixedNote: String get() = when (vehicle) {
+        "Inline" -> "写在配置中，随配置生效"
+        "Local" -> "本地文件，修改后自动生效"
+        else -> "由核心自行下载，重启代理时更新"
+    }
 }
 
 internal enum class PanelLogLevel(val label: String) { Debug("DEBUG"), Info("INFO"), Warn("WARN"), Error("ERROR") }

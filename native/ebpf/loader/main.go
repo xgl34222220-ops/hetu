@@ -12,9 +12,11 @@
 //	hetu-bpf sync-cn   <pindir> 4|6 <file>|-
 //	hetu-bpf count     <pindir>
 //	hetu-bpf unload    <pindir>
+//	hetu-bpf vendor-uid check|unblock <uids>
 package main
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -87,6 +89,17 @@ func run(args []string) error {
 		return count(args[1])
 	case "unload":
 		return unload(args[1])
+	case "vendor-uid":
+		if len(args) != 3 || (args[1] != "check" && args[1] != "unblock") {
+			return fail("usage", errors.New("vendor-uid check|unblock <uids>"))
+		}
+		uids, err := parseUIDs(args[2])
+		if err != nil {
+			return fail("uid-list-invalid", err)
+		}
+		paths, _ := filepath.Glob(vendorUIDMaps)
+		fmt.Println(vendorUID(paths, uids, args[1] == "unblock"))
+		return nil
 	}
 	return fail("usage", fmt.Errorf("unknown command %q", args[0]))
 }
@@ -406,4 +419,79 @@ func unload(pindir string) error {
 		return fail("unpin-failed", err)
 	}
 	return nil
+}
+
+// ColorOS / Oplus keeps a per-UID network block list in netd's cgroup eBPF maps (one per
+// network type: wlan, qcom cellular, ...). While a transparent proxy runs instead of a
+// VpnService it lists Google Play services, the Play Store, GSF and ConfigUpdater there, which
+// iptables cannot see, and it writes them again at boot and on every VPN interface change.
+// The same maps hold the user's own per-app "no WLAN / no mobile data" switches, so only the
+// given UIDs are ever touched, never the whole map. Keys are the 4-byte UID.
+const vendorUIDMaps = "/sys/fs/bpf/map_oplus-netd_app_*_socket_uid_limit_map"
+
+// vendorUID reports how many of uids the maps at paths list, deleting them when unblock is set.
+// A map that cannot be opened or has another key layout counts as failed and is left alone.
+func vendorUID(paths []string, uids []uint32, unblock bool) string {
+	want := map[uint32]bool{}
+	for _, u := range uids {
+		want[u] = true
+	}
+	maps, present, removed, failed := 0, 0, 0, 0
+	var names []string
+	for _, path := range paths {
+		fd, err := objGet(path)
+		if err != nil {
+			failed++
+			continue
+		}
+		keys, err := vendorKeys(fd)
+		if err != nil {
+			syscall.Close(fd)
+			failed++
+			continue
+		}
+		maps++
+		names = append(names, vendorMapLabel(path))
+		for _, k := range keys {
+			if !want[binary.NativeEndian.Uint32(k)] {
+				continue
+			}
+			present++
+			if !unblock {
+				continue
+			}
+			if err := mapDelete(fd, k); err == nil || errors.Is(err, syscall.ENOENT) {
+				removed++
+			} else {
+				failed++
+			}
+		}
+		syscall.Close(fd)
+	}
+	if len(names) == 0 {
+		names = []string{"-"}
+	}
+	return fmt.Sprintf("maps=%d present=%d removed=%d failed=%d names=%s", maps, present, removed, failed, strings.Join(names, ","))
+}
+
+func vendorKeys(fd int) ([][]byte, error) {
+	size, err := mapKeySize(fd)
+	if err != nil {
+		return nil, err
+	}
+	if size != 4 {
+		return nil, fmt.Errorf("key size %d", size)
+	}
+	return mapKeys(fd, 4)
+}
+
+// vendorMapLabel: map_oplus-netd_app_wlan_socket_uid_limit_map -> wlan.
+func vendorMapLabel(path string) string {
+	name := filepath.Base(path)
+	name = strings.TrimPrefix(name, "map_oplus-netd_app_")
+	name = strings.TrimSuffix(name, "_socket_uid_limit_map")
+	if name == "" || strings.ContainsAny(name, " ,=") {
+		return "map"
+	}
+	return name
 }

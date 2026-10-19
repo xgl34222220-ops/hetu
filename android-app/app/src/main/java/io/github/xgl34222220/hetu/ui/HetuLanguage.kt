@@ -483,6 +483,10 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
 当前配置没有 rule-providers|This configuration has no rule-providers|目前設定沒有 rule-providers|В конфигурации нет rule-providers
 没有匹配的规则集|No matching rule sets|沒有符合的規則集|Нет подходящих наборов правил
 %d 条规则|%d rules|%d 條規則|Правил: %d
+规则数未知|Rule count unknown|規則數未知|Число правил неизвестно
+写在配置中，随配置生效|Written in the config; applies with it|寫在設定中，隨設定生效|Записан в конфигурации и действует вместе с ней
+本地文件，修改后自动生效|Local file; changes apply automatically|本機檔案，修改後自動生效|Локальный файл; изменения применяются автоматически
+由核心自行下载，重启代理时更新|Downloaded by the core; updates when the proxy restarts|由核心自行下載，重新啟動代理時更新|Загружается ядром; обновляется при перезапуске прокси
 更新规则集|Update rule set|更新規則集|Обновить набор правил
 没有匹配的日志|No matching logs|沒有符合的日誌|Нет подходящих записей
 当前等级下暂无日志|No logs at this level yet|目前等級下暫無日誌|На этом уровне записей пока нет
@@ -888,6 +892,7 @@ Mihomo DNS 转发|Mihomo DNS forwarding|Mihomo DNS 轉送|Пересылка DNS
 内存限制|Memory limit|記憶體限制|Ограничение памяти
 厂商防火墙|Vendor firewall|廠商防火牆|Брандмауэр производителя
 启动时清理|Clear on start|啟動時清理|Очищать при запуске
+清理 Google 联网限制|Clear Google network blocks|清理 Google 連網限制|Снимать сетевые ограничения Google
 性能模式|Performance mode|效能模式|Режим производительности
 磁盘 I/O 权重|Disk I/O weight|磁碟 I/O 權重|Вес дискового ввода-вывода
 资源限制|Resource limits|資源限制|Ограничения ресурсов
@@ -978,6 +983,9 @@ eBPF 重定向到 TUN|eBPF redirect into TUN|eBPF 重新導向至 TUN|Перен
 Go 运行时的软上限：接近时更积极回收，不会结束核心；不低于 32M|A soft limit for the Go runtime: it collects harder near the limit and never kills the core; at least 32M|Go 執行階段的軟上限：接近時更積極回收，不會結束核心；不低於 32M|Мягкий предел для среды Go: у предела память освобождается активнее, ядро не завершается; не менее 32M
 0 最优先，7 最靠后|0 is the highest priority, 7 the lowest|0 最優先，7 最靠後|0 — высший приоритет, 7 — низший
 删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用|Removes vendor firewall rules that block Google services; only useful on systems that have such chains|刪除廠商防火牆裡攔截 Google 服務的規則，只在帶有這類規則鏈的系統上有用|Удаляет правила файрвола производителя, блокирующие сервисы Google; полезно только там, где такие цепочки есть
+解除系统对 Google Play 服务、Play 商店、GSF 和 ConfigUpdater 的联网限制：OPPO、一加、中兴的厂商规则链，以及 ColorOS 的 eBPF 联网限制名单。只删这几个 Google 应用的条目，你给其它应用设的联网开关不受影响。默认关闭，重启代理后生效|Lifts system network blocks on Google Play services, the Play Store, GSF and ConfigUpdater: the vendor chains of OPPO, OnePlus and ZTE, and the ColorOS eBPF block list. Only these Google apps' entries are removed; network switches you set for other apps stay. Off by default; takes effect after restarting the proxy|解除系統對 Google Play 服務、Play 商店、GSF 和 ConfigUpdater 的連網限制：OPPO、一加、中興的廠商規則鏈，以及 ColorOS 的 eBPF 連網限制名單。只刪這幾個 Google 應用程式的條目，你給其它應用程式設的連網開關不受影響。預設關閉，重新啟動代理後生效|Снимает системные сетевые ограничения для сервисов Google Play, Play Маркета, GSF и ConfigUpdater: цепочки производителя OPPO, OnePlus и ZTE, а также список блокировок eBPF в ColorOS. Удаляются только записи этих приложений Google; сетевые запреты, заданные вами для других приложений, остаются. По умолчанию выключено, действует после перезапуска прокси
+检测到 ColorOS 正在限制 Google 服务联网，Play 商店会因此提示“出了点问题”。打开后重启代理即可解除|ColorOS is blocking Google services from the network, which makes the Play Store show "Something went wrong". Turn this on and restart the proxy to lift it|偵測到 ColorOS 正在限制 Google 服務連網，Play 商店會因此提示「發生錯誤」。開啟後重新啟動代理即可解除|ColorOS блокирует сеть для сервисов Google, из-за этого Play Маркет пишет «Что-то пошло не так». Включите и перезапустите прокси, чтобы снять блокировку
+本机有 ColorOS 的 eBPF 联网限制名单，运行中约每 12 秒检查一次。本次已解除 %s 条 Google 限制|This device has the ColorOS eBPF block list; it is checked about every 12 seconds while running. %s Google blocks lifted this session|本機有 ColorOS 的 eBPF 連網限制名單，執行中約每 12 秒檢查一次。本次已解除 %s 條 Google 限制|На устройстве есть список блокировок eBPF ColorOS; во время работы он проверяется примерно раз в 12 секунд. Снято блокировок Google за сеанс: %s
 没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
 本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
 本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
