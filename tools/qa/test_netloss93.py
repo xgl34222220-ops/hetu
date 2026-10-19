@@ -83,7 +83,7 @@ HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape'
            'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick', 'fake_range', 'wd_session_fake_range',
            'wd_root_fake_captured', 'wd_offline_seen', 'wifi_heal_async', 'wd_uptime', 'wd_budget_start',
            'wd_budget_left', 'wd_groups', 'wd_conn_match', 'wd_close_through', 'wd_conn_busy', 'wd_heal_chain', 'wd_node_heal',
-           'wd_proxy_heal', 'wd_dataplane_heal')
+           'wd_proxy_heal', 'wd_dataplane_heal', 'wd_cache_lost', 'wd_fakeip_heal', 'foreign_tun_links')
 
 
 class Controller:
@@ -233,7 +233,7 @@ class ShellCase(unittest.TestCase):
         self.temp.cleanup()
 
     def prelude(self, extra=''):
-        text = 'set -u\nRUN=%s\nBASE=%s\nWATCHDOG_LOG="$RUN/watchdog.log"\nWATCHDOG_PID="$RUN/watchdog.pid"\n' % (
+        text = 'set -u\nRUN=%s\nBASE=%s\nWATCHDOG_LOG="$RUN/watchdog.log"\nWATCHDOG_PID="$RUN/watchdog.pid"\nLOG="$RUN/core.log"\n' % (
             shq(self.run_dir), shq(self.dir))
         text += 'PIDFILE="$RUN/core.pid"\nSESSION="$RUN/session.state"\nCG_MOUNTS=%s\n' % shq(self.dir / 'no-mounts')
         text += ''.join(top_assignment(v) for v in SELFHEAL_VARS)

@@ -2180,7 +2180,9 @@ final class RootProxyManager {
             validateWithCoreCli(CONFIG,core,"最终启动配置");
             return;
         }
-        String cmd="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
+        // 6.0.0: exec, so the root timeout signals the check itself. A check left running after its shell was
+        // killed keeps run/cache.db locked; a core started meanwhile runs without its fake-IP records.
+        String cmd="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && exec "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
         RootBridge.Result r=boundedRootShell(context,cmd,30000L);
         if(r.ok())return;
         String d=r.output==null?"":r.output.trim().replace('\n',' ');

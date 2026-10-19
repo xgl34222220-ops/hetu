@@ -166,6 +166,9 @@ internal fun HomeScreen(
                     })
             } else if (state.status.isLive && state.connection.health == HomeConnectionHealth.TakeoverDegraded && state.connection.runtimeMessage.isNotBlank()) {
                 HomeNotice(state.connection.runtimeMessage, HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
+            } else if (state.status.isLive && state.connection.egressFault.isNotEmpty()) {
+                // 6.0.0: the watchdog saw app-style requests fail (fake IP → core → site) and is healing it.
+                HomeNotice(ht(state.connection.egressFault), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
             }
 
             HomeReveal(live) {
@@ -352,6 +355,7 @@ internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
         HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
         else -> HomeGlyphMode.On
     }
+    if (connection.egressFault.isNotEmpty() && connection.health == HomeConnectionHealth.LocalReady) return HomeGlyphMode.Attention
     return when (connection.health) {
         HomeConnectionHealth.LocalReady, HomeConnectionHealth.Verified -> HomeGlyphMode.On
         HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed

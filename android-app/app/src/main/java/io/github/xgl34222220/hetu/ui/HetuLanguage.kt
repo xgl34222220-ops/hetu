@@ -999,6 +999,10 @@ private val vocabularyConnection = """
 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
 接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
+外网异常：核心的假 IP 记录失效，河图正在自动重启核心|Internet trouble: the core lost its fake-IP records; Hetu is restarting the core|外網異常：核心的假 IP 記錄失效，河圖正在自動重新啟動核心|Сбой интернета: ядро потеряло записи fake-IP; Hetu перезапускает ядро
+外网异常：请求没能经过核心，河图正在重查规则并重启核心|Internet trouble: requests do not get through the core; Hetu is re-checking the rules and restarting the core|外網異常：請求沒能經過核心，河圖正在重查規則並重新啟動核心|Сбой интернета: запросы не проходят через ядро; Hetu проверяет правила и перезапускает ядро
+外网异常：按当前规则访问外网失败，节点测速却正常，原因见通知|Internet trouble: sites fail under the current rules while node delays are fine; see the notification|外網異常：按目前規則存取外網失敗，節點測速卻正常，原因見通知|Сбой интернета: сайты не открываются по текущим правилам, хотя задержка узлов в норме; подробности в уведомлении
+外网异常：代理节点无响应，已让自动选择的节点组重新测速|Internet trouble: a proxy node does not answer; auto-select groups are re-testing|外網異常：代理節點無回應，已讓自動選擇的節點組重新測速|Сбой интернета: узел не отвечает; группы автовыбора перепроверяются
 配置选择|Configurations|設定選擇|Конфигурации
 当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
 内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка

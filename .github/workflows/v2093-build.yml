@@ -263,6 +263,8 @@ jobs:
 
         python3 tools/qa/test_google_ebpf600.py -v 2>&1 | tee out/verification/google-ebpf600-tests.txt
 
+        python3 tools/qa/test_foreign_outage600.py -v 2>&1 | tee out/verification/foreign-outage600-tests.txt
+
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter
       run: python3 tools/qa/test_filter_export.py --before out/verification/v2075-adblock.java
