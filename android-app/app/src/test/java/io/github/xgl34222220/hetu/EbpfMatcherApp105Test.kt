@@ -215,7 +215,9 @@ class EbpfMatcherApp105Test {
         val manager = File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").readText()
         assertTrue(manager.contains("boolean ebpf=prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false);"))
         assertTrue(manager.contains("cmd.append(EbpfMatcher.policyCommand(policyDir,ebpf));"))
-        assertTrue(manager.contains("if(ebpf)appendEbpfPayloads(cmd,stage,deploySuffix);"))
+        // 6.0.0: CNIP uses the object's CN programs where ipset is missing, so a CNIP policy deploys it too;
+        // whether the matcher itself runs stays gated by policy/ebpf above.
+        assertTrue(manager.contains("if(ebpf||!cnipBody.isEmpty())appendEbpfPayloads(cmd,stage,deploySuffix);"))
         val controller = File("src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt").readText()
         assertTrue(controller.contains(".putString(EbpfMatcher.PREF_STATE, status.optString(\"ebpf\", \"\"))"))
         assertTrue(controller.contains("root.ebpfHotUpdate(profile)"))
