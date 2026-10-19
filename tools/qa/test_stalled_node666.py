@@ -9,8 +9,8 @@ still answered its delay test. Mihomo's url-test / fallback groups only count a 
 dial against a node, and the watchdog's probes all went through the Google group, so nothing switched.
 
 * wd_stall_scan reads GET /connections and compares it with the previous read: TCP or QUIC (UDP 443) connections
-  through a node that sent data and received nothing, or received a handshake and nothing since they last sent,
-  for WD_STALL_AGE s are stuck; a node with stuck connections to two or more sites and none of its connections
+  through a node that sent data and received nothing, or TCP ones that received a handshake (under 16 KiB) and
+  nothing since they last sent, for WD_STALL_AGE s are stuck; a node with stuck connections to two or more sites and none of its connections
   receiving anything since the last read is stalled.
 * wd_stall_heal sends one HTTPS request through a group on the node. When it fails, or the node stalled three
   times within ten minutes even though it answers, the url-test / fallback groups on it are pinned to the first
@@ -320,10 +320,15 @@ class Scan(Case):
         """The field report: the first few KB (a TLS handshake) arrive, the request that follows gets nothing."""
         c = self.ctl()
         t0 = int(time.time())
-        for name, grow_down_later in (('stalled', False), ('answers later', True)):
+        for name, grow_down_later, kw, stalls in (('stalled', False, {}, True), ('answers later', True, {}, False),
+                                                  # Already received real data: idle or long polling as likely as stuck.
+                                                  ('past a handshake', False, {'down': 20000}, False),
+                                                  # A closed QUIC session's last packet is its own; the flow lingers.
+                                                  ('quic', False, {'network': 'udp'}, False)):
             with self.subTest(name):
                 (self.run_dir / '.wdtest.stalldb').unlink(missing_ok=True)
-                c.conns = [conn('p%d' % i, [BAD, 'Google'], age=12, up=2713, down=4481, host='h%d.test' % i) for i in range(3)]
+                args = dict({'age': 12, 'up': 2713, 'down': 4481}, **kw)
+                c.conns = [conn('p%d' % i, [BAD, 'Google'], host='h%d.test' % i, **args) for i in range(3)]
                 self.assertEqual(self.scan(c, t0), [], 'first read: nothing known yet')
                 for x in c.conns:
                     x['up'] += 300
@@ -331,7 +336,7 @@ class Scan(Case):
                 if grow_down_later:
                     c.conns[0]['down'] += 1000
                 got = self.scan(c, t0 + 20)
-                self.assertEqual(got, [] if grow_down_later else [[BAD, '3', '3', '0']])
+                self.assertEqual(got, [[BAD, '3', '3', '0']] if stalls else [])
         # A connection whose last change was a download (idle after its answer) is not waiting.
         (self.run_dir / '.wdtest.stalldb').unlink(missing_ok=True)
         c.conns = [conn('i%d' % i, [BAD], age=12, up=2713, down=4481, host='h%d.test' % i) for i in range(3)]

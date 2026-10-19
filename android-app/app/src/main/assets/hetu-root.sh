@@ -3726,7 +3726,9 @@ wd_stall_scan(){
           print id "\t" ul "\t" dl "\t" tu "\t" td > db
           if (grew || (fresh && dl >= 16384 && a <= live_age)) live[node] = 1
           z = (dl == 0 && ul > 0 && a >= age && a <= 300)
-          w = (!z && dl > 0 && tu > 0 && tu > td && now - tu >= age && a <= 600)
+          # Waiting after a handshake: TCP only (a QUIC flow lingers after its own close) and below 16 KiB
+          # received (one that already got real data and sent again is as likely idle or long polling).
+          w = (!z && net == "tcp" && dl > 0 && dl < 16384 && tu > 0 && tu > td && now - tu >= age && a <= 600)
           if (z || w) { n[node]++; if (z) nz[node]++; h = (host != "") ? host : dst; if (!((node, h) in hs)) { hs[node, h] = 1; nh[node]++ }
             print node "\t" id > stuck } }
         id = "" } }
