@@ -112,6 +112,13 @@ CN4_ON=0
 CN6_ON=0
 CN_FORCE=""
 CN_TCPONLY=0
+# 6.0.0: UDPONLY = only UDP to CN addresses skips the core (video/voice calls, games); AUTO = the App's
+# default rather than a switch the user turned on, so a kernel that cannot do it simply runs without it.
+CN_UDPONLY=0
+CN_AUTO=0
+# 6.0.0: families cnip_prepare left for the eBPF backend (no ipset), installed by cnip_bpf_install.
+CN_BPF4=0
+CN_BPF6=0
 CN_CHAIN=""
 CNIP_STATE=off
 CNIP_REASON=""
@@ -1641,7 +1648,7 @@ bypass6(){
 # ---------------------------------------------------------------- CNIP (ipset)
 cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
 cnip_load_policy(){
-  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0
+  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0; CN_UDPONLY=0; CN_AUTO=0
   [ -r "$BASE/policy/cnip" ] || return 1
   # The iptables CIDR tree (no ipset binary) is opt-in only: on ColorOS it left ~1000 mangle
   # chains behind and slowed every later iptables call until starts timed out (4.0.0).
@@ -1649,6 +1656,9 @@ cnip_load_policy(){
   CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
   # Optional (default off): only TCP to CN addresses bypasses the core; UDP/QUIC still reaches it.
   [ "$(cnip_policy_value TCPONLY)" = 1 ] && CN_TCPONLY=1
+  # 6.0.0: only UDP (the App's default, AUTO=1: video/voice calls and games skip the core's userspace relay).
+  if [ "$CN_TCPONLY" != 1 ] && [ "$(cnip_policy_value UDPONLY)" = 1 ]; then CN_UDPONLY=1; fi
+  [ "$(cnip_policy_value AUTO)" != 1 ] || CN_AUTO=1
   bool "$CNP_V4" || CNP_V4=0; bool "$CNP_V6" || CNP_V6=0
   split_safe_uids "$CN_FORCE" || CN_FORCE=""
   [ "$CNP_V4" = 1 ] || [ "$CNP_V6" = 1 ]
@@ -1656,9 +1666,10 @@ cnip_load_policy(){
 # What the running session installed (watchdog Kill Switch, status, reload read it back).
 cnip_load_session(){
   CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
-  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
-  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || return 0
+  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0; CN_UDPONLY=0
+  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ] || return 0
   [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
+  [ "$(sed -n 's/^CNIP_UDPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_UDPONLY=1
   [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
   [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
   CN_FORCE=$(sed -n 's/^CNIP_FORCE=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -1723,21 +1734,33 @@ cnip_import(){
 }
 # Start: decide which families bypass in the kernel. Never fails the start; degrades instead.
 cnip_prepare(){
-  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""
+  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""; CN_BPF4=0; CN_BPF6=0
   cnip_load_policy || { CN_FORCE=""; return 0; }
-  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; return 0;; esac
+  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; cnip_auto_off; return 0;; esac
   if ! cnip_capable; then
     # No ipset: the iptables CIDR tree (installed by cnip_xt_install after the start's cleanup).
     CNIP_REASON=ipset-unavailable
-    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; return 0; fi
-    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; return 0; fi
+    # 6.0.0: otherwise the CN programs of hetu_match.o (one xt_bpf rule per chain backed by LPM maps), set up by
+    # cnip_bpf_install after the start's cleanup; until then nothing references them (CN4_ON/CN6_ON stay 0).
+    if [ "$CN_XT" != 1 ] && [ -x "$EBPF_TOOL" ] && [ -r "$EBPF_OBJECT" ]; then
+      if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN_BPF4=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
+      if [ "$CNP_V6" = 1 ]; then
+        if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then
+          if [ -s "$CN_FILE6" ]; then CN_BPF6=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
+        else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
+      fi
+      if [ "$CN_BPF4" = 1 ] || [ "$CN_BPF6" = 1 ]; then CNIP_STATE=ebpf; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
+      return 0
+    fi
+    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; return 0; fi
+    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; cnip_auto_off; return 0; fi
     if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN4_ON=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
     if [ "$CNP_V6" = 1 ]; then
       if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables && has ip6tables-restore; then
         if [ -s "$CN_FILE6" ]; then CN6_ON=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
       else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
     fi
-    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; fi
+    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
     return 0
   fi
   if [ "$CNP_V4" = 1 ]; then cnip_import 4 && CN4_ON=1; fi
@@ -1745,7 +1768,35 @@ cnip_prepare(){
     if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then cnip_import 6 && CN6_ON=1
     else CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v6-mode-$START_V6"; fi
   fi
-  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; fi
+  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
+}
+# 6.0.0: the App's default (AUTO=1) is not a switch the user turned on: a kernel that cannot do it runs without
+# it (CNIP off, the reason kept for diagnostics) instead of reporting a degraded CNIP.
+cnip_auto_off(){ [ "$CN_AUTO" = 1 ] || return 0; CNIP_STATE=off; CN_FORCE=""; CN4_ON=0; CN6_ON=0; }
+# 6.0.0: what cnip_prepare chose for a kernel without ipset, after the start's cleanup (which drops stale pins)
+# and before any capture rule: hetu_match.o is loaded here unless the opt-in matcher already loaded it, xt_bpf
+# must accept the CN program and the LPM map takes the CN list (hetu-bpf sync-cn, same bounds as ipset).
+# Any failure leaves CNIP degraded (off for the App's default) with nothing referencing a pin.
+cnip_bpf_install(){
+  [ "$CNIP_STATE" = ebpf ] || return 0
+  if [ "$EBPF_STATE" != active ]; then
+    CBI_OUT=$(ebpf_tool load "$EBPF_OBJECT" "$EBPF_PIN" 2>/dev/null) || { cnip_bpf_fail "$(ebpf_reason "$CBI_OUT")"; return 0; }
+  fi
+  for CBI_F in 4 6; do
+    if [ "$CBI_F" = 4 ]; then [ "$CN_BPF4" = 1 ] || continue; CBI_FILE="$CN_FILE4"; CBI_XT=xt4; else [ "$CN_BPF6" = 1 ] || continue; CBI_FILE="$CN_FILE6"; CBI_XT=xt6; fi
+    if ! ebpf_xt_probe "$CBI_XT" "hetu_cn$CBI_F"; then CNIP_REASON="$CNIP_REASON,v$CBI_F-xt-bpf-unsupported"; continue; fi
+    CBI_OUT=$(ebpf_tool sync-cn "$EBPF_PIN" "$CBI_F" "$CBI_FILE" 2>/dev/null) || { CNIP_REASON="$CNIP_REASON,v$CBI_F-$(ebpf_reason "$CBI_OUT")"; continue; }
+    if [ "$CBI_F" = 4 ]; then CN4_ON=1; else CN6_ON=1; fi
+    printf '%s\n' "$CBI_OUT" | sed -n "s/^cn$CBI_F=//p" > "$RUN/state/cnip-bpf$CBI_F.count" 2>/dev/null || true
+    cnip_file_sig "$CBI_FILE" > "$RUN/state/cnip-bpf$CBI_F.stamp" 2>/dev/null || true
+  done
+  [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ] || cnip_bpf_fail unusable
+  return 0
+}
+cnip_bpf_fail(){
+  CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}bpf-${1:-error}"; CNIP_STATE=degraded; CN_FORCE=""; CN4_ON=0; CN6_ON=0
+  [ "$EBPF_STATE" = active ] || ebpf_unload || true
+  cnip_auto_off
 }
 # After the bypass/LAN returns of a capture or guard chain: CN destinations RETURN (no proxy, no
 # guard). $4: owner = local chain, exempt UIDs jump with -g to "<chain>_T" which holds every
@@ -1754,9 +1805,15 @@ cnip_prepare(){
 cn_split(){
   CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
   case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
-  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
+  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"; [ "$CN_UDPONLY" != 1 ] || CS_P="-p udp"
   # ipset: the set match; iptables tree: the CN verdict bit HETU_CNC stored on the connection.
   CS_M="-m set --match-set $CS_SET dst"; [ "$CNIP_STATE" != iptables ] || CS_M="-m connmark --mark $CN_CT_CN/$CN_CT_CN"
+  if [ "$CNIP_STATE" = ebpf ]; then
+    # 6.0.0 eBPF backend. The Kill Switch guard outlives the session's pins (they go at stop): it never
+    # references one, so with this backend it keeps CN destinations blocked like every other one.
+    case "$CS_C" in "$KOUT"|"$KOUT"_*|"$KFWD"|"$KFWD"_*) return 0;; esac
+    case "$CS_BIN" in xt6*) CS_M="-m bpf --object-pinned $EBPF_PIN/prog_hetu_cn6";; *) CS_M="-m bpf --object-pinned $EBPF_PIN/prog_hetu_cn4";; esac
+  fi
   if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
     CS_TAIL="${CS_C}_T"
     if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
@@ -1808,6 +1865,7 @@ cnip_reload(){ (
   trap 'release_lock' EXIT
   cnip_load_session
   [ "$CNIP_STATE" != iptables ] || cnip_xt_reload
+  [ "$CNIP_STATE" != ebpf ] || cnip_bpf_reload
   if [ "$CNIP_STATE" != ipset ]; then printf '{"ok":true,"reloaded":false,"cnip":"%s","message":"内核 CNIP 未生效，数据已保存，下次启动使用"}\n' "$CNIP_STATE"; exit 0; fi
   CR_DUE=0
   if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
@@ -1965,6 +2023,28 @@ cnip_xt_install(){
   if [ "$CN6_ON" = 1 ]; then cnip_xt_build 6 || CN6_ON=0; else cnip_xt_drop 6 || true; fi
   if [ "$CN4_ON" != 1 ] && [ "$CN6_ON" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; fi
   return 0
+}
+# 6.0.0: new CN data into the running session's LPM maps (hetu-bpf validates it first; invalid data keeps the map).
+cnip_bpf_reload(){
+  # Unchanged data (same cksum as the stamp of the last sync) leaves the maps alone: the watchdog asks every ~12 s.
+  CR_DUE=0
+  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-bpf4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-bpf6.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CR_DUE" = 0 ]; then printf '{"ok":true,"reloaded":false,"cnip":"ebpf","message":"CNIP 数据未变化"}\n'; exit 0; fi
+  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
+  CR_FAILED=0; CNIP_REASON=""
+  for CR_F in 4 6; do
+    if [ "$CR_F" = 4 ]; then [ "$CN4_ON" = 1 ] || continue; CR_FILE="$CN_FILE4"; else [ "$CN6_ON" = 1 ] || continue; CR_FILE="$CN_FILE6"; fi
+    [ "$(cnip_file_sig "$CR_FILE")" != "$(cat "$RUN/state/cnip-bpf$CR_F.stamp" 2>/dev/null)" ] || continue
+    if CR_OUT=$(ebpf_tool sync-cn "$EBPF_PIN" "$CR_F" "$CR_FILE" 2>/dev/null); then
+      printf '%s\n' "$CR_OUT" | sed -n "s/^cn$CR_F=//p" > "$RUN/state/cnip-bpf$CR_F.count" 2>/dev/null || true
+      cnip_file_sig "$CR_FILE" > "$RUN/state/cnip-bpf$CR_F.stamp" 2>/dev/null || true
+    else CR_FAILED=1; CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CR_F-$(ebpf_reason "$CR_OUT")"; fi
+  done
+  printf '%s cnip-reload(ebpf) failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
+  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ebpf","message":"CNIP eBPF 映射已热更新"}\n'
+  else printf '{"ok":false,"reloaded":false,"cnip":"ebpf","message":"CNIP 新数据无效或写入失败，继续使用原映射"}\n'; fi
+  exit 0
 }
 cnip_xt_reload(){
   CR_DUE=0
@@ -3607,7 +3687,7 @@ watchdog(){
     if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
       MISS=0; H_TICK=$((H_TICK+1))
       if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
-        case "$CNIP_STATE" in ipset|iptables) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
+        case "$CNIP_STATE" in ipset|iptables|ebpf) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
       wd_selfheal_tick
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
@@ -4166,6 +4246,7 @@ start(){
   ebpf_prepare
   # CNIP without ipset: the iptables tree goes in before any capture rule tests its verdict bit.
   start_stage "cnip-chain"
+  cnip_bpf_install
   cnip_xt_install
   start_stage "install-capture-batch"
   xt_batch_begin || fail "无法准备防火墙批量规则"
@@ -4195,7 +4276,7 @@ start(){
   # Finish the immutable session before its integrity snapshot. Updating it after
   # health_record would invalidate every status check and disable owned-rule repair.
   printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\nCNIP_UDPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && echo "$CN_TCPONLY" || echo 0)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && echo "$CN_UDPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
   printf 'EBPF_MATCH=%s\nEBPF_REASON=%s\n' "$EBPF_STATE" "$EBPF_REASON" >> "$SESSION" || { fail "无法记录 eBPF 匹配状态，已停止本次启动"; }
   printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
@@ -4445,11 +4526,15 @@ status(){
     if [ "$CN6_ON" = 1 ]; then CNIP6N=$(cat "$RUN/state/cnip-xt6.count" 2>/dev/null); xt6q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v6-chain-missing"; fi
     case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
     case "$CNIPR" in *chain-missing*) CNIP_STATE=degraded;; esac
+  elif [ "$CNIP_STATE" = ebpf ]; then
+    [ "$CN4_ON" != 1 ] || CNIP4N=$(cat "$RUN/state/cnip-bpf4.count" 2>/dev/null); [ "$CN6_ON" != 1 ] || CNIP6N=$(cat "$RUN/state/cnip-bpf6.count" 2>/dev/null)
+    case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
+    if { [ "$CN4_ON" = 1 ] && [ ! -e "$EBPF_PIN/prog_hetu_cn4" ]; } || { [ "$CN6_ON" = 1 ] && [ ! -e "$EBPF_PIN/prog_hetu_cn6" ]; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}pins-missing"; fi
   fi
   ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
   # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | route-down | fakeip-lost | offline), else empty.
   EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"cnipUdpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_UDPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.

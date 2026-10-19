@@ -241,6 +241,7 @@ internal fun ToolsCnIpScreen(
     modifier: Modifier = Modifier,
     onKernelChange: ((v4: Boolean, v6: Boolean) -> Unit)? = null,
     onTcpOnlyChange: ((Boolean) -> Unit)? = null,
+    onUdpDirectChange: ((Boolean) -> Unit)? = null,
 ) {
     val stagger = rememberHomeStagger()
     ToolsPage(title = "CNIP 设置", onBack = onBack, modifier = modifier, subtitle = "中国大陆 IPv4 / IPv6 自动直连") {
@@ -256,6 +257,18 @@ internal fun ToolsCnIpScreen(
         if (onKernelChange != null) {
             // Kernel-level bypass: the same glass card family as the rows above.
             HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
+                if (onUdpDirectChange != null) {
+                    // 6.0.0, default on: calls and games to CN addresses skip the core's userspace UDP relay.
+                    val full = state.kernelV4 || state.kernelV6
+                    ToolsSwitchRow(
+                        "国内 UDP 内核直连", state.udpDirect || full, onUdpDirectChange,
+                        icon = ToolsFeatureIcons.ShieldCheck,
+                        subtitle = if (full) "已开启内核绕过：国内 TCP 和 UDP 都不经过核心"
+                            else "视频 / 语音通话、游戏发往国内 IP 的 UDP 不经过核心，减少卡顿；TCP 仍经核心规则。默认开启",
+                        enabled = state.load is ToolsLoad.Ready && !full,
+                    )
+                    HomeRowDivider(start = HomeRowDims.textStart)
+                }
                 ToolsSwitchRow(
                     "内核绕过 IPv4", state.kernelV4, { onKernelChange(it, state.kernelV6) },
                     icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset）",
@@ -299,16 +312,32 @@ internal data class CnIpStatusPart(val key: String, val args: List<Any> = emptyL
  */
 internal fun cnIpKernelStatusParts(state: ToolsCnIpState): List<CnIpStatusPart> {
     val reason = state.kernelReason
+    val active = state.kernelStatus == "ipset" || state.kernelStatus == "iptables" || state.kernelStatus == "ebpf"
     return when {
+        // 6.0.0: the default UDP-only bypass while the full bypass is off; a kernel without it runs without it.
+        !state.kernelV4 && !state.kernelV6 && state.udpDirect -> when {
+            active && state.kernelUdpOnly -> buildList {
+                add(CnIpStatusPart(if (state.kernelStatus == "ebpf") "国内 UDP 内核直连生效（eBPF）" else "国内 UDP 内核直连生效（ipset）"))
+                if (state.kernelV4Entries > 0) add(CnIpStatusPart("IPv4 %s 段", listOf(state.kernelV4Entries)))
+                if (state.kernelV6Entries > 0) add(CnIpStatusPart("IPv6 %s 段", listOf(state.kernelV6Entries)))
+            }
+            state.kernelStatus == "off" && reason.isNotBlank() -> listOf(CnIpStatusPart("本机内核不支持国内 UDP 直连，UDP 仍经核心（%s）", listOf(reason)))
+            else -> listOf(CnIpStatusPart("重启代理后生效"))
+        }
         !state.kernelV4 && !state.kernelV6 -> listOf(CnIpStatusPart("未开启"))
-        state.kernelStatus == "ipset" || state.kernelStatus == "iptables" -> buildList {
-            add(CnIpStatusPart(if (state.kernelStatus == "ipset") "内核 ipset 生效" else "内核 iptables 规则生效（本机没有 ipset）"))
+        active -> buildList {
+            add(CnIpStatusPart(when (state.kernelStatus) {
+                "ipset" -> "内核 ipset 生效"
+                "ebpf" -> "内核 eBPF 生效（本机没有 ipset）"
+                else -> "内核 iptables 规则生效（本机没有 ipset）"
+            }))
             if (state.kernelV4Entries > 0) add(CnIpStatusPart("IPv4 %s 段", listOf(state.kernelV4Entries)))
             if (state.kernelV6Entries > 0) add(CnIpStatusPart("IPv6 %s 段", listOf(state.kernelV6Entries)))
             if (state.kernelV6 && reason.contains("v6-mode-")) add(CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式"))
         }
         state.kernelStatus == "degraded" -> listOf(when {
-            reason.contains("chain-missing") -> CnIpStatusPart("内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复")
+            reason.contains("chain-missing") || reason.contains("pins-missing") -> CnIpStatusPart("内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复")
+            reason.contains("bpf-") -> CnIpStatusPart("设备没有 ipset，eBPF 也不可用，已降级为核心内规则（%s）", listOf(reason))
             reason.contains("xt-connmark-unavailable") -> CnIpStatusPart("设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则")
             reason.contains("mode-tun") || reason.contains("mode-ebpf") -> CnIpStatusPart("当前代理模式不支持内核绕过，已降级为核心内规则")
             reason.contains("iptables-failed") || reason.contains("restore-missing") -> CnIpStatusPart("内核 iptables 规则安装失败，已降级为核心内规则（%s）", listOf(reason))

@@ -267,8 +267,25 @@ class Ebpf93(cn.Cnip93):
         self.assertEqual('proxy', self.verdict('4', 10100, '8.8.8.8')); self.assertIsNone(self.verdict('4', 10300, '8.8.8.8'))
         self.stop(); self.assert_clean(); self.assert_no_ebpf()
 
+    def hold_watchdog(self):
+        """The session's watchdog runs `ip` and iptables reads on its own clock (its address check, the
+        12 s repair-network); it is stopped while a test measures what one command ran, then resumed.
+        Without this the check flaked (base tree 1 of 10 runs, 6.0.0): the watchdog's own `ip -o -4 addr`
+        landed inside the measured window."""
+        def resume():
+            try: os.kill(pid, signal.SIGCONT)
+            except OSError: pass
+        try: pid = int(self.read(self.base / 'run/watchdog.pid').strip())
+        except ValueError: return lambda: None
+        try: os.kill(pid, signal.SIGSTOP)
+        except OSError: return lambda: None
+        self.addCleanup(resume)
+        time.sleep(0.5)  # a command it had already started finishes and logs before the snapshot
+        return resume
+
     def test_ebpf_update_rewrites_maps_without_touching_iptables(self):
         self.enable(); self.start_with()
+        resume = self.hold_watchdog()
         before = self.state.read_text(); calls = self.read(str(self.state) + '.calls')
         r = self.run_cmd('ebpf-update', '', '10300', '198.51.100.0/24')
         out = json.loads(r.stdout.strip().splitlines()[-1])
@@ -276,6 +293,7 @@ class Ebpf93(cn.Cnip93):
         self.assertIn('uid=1', out['ebpfEntries'])
         self.assertEqual(before, self.state.read_text(), 'no rule changed')
         self.assertEqual(calls, self.read(str(self.state) + '.calls'), 'no iptables process ran')
+        resume()
         self.assertEqual({'10300': 2}, self.maps()['hetu_uid'])
         self.assertIsNone(self.verdict('4', 10300, '8.8.8.8')); self.assertEqual('proxy', self.verdict('4', 10100, '8.8.8.8'))
         self.assertIsNone(self.verdict('4', 10123, '198.51.100.9')); self.assertEqual('proxy', self.verdict('4', 10123, '203.0.113.7'))

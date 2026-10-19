@@ -206,6 +206,10 @@ internal data class ToolsCnIpState(
     val kernelV6Entries: Int = 0,
     /** Optional (default off): only TCP to CN addresses skips the core; UDP/QUIC still reaches it. */
     val kernelTcpOnly: Boolean = false,
+    /** 6.0.0, default on while the full bypass is off: UDP to CN addresses (calls, games) skips the core. */
+    val udpDirect: Boolean = true,
+    /** The running session bypasses only UDP (status cnipUdpOnly). */
+    val kernelUdpOnly: Boolean = false,
 )
 
 /** What the CNIP kernel bypass page reads back. */
@@ -434,6 +438,9 @@ internal class ToolsFeatureActions(
     val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
     val loadCnIpTcpOnly: (suspend () -> Boolean)? = null,
     val setCnIpTcpOnly: suspend (Boolean) -> Unit = {},
+    /** 6.0.0: 国内 UDP 内核直连 (default on) and whether the running session applies it UDP-only. */
+    val loadCnIpUdp: (suspend () -> Pair<Boolean, Boolean>)? = null,
+    val setCnIpUdp: suspend (Boolean) -> Unit = {},
 
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,

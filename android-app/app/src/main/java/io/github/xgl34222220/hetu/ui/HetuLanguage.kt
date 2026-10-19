@@ -1400,6 +1400,14 @@ private val vocabularyCnipSpeed = """
 国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
 内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
 内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)
+内核 eBPF 生效（本机没有 ipset）|Kernel eBPF active (this device has no ipset)|核心 eBPF 生效（本機沒有 ipset）|eBPF в ядре активен (на устройстве нет ipset)
+国内 UDP 内核直连|Domestic UDP direct in the kernel|國內 UDP 核心直連|Внутренний UDP напрямую в ядре
+已开启内核绕过：国内 TCP 和 UDP 都不经过核心|Kernel bypass is on: domestic TCP and UDP both skip the core|已開啟核心繞過：國內 TCP 和 UDP 都不經過核心|Обход в ядре включён: внутренний TCP и UDP идут мимо ядра прокси
+视频 / 语音通话、游戏发往国内 IP 的 UDP 不经过核心，减少卡顿；TCP 仍经核心规则。默认开启|UDP to domestic IPs (video / voice calls, games) skips the core to reduce lag; TCP still follows the core rules. On by default|視訊 / 語音通話、遊戲發往國內 IP 的 UDP 不經過核心，減少卡頓；TCP 仍經核心規則。預設開啟|UDP к внутренним IP (видео- и голосовые звонки, игры) идёт мимо ядра прокси, чтобы меньше тормозило; TCP по-прежнему по правилам ядра. Включено по умолчанию
+国内 UDP 内核直连生效（eBPF）|Domestic UDP direct active (eBPF)|國內 UDP 核心直連生效（eBPF）|Внутренний UDP напрямую активен (eBPF)
+国内 UDP 内核直连生效（ipset）|Domestic UDP direct active (ipset)|國內 UDP 核心直連生效（ipset）|Внутренний UDP напрямую активен (ipset)
+本机内核不支持国内 UDP 直连，UDP 仍经核心（%s）|This kernel cannot send domestic UDP direct; UDP still goes through the core (%s)|本機核心不支援國內 UDP 直連，UDP 仍經核心（%s）|Ядро устройства не умеет отправлять внутренний UDP напрямую; UDP по-прежнему идёт через ядро прокси (%s)
+设备没有 ipset，eBPF 也不可用，已降级为核心内规则（%s）|This device has no ipset and eBPF is unavailable; the core rules handle it instead (%s)|裝置沒有 ipset，eBPF 也無法使用，已降級為核心內規則（%s）|На устройстве нет ipset, и eBPF недоступен; вместо этого работают правила ядра прокси (%s)
 IPv4 %s 段|IPv4 %s ranges|IPv4 %s 段|IPv4: %s диапазонов
 IPv6 %s 段|IPv6 %s ranges|IPv6 %s 段|IPv6: %s диапазонов
 IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs IPv6 mode "Enable / Strict"|IPv6 未生效：需要 IPv6「啟用／嚴格」模式|IPv6 не применён: нужен режим IPv6 «Включить / Строгий»

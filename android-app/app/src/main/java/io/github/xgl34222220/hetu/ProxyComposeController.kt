@@ -347,6 +347,7 @@ internal class ProxyComposeController(context: Context) {
                     .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
                     .putString("proxyRootIpv6DnsPolicy", status.optString("ipv6DnsPolicy", ""))
                     .putBoolean("proxyCnIpKernelTcpOnlyActive", status.optBoolean("cnipTcpOnly", false))
+                    .putBoolean("proxyCnIpKernelUdpOnlyActive", status.optBoolean("cnipUdpOnly", false))
                     .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
                     .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
                     .putString("proxyRootTuning", status.optString("tuning", ""))

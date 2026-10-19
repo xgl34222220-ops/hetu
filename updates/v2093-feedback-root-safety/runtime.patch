@@ -36617,7 +36617,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..67fb5e0 100755
+index ae832da..30d13ed 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36680,7 +36680,7 @@ index ae832da..67fb5e0 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +100,176 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +100,183 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -36696,6 +36696,13 @@ index ae832da..67fb5e0 100755
 +CN6_ON=0
 +CN_FORCE=""
 +CN_TCPONLY=0
++# 6.0.0: UDPONLY = only UDP to CN addresses skips the core (video/voice calls, games); AUTO = the App's
++# default rather than a switch the user turned on, so a kernel that cannot do it simply runs without it.
++CN_UDPONLY=0
++CN_AUTO=0
++# 6.0.0: families cnip_prepare left for the eBPF backend (no ipset), installed by cnip_bpf_install.
++CN_BPF4=0
++CN_BPF6=0
 +CN_CHAIN=""
 +CNIP_STATE=off
 +CNIP_REASON=""
@@ -36860,7 +36867,7 @@ index ae832da..67fb5e0 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +281,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +288,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -36984,7 +36991,7 @@ index ae832da..67fb5e0 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +403,53 @@ acquire_lock(){
+@@ -99,10 +410,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -37040,7 +37047,7 @@ index ae832da..67fb5e0 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +535,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +542,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -37064,7 +37071,7 @@ index ae832da..67fb5e0 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +584,9 @@ cleanup4(){
+@@ -233,7 +591,9 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -37075,7 +37082,7 @@ index ae832da..67fb5e0 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +601,453 @@ cleanup6(){
+@@ -248,13 +608,453 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -37531,7 +37538,7 @@ index ae832da..67fb5e0 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +1079,21 @@ findcorepid(){
+@@ -286,8 +1086,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -37554,7 +37561,7 @@ index ae832da..67fb5e0 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +1102,8 @@ stopcore(){
+@@ -296,6 +1109,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -37563,7 +37570,7 @@ index ae832da..67fb5e0 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,8 +1128,65 @@ stopcore(){
+@@ -320,8 +1135,65 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -37629,7 +37636,7 @@ index ae832da..67fb5e0 100755
 
  # procfs reports a zero stat size even when this file contains IPv6 addresses.
  # Install the selected IPv6 policy whenever the kernel supports IPv6, including
-@@ -362,6 +1227,138 @@ v6disabled(){
+@@ -362,6 +1234,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -37768,7 +37775,7 @@ index ae832da..67fb5e0 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1453,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1460,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -37866,7 +37873,7 @@ index ae832da..67fb5e0 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1561,8 @@ core_return(){
+@@ -473,8 +1568,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -37877,7 +37884,7 @@ index ae832da..67fb5e0 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1586,14 @@ append_scoped(){
+@@ -498,12 +1593,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -37894,7 +37901,7 @@ index ae832da..67fb5e0 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1601,21 @@ scoped_redirect(){
+@@ -511,17 +1608,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -37919,7 +37926,7 @@ index ae832da..67fb5e0 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,15 +1627,459 @@ bypass4(){
+@@ -533,15 +1634,532 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -37937,7 +37944,7 @@ index ae832da..67fb5e0 100755
 +# ---------------------------------------------------------------- CNIP (ipset)
 +cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
 +cnip_load_policy(){
-+  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0
++  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0; CN_XT=0; CN_UDPONLY=0; CN_AUTO=0
 +  [ -r "$BASE/policy/cnip" ] || return 1
 +  # The iptables CIDR tree (no ipset binary) is opt-in only: on ColorOS it left ~1000 mangle
 +  # chains behind and slowed every later iptables call until starts timed out (4.0.0).
@@ -37945,6 +37952,9 @@ index ae832da..67fb5e0 100755
 +  CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
 +  # Optional (default off): only TCP to CN addresses bypasses the core; UDP/QUIC still reaches it.
 +  [ "$(cnip_policy_value TCPONLY)" = 1 ] && CN_TCPONLY=1
++  # 6.0.0: only UDP (the App's default, AUTO=1: video/voice calls and games skip the core's userspace relay).
++  if [ "$CN_TCPONLY" != 1 ] && [ "$(cnip_policy_value UDPONLY)" = 1 ]; then CN_UDPONLY=1; fi
++  [ "$(cnip_policy_value AUTO)" != 1 ] || CN_AUTO=1
 +  bool "$CNP_V4" || CNP_V4=0; bool "$CNP_V6" || CNP_V6=0
 +  split_safe_uids "$CN_FORCE" || CN_FORCE=""
 +  [ "$CNP_V4" = 1 ] || [ "$CNP_V6" = 1 ]
@@ -37952,9 +37962,10 @@ index ae832da..67fb5e0 100755
 +# What the running session installed (watchdog Kill Switch, status, reload read it back).
 +cnip_load_session(){
 +  CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
-+  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
-+  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || return 0
++  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0; CN_UDPONLY=0
++  [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ] || return 0
 +  [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
++  [ "$(sed -n 's/^CNIP_UDPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_UDPONLY=1
 +  [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
 +  [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
 +  CN_FORCE=$(sed -n 's/^CNIP_FORCE=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -38019,21 +38030,33 @@ index ae832da..67fb5e0 100755
 +}
 +# Start: decide which families bypass in the kernel. Never fails the start; degrades instead.
 +cnip_prepare(){
-+  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""
++  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""; CN_BPF4=0; CN_BPF6=0
 +  cnip_load_policy || { CN_FORCE=""; return 0; }
-+  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; return 0;; esac
++  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; cnip_auto_off; return 0;; esac
 +  if ! cnip_capable; then
 +    # No ipset: the iptables CIDR tree (installed by cnip_xt_install after the start's cleanup).
 +    CNIP_REASON=ipset-unavailable
-+    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; return 0; fi
-+    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; return 0; fi
++    # 6.0.0: otherwise the CN programs of hetu_match.o (one xt_bpf rule per chain backed by LPM maps), set up by
++    # cnip_bpf_install after the start's cleanup; until then nothing references them (CN4_ON/CN6_ON stay 0).
++    if [ "$CN_XT" != 1 ] && [ -x "$EBPF_TOOL" ] && [ -r "$EBPF_OBJECT" ]; then
++      if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN_BPF4=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
++      if [ "$CNP_V6" = 1 ]; then
++        if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then
++          if [ -s "$CN_FILE6" ]; then CN_BPF6=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
++        else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
++      fi
++      if [ "$CN_BPF4" = 1 ] || [ "$CN_BPF6" = 1 ]; then CNIP_STATE=ebpf; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
++      return 0
++    fi
++    if [ "$CN_XT" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; return 0; fi
++    if ! cnip_xt_capable; then CNIP_STATE=degraded; CNIP_REASON="$CNIP_REASON,xt-connmark-unavailable"; CN_FORCE=""; cnip_auto_off; return 0; fi
 +    if [ "$CNP_V4" = 1 ]; then if [ -s "$CN_FILE4" ]; then CN4_ON=1; else CNIP_REASON="$CNIP_REASON,v4-data-missing"; fi; fi
 +    if [ "$CNP_V6" = 1 ]; then
 +      if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables && has ip6tables-restore; then
 +        if [ -s "$CN_FILE6" ]; then CN6_ON=1; else CNIP_REASON="$CNIP_REASON,v6-data-missing"; fi
 +      else CNIP_REASON="$CNIP_REASON,v6-mode-$START_V6"; fi
 +    fi
-+    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; fi
++    if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=iptables; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
 +    return 0
 +  fi
 +  if [ "$CNP_V4" = 1 ]; then cnip_import 4 && CN4_ON=1; fi
@@ -38041,7 +38064,35 @@ index ae832da..67fb5e0 100755
 +    if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then cnip_import 6 && CN6_ON=1
 +    else CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v6-mode-$START_V6"; fi
 +  fi
-+  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; fi
++  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; cnip_auto_off; fi
++}
++# 6.0.0: the App's default (AUTO=1) is not a switch the user turned on: a kernel that cannot do it runs without
++# it (CNIP off, the reason kept for diagnostics) instead of reporting a degraded CNIP.
++cnip_auto_off(){ [ "$CN_AUTO" = 1 ] || return 0; CNIP_STATE=off; CN_FORCE=""; CN4_ON=0; CN6_ON=0; }
++# 6.0.0: what cnip_prepare chose for a kernel without ipset, after the start's cleanup (which drops stale pins)
++# and before any capture rule: hetu_match.o is loaded here unless the opt-in matcher already loaded it, xt_bpf
++# must accept the CN program and the LPM map takes the CN list (hetu-bpf sync-cn, same bounds as ipset).
++# Any failure leaves CNIP degraded (off for the App's default) with nothing referencing a pin.
++cnip_bpf_install(){
++  [ "$CNIP_STATE" = ebpf ] || return 0
++  if [ "$EBPF_STATE" != active ]; then
++    CBI_OUT=$(ebpf_tool load "$EBPF_OBJECT" "$EBPF_PIN" 2>/dev/null) || { cnip_bpf_fail "$(ebpf_reason "$CBI_OUT")"; return 0; }
++  fi
++  for CBI_F in 4 6; do
++    if [ "$CBI_F" = 4 ]; then [ "$CN_BPF4" = 1 ] || continue; CBI_FILE="$CN_FILE4"; CBI_XT=xt4; else [ "$CN_BPF6" = 1 ] || continue; CBI_FILE="$CN_FILE6"; CBI_XT=xt6; fi
++    if ! ebpf_xt_probe "$CBI_XT" "hetu_cn$CBI_F"; then CNIP_REASON="$CNIP_REASON,v$CBI_F-xt-bpf-unsupported"; continue; fi
++    CBI_OUT=$(ebpf_tool sync-cn "$EBPF_PIN" "$CBI_F" "$CBI_FILE" 2>/dev/null) || { CNIP_REASON="$CNIP_REASON,v$CBI_F-$(ebpf_reason "$CBI_OUT")"; continue; }
++    if [ "$CBI_F" = 4 ]; then CN4_ON=1; else CN6_ON=1; fi
++    printf '%s\n' "$CBI_OUT" | sed -n "s/^cn$CBI_F=//p" > "$RUN/state/cnip-bpf$CBI_F.count" 2>/dev/null || true
++    cnip_file_sig "$CBI_FILE" > "$RUN/state/cnip-bpf$CBI_F.stamp" 2>/dev/null || true
++  done
++  [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ] || cnip_bpf_fail unusable
++  return 0
++}
++cnip_bpf_fail(){
++  CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}bpf-${1:-error}"; CNIP_STATE=degraded; CN_FORCE=""; CN4_ON=0; CN6_ON=0
++  [ "$EBPF_STATE" = active ] || ebpf_unload || true
++  cnip_auto_off
 +}
 +# After the bypass/LAN returns of a capture or guard chain: CN destinations RETURN (no proxy, no
 +# guard). $4: owner = local chain, exempt UIDs jump with -g to "<chain>_T" which holds every
@@ -38050,9 +38101,15 @@ index ae832da..67fb5e0 100755
 +cn_split(){
 +  CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
 +  case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
-+  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
++  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"; [ "$CN_UDPONLY" != 1 ] || CS_P="-p udp"
 +  # ipset: the set match; iptables tree: the CN verdict bit HETU_CNC stored on the connection.
 +  CS_M="-m set --match-set $CS_SET dst"; [ "$CNIP_STATE" != iptables ] || CS_M="-m connmark --mark $CN_CT_CN/$CN_CT_CN"
++  if [ "$CNIP_STATE" = ebpf ]; then
++    # 6.0.0 eBPF backend. The Kill Switch guard outlives the session's pins (they go at stop): it never
++    # references one, so with this backend it keeps CN destinations blocked like every other one.
++    case "$CS_C" in "$KOUT"|"$KOUT"_*|"$KFWD"|"$KFWD"_*) return 0;; esac
++    case "$CS_BIN" in xt6*) CS_M="-m bpf --object-pinned $EBPF_PIN/prog_hetu_cn6";; *) CS_M="-m bpf --object-pinned $EBPF_PIN/prog_hetu_cn4";; esac
++  fi
 +  if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
 +    CS_TAIL="${CS_C}_T"
 +    if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
@@ -38104,6 +38161,7 @@ index ae832da..67fb5e0 100755
 +  trap 'release_lock' EXIT
 +  cnip_load_session
 +  [ "$CNIP_STATE" != iptables ] || cnip_xt_reload
++  [ "$CNIP_STATE" != ebpf ] || cnip_bpf_reload
 +  if [ "$CNIP_STATE" != ipset ]; then printf '{"ok":true,"reloaded":false,"cnip":"%s","message":"内核 CNIP 未生效，数据已保存，下次启动使用"}\n' "$CNIP_STATE"; exit 0; fi
 +  CR_DUE=0
 +  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
@@ -38262,6 +38320,28 @@ index ae832da..67fb5e0 100755
 +  if [ "$CN4_ON" != 1 ] && [ "$CN6_ON" != 1 ]; then CNIP_STATE=degraded; CN_FORCE=""; fi
 +  return 0
 +}
++# 6.0.0: new CN data into the running session's LPM maps (hetu-bpf validates it first; invalid data keeps the map).
++cnip_bpf_reload(){
++  # Unchanged data (same cksum as the stamp of the last sync) leaves the maps alone: the watchdog asks every ~12 s.
++  CR_DUE=0
++  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-bpf4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
++  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip-bpf6.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
++  if [ "$CR_DUE" = 0 ]; then printf '{"ok":true,"reloaded":false,"cnip":"ebpf","message":"CNIP 数据未变化"}\n'; exit 0; fi
++  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
++  CR_FAILED=0; CNIP_REASON=""
++  for CR_F in 4 6; do
++    if [ "$CR_F" = 4 ]; then [ "$CN4_ON" = 1 ] || continue; CR_FILE="$CN_FILE4"; else [ "$CN6_ON" = 1 ] || continue; CR_FILE="$CN_FILE6"; fi
++    [ "$(cnip_file_sig "$CR_FILE")" != "$(cat "$RUN/state/cnip-bpf$CR_F.stamp" 2>/dev/null)" ] || continue
++    if CR_OUT=$(ebpf_tool sync-cn "$EBPF_PIN" "$CR_F" "$CR_FILE" 2>/dev/null); then
++      printf '%s\n' "$CR_OUT" | sed -n "s/^cn$CR_F=//p" > "$RUN/state/cnip-bpf$CR_F.count" 2>/dev/null || true
++      cnip_file_sig "$CR_FILE" > "$RUN/state/cnip-bpf$CR_F.stamp" 2>/dev/null || true
++    else CR_FAILED=1; CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CR_F-$(ebpf_reason "$CR_OUT")"; fi
++  done
++  printf '%s cnip-reload(ebpf) failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
++  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ebpf","message":"CNIP eBPF 映射已热更新"}\n'
++  else printf '{"ok":false,"reloaded":false,"cnip":"ebpf","message":"CNIP 新数据无效或写入失败，继续使用原映射"}\n'; fi
++  exit 0
++}
 +cnip_xt_reload(){
 +  CR_DUE=0
 +  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip-xt4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
@@ -38379,7 +38459,7 @@ index ae832da..67fb5e0 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -710,8 +2248,12 @@ local_destination_return(){
+@@ -710,8 +2328,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -38393,7 +38473,7 @@ index ae832da..67fb5e0 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +2273,23 @@ install_mangle4(){
+@@ -731,22 +2353,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -38426,7 +38506,7 @@ index ae832da..67fb5e0 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +2304,45 @@ install_mangle6(){
+@@ -761,40 +2384,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -38486,7 +38566,7 @@ index ae832da..67fb5e0 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +2370,12 @@ remove_dot_guard(){
+@@ -822,12 +2450,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -38501,7 +38581,7 @@ index ae832da..67fb5e0 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +2389,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2469,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -38523,7 +38603,7 @@ index ae832da..67fb5e0 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +2414,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2494,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -38567,7 +38647,7 @@ index ae832da..67fb5e0 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +2473,128 @@ v6_disable_guard_ready(){
+@@ -921,22 +2553,134 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -38638,6 +38718,12 @@ index ae832da..67fb5e0 100755
  }
 
 -validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
+-hexport(){ printf '%04X' "$1" 2>/dev/null; }
+-# One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
+-LISTEN_SNAPSHOT_VALID=0
+-LISTEN_PORTS=''
+-listen_snapshot(){
+-  LISTEN_SNAPSHOT_VALID=0; LISTEN_PORTS=''
 +core_kind(){
 +  CK="$CORE_KIND_OVERRIDE"; [ -n "$CK" ] || CK=$(head -n 1 "$CORE_KIND_FILE" 2>/dev/null || true)
 +  case "$CK" in sing-box|xray|v2ray|hysteria) printf '%s' "$CK";; *) printf mihomo;; esac
@@ -38698,10 +38784,16 @@ index ae832da..67fb5e0 100755
 +    timeout -s TERM -k 1 "$VC_LEFT" "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1
 +  else "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; fi
 +}
- hexport(){ printf '%04X' "$1" 2>/dev/null; }
- # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
- LISTEN_SNAPSHOT_VALID=0
-@@ -961,10 +2625,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
++hexport(){ printf '%04X' "$1" 2>/dev/null; }
++# One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
++LISTEN_SNAPSHOT_VALID=0
++LISTEN_PORTS=''
++listen_snapshot(){
++  LISTEN_SNAPSHOT_VALID=0; LISTEN_PORTS=''
+   if has ss; then
+     LS_RAW=$(ss -lnut 2>/dev/null); LS_RC=$?
+     if [ "$LS_RC" = 0 ]; then
+@@ -961,10 +2705,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -38789,14 +38881,10 @@ index ae832da..67fb5e0 100755
  check_start_ports(){
    listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
    M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
-@@ -1019,20 +2759,911 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2839,911 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
--watchdog(){
--  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
--  load_session_fake_ip_policy || exit 0
--  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
 +# ---- self-heal helpers (watchdog) --------------------------------------------------------
 +# setsid only when it keeps the PID of a background child (it forks for a group leader).
 +detach_probe(){
@@ -39623,14 +39711,16 @@ index ae832da..67fb5e0 100755
 +  WD_DP_NEXT=$((WD_NOW+WD_DP_BACKOFF)); WD_DP_BACKOFF=$((WD_DP_BACKOFF*2)); [ "$WD_DP_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_DP_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
 +  case "$WDT_C" in proxy-down) wd_proxy_heal;; route-down) wd_route_heal;; *) wd_dataplane_heal;; esac
 +}
-+watchdog(){
+ watchdog(){
+-  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
 +  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; WD_GENERATION="${11:-}"
 +  [ -n "$WD_GENERATION" ] && [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
 +  WD_N=0
 +  while [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ]; do
 +    WD_N=$((WD_N+1)); [ "$WD_N" -lt 40 ] || exit 0; sleep 0.025
 +  done
-+  load_session_fake_ip_policy || exit 0
+   load_session_fake_ip_policy || exit 0
+-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
 +  cnip_load_session
 +  share_load_session
 +  printf '%s\n' "$WD_GENERATION" > "$RUN/watchdog.ready.$$" || exit 0
@@ -39645,7 +39735,7 @@ index ae832da..67fb5e0 100755
 +    if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
 +      MISS=0; H_TICK=$((H_TICK+1))
 +      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
-+        case "$CNIP_STATE" in ipset|iptables) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
++        case "$CNIP_STATE" in ipset|iptables|ebpf) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
 +      wd_selfheal_tick
 +      sleep 2
 +    else MISS=$((MISS+1)); sleep 0.20; fi
@@ -39711,7 +39801,7 @@ index ae832da..67fb5e0 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +3676,45 @@ probe_core_owner(){
+@@ -1045,9 +3756,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -39758,7 +39848,7 @@ index ae832da..67fb5e0 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +3725,29 @@ core_identity_prepare(){
+@@ -1058,14 +3805,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -39792,7 +39882,7 @@ index ae832da..67fb5e0 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +3761,9 @@ core_launch(){
+@@ -1079,8 +3841,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -39804,7 +39894,7 @@ index ae832da..67fb5e0 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,25 +3830,78 @@ core_tune(){
+@@ -1147,25 +3910,78 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -39884,7 +39974,7 @@ index ae832da..67fb5e0 100755
    GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
    GF_FILE="$RUN/.google-firewall.$$"
    for GF_TOOL in xt4q xt6q; do
-@@ -1208,33 +3944,128 @@ google_firewall_cleanup(){
+@@ -1208,33 +4024,128 @@ google_firewall_cleanup(){
      tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
    fi
  }
@@ -39929,7 +40019,7 @@ index ae832da..67fb5e0 100755
 +  printf '%s\n' "$GD_UIDS" > "$RUN/google-firewall-uids" 2>/dev/null || true
 +  google_firewall_ebpf check "$GD_UIDS"
 +}
-
++
 +install_capture_rules(){
 +  start_stage "install-ipv4-tproxy"
 +  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
@@ -39982,7 +40072,7 @@ index ae832da..67fb5e0 100755
 +  done
 +  SWEEP_ONLY=""
 +}
-+
+
 +# What a watchdog restart replays, the self-heal budget (reset by every start that is not itself a
 +# self-heal restart) and where this session's processes ended up in the cgroup tree.
 +start_selfheal_record(){ { start_selfheal_body "$@"; } 2>/dev/null; return 0; }
@@ -40017,7 +40107,7 @@ index ae832da..67fb5e0 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +4073,16 @@ start(){
+@@ -1242,8 +4153,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -40027,15 +40117,15 @@ index ae832da..67fb5e0 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +4092,97 @@ start(){
+@@ -1253,75 +4172,98 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -40139,6 +40229,7 @@ index ae832da..67fb5e0 100755
 +  ebpf_prepare
 +  # CNIP without ipset: the iptables tree goes in before any capture rule tests its verdict bit.
 +  start_stage "cnip-chain"
++  cnip_bpf_install
 +  cnip_xt_install
 +  start_stage "install-capture-batch"
 +  xt_batch_begin || fail "无法准备防火墙批量规则"
@@ -40171,14 +40262,14 @@ index ae832da..67fb5e0 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +4194,94 @@ start(){
+@@ -1333,19 +4275,94 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
 -  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 DNS 接管状态，已停止本次启动"; }
 -  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
 +  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
++  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\nCNIP_UDPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && echo "$CN_TCPONLY" || echo 0)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && echo "$CN_UDPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
 +  printf 'EBPF_MATCH=%s\nEBPF_REASON=%s\n' "$EBPF_STATE" "$EBPF_REASON" >> "$SESSION" || { fail "无法记录 eBPF 匹配状态，已停止本次启动"; }
 +  printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
 +  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
@@ -40272,7 +40363,7 @@ index ae832da..67fb5e0 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +4294,8 @@ status(){
+@@ -1358,6 +4375,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -40281,7 +40372,7 @@ index ae832da..67fb5e0 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1375,6 +4313,7 @@ status(){
+@@ -1375,6 +4394,7 @@ status(){
    DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
    PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
    GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
@@ -40289,7 +40380,7 @@ index ae832da..67fb5e0 100755
    TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
    CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
    case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
-@@ -1407,6 +4346,12 @@ status(){
+@@ -1407,6 +4427,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -40302,7 +40393,7 @@ index ae832da..67fb5e0 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +4432,30 @@ status(){
+@@ -1487,13 +4513,34 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -40320,11 +40411,15 @@ index ae832da..67fb5e0 100755
 +    if [ "$CN6_ON" = 1 ]; then CNIP6N=$(cat "$RUN/state/cnip-xt6.count" 2>/dev/null); xt6q -t mangle -C OUTPUT -j HETU_CNC >/dev/null 2>&1 || CNIPR="${CNIPR:+$CNIPR,}v6-chain-missing"; fi
 +    case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
 +    case "$CNIPR" in *chain-missing*) CNIP_STATE=degraded;; esac
++  elif [ "$CNIP_STATE" = ebpf ]; then
++    [ "$CN4_ON" != 1 ] || CNIP4N=$(cat "$RUN/state/cnip-bpf4.count" 2>/dev/null); [ "$CN6_ON" != 1 ] || CNIP6N=$(cat "$RUN/state/cnip-bpf6.count" 2>/dev/null)
++    case "$CNIP4N" in ''|*[!0-9]*) CNIP4N=0;; esac; case "$CNIP6N" in ''|*[!0-9]*) CNIP6N=0;; esac
++    if { [ "$CN4_ON" = 1 ] && [ ! -e "$EBPF_PIN/prog_hetu_cn4" ]; } || { [ "$CN6_ON" = 1 ] && [ ! -e "$EBPF_PIN/prog_hetu_cn6" ]; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}pins-missing"; fi
 +  fi
 +  ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
 +  # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | route-down | fakeip-lost | offline), else empty.
 +  EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
-+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
++  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"cnipUdpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_UDPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
  }
 
  # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -40335,7 +40430,7 @@ index ae832da..67fb5e0 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +4579,8 @@ health_collect(){
+@@ -1617,6 +4664,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -40344,7 +40439,7 @@ index ae832da..67fb5e0 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +4630,18 @@ health_restore_table(){
+@@ -1666,16 +4715,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -40365,7 +40460,7 @@ index ae832da..67fb5e0 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +4690,7 @@ health_repair(){ (
+@@ -1724,7 +4775,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -40374,7 +40469,7 @@ index ae832da..67fb5e0 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +4723,481 @@ health_json(){ (
+@@ -1757,6 +4808,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -40856,7 +40951,7 @@ index ae832da..67fb5e0 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +5215,33 @@ case "${1:-status}" in
+@@ -1774,10 +5300,33 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -54651,7 +54746,7 @@ index 738ebf5..428a4cc 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..91d3aeb 100644
+index 4f004b9..babc155 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
@@ -54775,7 +54870,7 @@ index 4f004b9..91d3aeb 100644
          }
          // A completed status observation supersedes the cached fast hint, including
          // a confirmed stopped core. Missing/failed observations keep only the hint.
-@@ -275,15 +338,21 @@ internal class ProxyComposeController(context: Context) {
+@@ -275,15 +338,22 @@ internal class ProxyComposeController(context: Context) {
                      .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
                      .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
                      .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
@@ -54788,6 +54883,7 @@ index 4f004b9..91d3aeb 100644
                      .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
 +                    .putString("proxyRootIpv6DnsPolicy", status.optString("ipv6DnsPolicy", ""))
 +                    .putBoolean("proxyCnIpKernelTcpOnlyActive", status.optBoolean("cnipTcpOnly", false))
++                    .putBoolean("proxyCnIpKernelUdpOnlyActive", status.optBoolean("cnipUdpOnly", false))
                      .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
                      .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
                      .putString("proxyRootTuning", status.optString("tuning", ""))
@@ -54797,7 +54893,7 @@ index 4f004b9..91d3aeb 100644
                      .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
                  val livePort = status.optInt("controllerPort", 0)
                  if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
-@@ -299,13 +368,39 @@ internal class ProxyComposeController(context: Context) {
+@@ -299,13 +369,39 @@ internal class ProxyComposeController(context: Context) {
          var trafficMode = ""
          var controllerReadFailed = false
          var controllerError = ""
@@ -54842,7 +54938,7 @@ index 4f004b9..91d3aeb 100644
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
                  // selection or publish the absent counters as a fresh zero measurement.
-@@ -337,7 +432,8 @@ internal class ProxyComposeController(context: Context) {
+@@ -337,7 +433,8 @@ internal class ProxyComposeController(context: Context) {
          }
          val observed = ProxyComposeState(
              running = running,
@@ -54852,7 +54948,7 @@ index 4f004b9..91d3aeb 100644
              mode = profile.mode.label,
              ipv6 = profile.ipv6.id,
              effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
-@@ -362,6 +458,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -362,6 +459,7 @@ internal class ProxyComposeController(context: Context) {
                  else -> ""
              },
              panelReady = panelReady,
@@ -54860,7 +54956,7 @@ index 4f004b9..91d3aeb 100644
              controllerReadFailed = controllerReadFailed,
              controllerError = controllerError,
              groups = groups,
-@@ -384,6 +481,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -384,6 +482,7 @@ internal class ProxyComposeController(context: Context) {
              watchdog = status.optBoolean("watchdog", false),
              dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
              healthObserved = healthObserved,
@@ -54868,7 +54964,7 @@ index 4f004b9..91d3aeb 100644
              trafficMode = trafficMode,
              continuityRootObserved = continuityRootObserved,
              continuityAutomationOnly = continuityAutomationOnly,
-@@ -410,8 +508,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -410,8 +509,12 @@ internal class ProxyComposeController(context: Context) {
          LegacyAppMigrator.migrateIfNeeded(app)
          var profile = ProxyRuntimeProfile.load(prefs)
          if (!profile.capability().available) {
@@ -54883,7 +54979,7 @@ index 4f004b9..91d3aeb 100644
              profile = ProxyRuntimeProfile.load(prefs)
          }
          if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
-@@ -419,13 +521,47 @@ internal class ProxyComposeController(context: Context) {
+@@ -419,13 +522,47 @@ internal class ProxyComposeController(context: Context) {
              prefs.edit().putString("proxyBaseCore", "mihomo").apply()
              profile = ProxyRuntimeProfile.load(prefs)
          }
@@ -54937,7 +55033,7 @@ index 4f004b9..91d3aeb 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -435,10 +571,22 @@ internal class ProxyComposeController(context: Context) {
+@@ -435,10 +572,22 @@ internal class ProxyComposeController(context: Context) {
      suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
          LegacyAppMigrator.migrateIfNeeded(app)
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -54961,7 +55057,7 @@ index 4f004b9..91d3aeb 100644
          val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
          check(replaced) { "重启未完成，请等待当前操作结束后重试" }
          check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
-@@ -481,7 +629,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -481,7 +630,7 @@ internal class ProxyComposeController(context: Context) {
 
      suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -54970,7 +55066,7 @@ index 4f004b9..91d3aeb 100644
          val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
          var downloaded = 0
          for (chunk in urls.chunked(6)) {
-@@ -515,7 +663,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -515,7 +664,12 @@ internal class ProxyComposeController(context: Context) {
          "disable" to "禁用本机 IPv6",
      )
 
@@ -54984,7 +55080,7 @@ index 4f004b9..91d3aeb 100644
      fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
      fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
      fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
-@@ -532,13 +685,20 @@ internal class ProxyComposeController(context: Context) {
+@@ -532,13 +686,20 @@ internal class ProxyComposeController(context: Context) {
              ProxyConfigUi(
                  name = it.name,
                  selected = it.name == selected,
@@ -55007,7 +55103,7 @@ index 4f004b9..91d3aeb 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -551,8 +711,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -551,8 +712,10 @@ internal class ProxyComposeController(context: Context) {
          val profile = ProxyRuntimeProfile.load(prefs)
          val entry = configs.selected(profile.core)
          val name = entry?.name ?: "尚未选择配置"
@@ -55020,7 +55116,7 @@ index 4f004b9..91d3aeb 100644
          name to items
      }
 
-@@ -563,25 +725,25 @@ internal class ProxyComposeController(context: Context) {
+@@ -563,25 +726,25 @@ internal class ProxyComposeController(context: Context) {
 
      suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -55050,7 +55146,7 @@ index 4f004b9..91d3aeb 100644
          configs.deleteSubscription(entry, name)
      }
 
-@@ -683,6 +845,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -683,6 +846,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -55061,7 +55157,7 @@ index 4f004b9..91d3aeb 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -789,6 +955,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +956,7 @@ internal class ProxyComposeController(context: Context) {
                  size = r.optInt("size", -1),
                  disabled = extra?.optBoolean("disabled", false) ?: false,
                  hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
@@ -55069,7 +55165,7 @@ index 4f004b9..91d3aeb 100644
              )
          }
          return out
-@@ -813,6 +980,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +981,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -55088,7 +55184,7 @@ index 4f004b9..91d3aeb 100644
      private var lastIconSource: String? = null
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
-@@ -824,19 +1003,4 @@ internal class ProxyComposeController(context: Context) {
+@@ -824,19 +1004,4 @@ internal class ProxyComposeController(context: Context) {
          return parsed
      }
 
@@ -60973,7 +61069,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..371b1bc 100644
+index 9cd82da..075dc8e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -14,6 +14,7 @@ import java.nio.file.*;
@@ -62934,7 +63030,7 @@ index 9cd82da..371b1bc 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2534,58 @@ final class RootProxyManager {
+@@ -1366,13 +2534,64 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -62947,10 +63043,15 @@ index 9cd82da..371b1bc 100644
 +        // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
 +        String cnipPolicy=policyDir+"/cnip";
 +        boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
-+        if(cnipV4||cnipV6){
-+            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
-+                    +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n";
-+            cmd.append("; printf %s ").append(RootBridge.quote(body)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
++        // 6.0.0 (domestic video calls lagging): with the full bypass off, UDP to CN addresses skips the core's
++        // userspace relay by default; TCP still goes through the core's rules. AUTO: a kernel that can do it
++        // neither with ipset nor with the eBPF CN programs simply runs without it.
++        boolean cnUdp=!(cnipV4||cnipV6)&&prefs.getBoolean(CnipFakeIp.PREF_UDP_DIRECT,true);
++        String cnipBody=cnipV4||cnipV6?"V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
++                +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n"
++                :cnUdp?CnipFakeIp.udpPolicyBody(cnipForceUids()):"";
++        if(!cnipBody.isEmpty()){
++            cmd.append("; printf %s ").append(RootBridge.quote(cnipBody)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
 +                    .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
 +                    .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
 +        }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
@@ -62972,7 +63073,8 @@ index 9cd82da..371b1bc 100644
 +        // object are deployed only while it is on (hetu-root.sh ignores them when it is off).
 +        boolean ebpf=prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false);
 +        cmd.append(EbpfMatcher.policyCommand(policyDir,ebpf));
-+        if(ebpf)appendEbpfPayloads(cmd,stage,deploySuffix);
++        // 6.0.0: CNIP uses the object's CN programs on kernels without ipset, so it is deployed whenever CNIP is on.
++        if(ebpf||!cnipBody.isEmpty())appendEbpfPayloads(cmd,stage,deploySuffix);
 +        // The loader alone also reads and clears ColorOS's eBPF block list for the Google apps
 +        // (google_firewall_ebpf): wherever the cleanup is on, and on OPPO / OnePlus / realme for
 +        // the read-only check. It never loads the matcher while policy/ebpf is absent.
@@ -62993,7 +63095,7 @@ index 9cd82da..371b1bc 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2597,12 @@ final class RootProxyManager {
+@@ -1384,7 +2603,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -63007,7 +63109,7 @@ index 9cd82da..371b1bc 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2611,13 @@ final class RootProxyManager {
+@@ -1393,6 +2617,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -63021,7 +63123,7 @@ index 9cd82da..371b1bc 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,22 +2637,111 @@ final class RootProxyManager {
+@@ -1412,22 +2643,111 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -63774,10 +63876,10 @@ index 0000000..02726eb
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
-index e4053e5..dcc502b 100644
+index e4053e5..4928ce5 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
-@@ -17,7 +17,39 @@ internal class ToolsAdblockChain(
+@@ -17,7 +17,41 @@ internal class ToolsAdblockChain(
      val controllerLoaded: Boolean,
      val hits: Long,
      val recent: List<String>,
@@ -63805,6 +63907,8 @@ index e4053e5..dcc502b 100644
 +    val ipv6DnsPolicy: String = "",
 +    val cnip: String = "",
 +    val cnipTcpOnly: Boolean = false,
++    /** 6.0.0: the session bypasses only UDP to CN addresses (the default 国内 UDP 内核直连). */
++    val cnipUdpOnly: Boolean = false,
 +    /** The selected subscription has its own dns: block. */
 +    val sourceHasDns: Boolean = true,
 +    val recommendedDns: Boolean = false,
@@ -63818,7 +63922,7 @@ index e4053e5..dcc502b 100644
 
  /**
   * Root-package access for pages 28–49 of the 工具 module. Like `ToolsConfigBridge`, it exists
-@@ -86,6 +118,18 @@ internal object ToolsRuntimeBridge {
+@@ -86,6 +120,18 @@ internal object ToolsRuntimeBridge {
 
      /* ------------------------------ 广告过滤 ------------------------------ */
 
@@ -63837,7 +63941,7 @@ index e4053e5..dcc502b 100644
      /**
       * The checks `ProxyAdblockChainActivity` runs for its 运行链验证 card, in the same order and
       * from the same sources: startup copy, live rules, runtime log, session counters.
-@@ -96,21 +140,48 @@ internal object ToolsRuntimeBridge {
+@@ -96,21 +142,49 @@ internal object ToolsRuntimeBridge {
          val controller = ProxyComposeController(app)
          val running = quietly(false) { controller.state().running }
          val startup = quietly("") { RootProxyManager(app).startupConfig() }
@@ -63883,6 +63987,7 @@ index e4053e5..dcc502b 100644
 +            ipv6DnsPolicy = prefs.getString("proxyRootIpv6DnsPolicy", "").orEmpty(),
 +            cnip = if (running) prefs.getString("proxyCnIpKernelStatus", "").orEmpty() else "",
 +            cnipTcpOnly = prefs.getBoolean("proxyCnIpKernelTcpOnlyActive", false),
++            cnipUdpOnly = prefs.getBoolean("proxyCnIpKernelUdpOnlyActive", false),
 +            sourceHasDns = source == null || MihomoStartupConfig.sourceHasDns(source),
 +            recommendedDns = prefs.getBoolean("proxyRecommendedDns", false),
 +            appScope = profile.appScope.id,
@@ -64466,10 +64571,10 @@ index 4722bed..812986e 100644
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt
 new file mode 100644
-index 0000000..bfafcc1
+index 0000000..e8a3168
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,350 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -64775,7 +64880,11 @@ index 0000000..bfafcc1
 +            else -> "IPv6 DNS 未劫持"
 +        }
 +        parts += when (chain.cnip) {
-+            "ipset", "iptables" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
++            "ipset", "iptables", "ebpf" -> when {
++                chain.cnipTcpOnly -> "CNIP 内核旁路（仅 TCP）"
++                chain.cnipUdpOnly -> "CNIP 内核旁路（仅 UDP）"
++                else -> "CNIP 内核旁路"
++            }
 +            "degraded" -> "CNIP 由核心规则处理"
 +            else -> "CNIP 关闭"
 +        }
@@ -64793,9 +64902,15 @@ index 0000000..bfafcc1
 +            "disabled" -> out += "订阅关闭了域名嗅探（sniffer 未启用）：直连 IP 的广告连接没有域名，连接层规则无法识别，只能靠 DNS 层拦截。"
 +            "pure-ip-off" -> out += "订阅设置了 parse-pure-ip: false：直连 IP 的连接不做嗅探，这部分广告无法按域名识别。"
 +        }
-+        if (chain.cnip == "ipset" || chain.cnip == "iptables") out += if (chain.dnsLayer)
-+            "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
-+        else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
++        val cnipActive = chain.cnip == "ipset" || chain.cnip == "iptables" || chain.cnip == "ebpf"
++        if (cnipActive && chain.cnipUdpOnly) {
++            out += if (chain.dnsLayer) "国内 UDP 内核直连已开启：发往中国 IP 的 UDP（含 QUIC）不经过核心，这部分广告只靠 DNS 层拦截。"
++            else "国内 UDP 内核直连已开启且当前没有 DNS 层拦截：发往中国 IP 的 UDP（含 QUIC）广告连接不会被拦截。"
++        } else if (cnipActive) {
++            out += if (chain.dnsLayer)
++                "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
++            else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
++        }
 +        if (!chain.sourceHasDns && !chain.recommendedDns)
 +            out += "订阅没有 dns: 配置：核心只用系统 DNS（redir-host）。可开启下方「河图推荐 DNS」（fake-ip + 国内 DoH，默认关闭，重启代理后生效）。"
 +        when {
@@ -65084,10 +65199,10 @@ index 0000000..5f196ab
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CnipFakeIp.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CnipFakeIp.kt
 new file mode 100644
-index 0000000..05ba4ab
+index 0000000..fd106de
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CnipFakeIp.kt
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,207 @@
 +package io.github.xgl34222220.hetu
 +
 +import java.util.Locale
@@ -65112,6 +65227,16 @@ index 0000000..05ba4ab
 +object CnipFakeIp {
 +    const val PREF_V4 = "proxyCnIpKernelV4"
 +    const val PREF_V6 = "proxyCnIpKernelV6"
++    /**
++     * 6.0.0 (domestic video calls lagging), default on: while the full kernel bypass above is off, UDP to CN
++     * addresses (voice/video calls, games, P2P) skips the core's userspace relay. TCP keeps going through the
++     * core's rules, and no DNS answer changes (no fake-ip-filter entries are added for it).
++     */
++    const val PREF_UDP_DIRECT = "proxyCnIpUdpDirect"
++
++    /** policy/cnip for [PREF_UDP_DIRECT]: both families, UDP only, AUTO = runs without it where the kernel cannot. */
++    @JvmStatic
++    fun udpPolicyBody(forceUids: String): String = "V4=1\nV6=1\nFORCE=$forceUids\nTCPONLY=0\nUDPONLY=1\nAUTO=1\n"
 +    const val GEOSITE_ENTRY = "geosite:cn"
 +    const val GEOSITE_RULE = "GEOSITE,cn,real-ip"
 +
@@ -81489,7 +81614,7 @@ index 9ec8a80..ea7d501 100644
                          ToolsChevron()
                      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..1f401d9 100644
+index f575100..9d91c54 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -81535,7 +81660,7 @@ index f575100..1f401d9 100644
 
              /* ------------------------------ 绕过规则 ------------------------------ */
              loadBypass = { ToolsBypassRules(prefs.strings(Keys.BypassCidrs).sorted(), prefs.strings(Keys.BypassInterfaces).sorted()) },
-@@ -183,49 +193,93 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -183,49 +193,101 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              /* ------------------------------ 共享网络 ------------------------------ */
              loadShare = {
                  val live = ProxySharedNetworkInspector.inspect(app)
@@ -81618,6 +81743,14 @@ index f575100..1f401d9 100644
 +                prefs.edit().putBoolean("proxyCnIpKernelTcpOnly", on).putBoolean("proxyRootSettingsDirty", true).apply()
 +                changed()
 +            },
++            loadCnIpUdp = {
++                prefs.getBoolean(io.github.xgl34222220.hetu.CnipFakeIp.PREF_UDP_DIRECT, true) to
++                    prefs.getBoolean("proxyCnIpKernelUdpOnlyActive", false)
++            },
++            setCnIpUdp = { on ->
++                prefs.edit().putBoolean(io.github.xgl34222220.hetu.CnipFakeIp.PREF_UDP_DIRECT, on).putBoolean("proxyRootSettingsDirty", true).apply()
++                changed()
++            },
 
              /* ------------------------------ 诊断与维护 ------------------------------ */
              onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
@@ -81643,7 +81776,7 @@ index f575100..1f401d9 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +287,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +295,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
@@ -81656,7 +81789,7 @@ index f575100..1f401d9 100644
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -243,6 +303,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -243,6 +311,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          modeLabel = when (chain.mode.lowercase()) { "global" -> "全局"; "direct" -> "直连"; else -> "" },
                          ruleCount = snapshot.count,
                          hits = chain.hits,
@@ -81670,7 +81803,7 @@ index f575100..1f401d9 100644
                          allow = snapshot.allow,
                          block = snapshot.block,
                          sources = snapshot.sources.map { source ->
-@@ -262,12 +329,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -262,12 +337,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -81701,7 +81834,7 @@ index f575100..1f401d9 100644
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
-@@ -333,16 +417,22 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+@@ -333,16 +425,22 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
          downloaded = downloaded,
          runnable = runtimeReady,
          canDownload = canDownload,
@@ -81750,7 +81883,7 @@ index 378e395..fd08d08 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..c032f2d 100644
+index 40111ed..53df2e4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 @@ -97,6 +97,8 @@ internal data class ToolsCore(
@@ -81796,7 +81929,7 @@ index 40111ed..c032f2d 100644
  }
 
  internal class ToolsShareSnapshot(
-@@ -180,7 +193,25 @@ internal data class ToolsShareState(
+@@ -180,7 +193,29 @@ internal data class ToolsShareState(
 
  /* ---------------------------- CNIP (39) ---------------------------- */
 
@@ -81814,6 +81947,10 @@ index 40111ed..c032f2d 100644
 +    val kernelV6Entries: Int = 0,
 +    /** Optional (default off): only TCP to CN addresses skips the core; UDP/QUIC still reaches it. */
 +    val kernelTcpOnly: Boolean = false,
++    /** 6.0.0, default on while the full bypass is off: UDP to CN addresses (calls, games) skips the core. */
++    val udpDirect: Boolean = true,
++    /** The running session bypasses only UDP (status cnipUdpOnly). */
++    val kernelUdpOnly: Boolean = false,
 +)
 +
 +/** What the CNIP kernel bypass page reads back. */
@@ -81823,7 +81960,7 @@ index 40111ed..c032f2d 100644
 
  /* ---------------------------- 诊断与维护 (40–43) ---------------------------- */
 
-@@ -203,6 +234,9 @@ internal sealed interface ToolsDiagOverlay {
+@@ -203,6 +238,9 @@ internal sealed interface ToolsDiagOverlay {
 
      /** Page 42. */
      data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
@@ -81833,7 +81970,7 @@ index 40111ed..c032f2d 100644
  }
 
  internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
-@@ -218,6 +252,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
+@@ -218,6 +256,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
  /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
  internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
 
@@ -81843,7 +81980,7 @@ index 40111ed..c032f2d 100644
  internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
  internal data class ToolsAdblockState(
-@@ -241,13 +278,40 @@ internal data class ToolsAdblockState(
+@@ -241,13 +282,40 @@ internal data class ToolsAdblockState(
      val recent: List<String> = emptyList(),
      val startupInjected: Boolean = false,
      val controllerLoaded: Boolean = false,
@@ -81884,7 +82021,7 @@ index 40111ed..c032f2d 100644
      val status: ToolsAdStatus
          get() = when {
              !enabled -> ToolsAdStatus.Off
-@@ -312,6 +376,9 @@ internal object ToolsFeatureRules {
+@@ -312,6 +380,9 @@ internal object ToolsFeatureRules {
      fun shareError(settings: ToolsShareSettings): String? {
          settings.macs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
          if (settings.macs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
@@ -81894,7 +82031,7 @@ index 40111ed..c032f2d 100644
          return null
      }
 
-@@ -363,12 +430,22 @@ internal class ToolsFeatureActions(
+@@ -363,12 +434,25 @@ internal class ToolsFeatureActions(
      /* CNIP */
      val loadCnIp: (suspend () -> Boolean)? = null,
      val setCnIp: suspend (Boolean) -> Unit = {},
@@ -81902,6 +82039,9 @@ index 40111ed..c032f2d 100644
 +    val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
 +    val loadCnIpTcpOnly: (suspend () -> Boolean)? = null,
 +    val setCnIpTcpOnly: suspend (Boolean) -> Unit = {},
++    /** 6.0.0: 国内 UDP 内核直连 (default on) and whether the running session applies it UDP-only. */
++    val loadCnIpUdp: (suspend () -> Pair<Boolean, Boolean>)? = null,
++    val setCnIpUdp: suspend (Boolean) -> Unit = {},
 
      /* 诊断与维护 */
      val runPreflight: (suspend () -> ToolsPreflight)? = null,
@@ -81917,7 +82057,7 @@ index 40111ed..c032f2d 100644
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
      val restoreNetwork: suspend () -> String = { "已停止代理并回滚网络规则" },
      val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
-@@ -385,6 +462,12 @@ internal class ToolsFeatureActions(
+@@ -385,6 +469,12 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
@@ -81931,7 +82071,7 @@ index 40111ed..c032f2d 100644
      val onMessage: (String) -> Unit = {},
  ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-index 6e1e067..d11f250 100644
+index 6e1e067..0953416 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 @@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
@@ -82013,19 +82153,21 @@ index 6e1e067..d11f250 100644
  }
 
  /* ------------------------------ 绕过规则 ------------------------------ */
-@@ -328,7 +359,10 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -328,7 +359,12 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
      LaunchedEffect(Unit) {
          val loader = actions.loadCnIp ?: return@LaunchedEffect
          state = try {
 -            ToolsCnIpState(ToolsLoad.Ready, loader())
 +            val kernel = actions.loadCnIpKernel?.invoke()
++            val udp = actions.loadCnIpUdp?.invoke()
 +            if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
 +            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries,
-+                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false)
++                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false,
++                udpDirect = udp?.first ?: true, kernelUdpOnly = udp?.second ?: false)
          } catch (cancel: CancellationException) {
              throw cancel
          } catch (error: Exception) {
-@@ -346,6 +380,22 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -346,6 +382,30 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
              }
          },
          modifier = modifier,
@@ -82045,10 +82187,18 @@ index 6e1e067..d11f250 100644
 +                actions.onMessage("已保存；重启代理后生效")
 +            }
 +        },
++        onUdpDirectChange = if (actions.loadCnIpUdp == null) null else { on ->
++            val previous = state
++            state = state.copy(udpDirect = on)
++            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
++                actions.setCnIpUdp(on)
++                actions.onMessage("已保存；重启代理后生效")
++            }
++        },
      )
  }
 
-@@ -357,6 +407,24 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -357,6 +417,24 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
      var state by remember { mutableStateOf(ToolsDiagState()) }
      var overlay by remember { mutableStateOf<ToolsDiagOverlay?>(null) }
 
@@ -82073,7 +82223,7 @@ index 6e1e067..d11f250 100644
      fun preflight() {
          val runner = actions.runPreflight ?: return
          if (state.preflight is ToolsPreflight.Running) return
-@@ -388,7 +456,20 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -388,7 +466,20 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
          onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
          onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
@@ -82095,7 +82245,7 @@ index 6e1e067..d11f250 100644
          modifier = modifier,
      )
 
-@@ -399,6 +480,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -399,6 +490,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
              ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
          }
@@ -82105,7 +82255,7 @@ index 6e1e067..d11f250 100644
          is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
              ToolsRestoreNetworkDialogCard(
                  loading = current.running,
-@@ -427,7 +511,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -427,7 +521,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
      suspend fun read() {
          val snapshot = (actions.loadAdblock ?: return)()
@@ -82115,7 +82265,7 @@ index 6e1e067..d11f250 100644
      }
 
      fun reload(announce: String? = null) {
-@@ -506,8 +591,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -506,8 +601,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
          },
          onStandaloneDnsChange = { on -> change(state.copy(standaloneDns = on), "独立 DNS 过滤切换失败") { actions.setStandaloneDns(on) } },
          onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
@@ -82219,7 +82369,7 @@ index 60a38ad..92b6f6a 100644
      val exportConfig: (name: String) -> Unit = {},
      val renameConfig: suspend (from: String, to: String) -> Unit = { _, _ -> },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-index 4bdee7e..b33ef62 100644
+index 4bdee7e..bb21682 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 @@ -21,6 +21,7 @@ import io.github.xgl34222220.hetu.home.HomeTone
@@ -82348,12 +82498,13 @@ index 4bdee7e..b33ef62 100644
                      Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                  )
              }
-@@ -217,18 +239,90 @@ internal fun ToolsCnIpScreen(
+@@ -217,18 +239,119 @@ internal fun ToolsCnIpScreen(
      onBack: () -> Unit,
      onEnabledChange: (Boolean) -> Unit,
      modifier: Modifier = Modifier,
 +    onKernelChange: ((v4: Boolean, v6: Boolean) -> Unit)? = null,
 +    onTcpOnlyChange: ((Boolean) -> Unit)? = null,
++    onUdpDirectChange: ((Boolean) -> Unit)? = null,
  ) {
      val stagger = rememberHomeStagger()
      ToolsPage(title = "CNIP 设置", onBack = onBack, modifier = modifier, subtitle = "中国大陆 IPv4 / IPv6 自动直连") {
@@ -82373,6 +82524,18 @@ index 4bdee7e..b33ef62 100644
 +        if (onKernelChange != null) {
 +            // Kernel-level bypass: the same glass card family as the rows above.
 +            HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
++                if (onUdpDirectChange != null) {
++                    // 6.0.0, default on: calls and games to CN addresses skip the core's userspace UDP relay.
++                    val full = state.kernelV4 || state.kernelV6
++                    ToolsSwitchRow(
++                        "国内 UDP 内核直连", state.udpDirect || full, onUdpDirectChange,
++                        icon = ToolsFeatureIcons.ShieldCheck,
++                        subtitle = if (full) "已开启内核绕过：国内 TCP 和 UDP 都不经过核心"
++                            else "视频 / 语音通话、游戏发往国内 IP 的 UDP 不经过核心，减少卡顿；TCP 仍经核心规则。默认开启",
++                        enabled = state.load is ToolsLoad.Ready && !full,
++                    )
++                    HomeRowDivider(start = HomeRowDims.textStart)
++                }
 +                ToolsSwitchRow(
 +                    "内核绕过 IPv4", state.kernelV4, { onKernelChange(it, state.kernelV6) },
 +                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset）",
@@ -82416,16 +82579,32 @@ index 4bdee7e..b33ef62 100644
 + */
 +internal fun cnIpKernelStatusParts(state: ToolsCnIpState): List<CnIpStatusPart> {
 +    val reason = state.kernelReason
++    val active = state.kernelStatus == "ipset" || state.kernelStatus == "iptables" || state.kernelStatus == "ebpf"
 +    return when {
++        // 6.0.0: the default UDP-only bypass while the full bypass is off; a kernel without it runs without it.
++        !state.kernelV4 && !state.kernelV6 && state.udpDirect -> when {
++            active && state.kernelUdpOnly -> buildList {
++                add(CnIpStatusPart(if (state.kernelStatus == "ebpf") "国内 UDP 内核直连生效（eBPF）" else "国内 UDP 内核直连生效（ipset）"))
++                if (state.kernelV4Entries > 0) add(CnIpStatusPart("IPv4 %s 段", listOf(state.kernelV4Entries)))
++                if (state.kernelV6Entries > 0) add(CnIpStatusPart("IPv6 %s 段", listOf(state.kernelV6Entries)))
++            }
++            state.kernelStatus == "off" && reason.isNotBlank() -> listOf(CnIpStatusPart("本机内核不支持国内 UDP 直连，UDP 仍经核心（%s）", listOf(reason)))
++            else -> listOf(CnIpStatusPart("重启代理后生效"))
++        }
 +        !state.kernelV4 && !state.kernelV6 -> listOf(CnIpStatusPart("未开启"))
-+        state.kernelStatus == "ipset" || state.kernelStatus == "iptables" -> buildList {
-+            add(CnIpStatusPart(if (state.kernelStatus == "ipset") "内核 ipset 生效" else "内核 iptables 规则生效（本机没有 ipset）"))
++        active -> buildList {
++            add(CnIpStatusPart(when (state.kernelStatus) {
++                "ipset" -> "内核 ipset 生效"
++                "ebpf" -> "内核 eBPF 生效（本机没有 ipset）"
++                else -> "内核 iptables 规则生效（本机没有 ipset）"
++            }))
 +            if (state.kernelV4Entries > 0) add(CnIpStatusPart("IPv4 %s 段", listOf(state.kernelV4Entries)))
 +            if (state.kernelV6Entries > 0) add(CnIpStatusPart("IPv6 %s 段", listOf(state.kernelV6Entries)))
 +            if (state.kernelV6 && reason.contains("v6-mode-")) add(CnIpStatusPart("IPv6 未生效：需要 IPv6「启用 / 严格」模式"))
 +        }
 +        state.kernelStatus == "degraded" -> listOf(when {
-+            reason.contains("chain-missing") -> CnIpStatusPart("内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复")
++            reason.contains("chain-missing") || reason.contains("pins-missing") -> CnIpStatusPart("内核绕过规则已丢失，已降级为核心内规则；重启代理可恢复")
++            reason.contains("bpf-") -> CnIpStatusPart("设备没有 ipset，eBPF 也不可用，已降级为核心内规则（%s）", listOf(reason))
 +            reason.contains("xt-connmark-unavailable") -> CnIpStatusPart("设备没有 ipset，也不支持 iptables 连接标记，已降级为核心内规则")
 +            reason.contains("mode-tun") || reason.contains("mode-ebpf") -> CnIpStatusPart("当前代理模式不支持内核绕过，已降级为核心内规则")
 +            reason.contains("iptables-failed") || reason.contains("restore-missing") -> CnIpStatusPart("内核 iptables 规则安装失败，已降级为核心内规则（%s）", listOf(reason))
@@ -82821,7 +83000,7 @@ index 9841062..4f452b7 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..62c703f 100644
+index 578ce9d..56dc6d0 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -82897,7 +83076,7 @@ index 578ce9d..62c703f 100644
  没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
  本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
  本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
-@@ -969,16 +998,449 @@ private val vocabularyConnection = """
+@@ -969,16 +998,457 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -83304,6 +83483,14 @@ index 578ce9d..62c703f 100644
 +国内 IPv4 直接放行，不经过核心（ipset；没有 ipset 时用 iptables 规则）|Domestic IPv4 goes direct without the core (ipset; iptables rules when there is no ipset)|國內 IPv4 直接放行，不經過核心（ipset；沒有 ipset 時改用 iptables 規則）|Внутренний IPv4 идёт напрямую, минуя ядро (ipset; без ipset — правила iptables)
 +内核 ipset 生效|Kernel ipset active|核心 ipset 生效|ipset в ядре активен
 +内核 iptables 规则生效（本机没有 ipset）|Kernel iptables rules active (this device has no ipset)|核心 iptables 規則生效（本機沒有 ipset）|Правила iptables в ядре активны (на устройстве нет ipset)
++内核 eBPF 生效（本机没有 ipset）|Kernel eBPF active (this device has no ipset)|核心 eBPF 生效（本機沒有 ipset）|eBPF в ядре активен (на устройстве нет ipset)
++国内 UDP 内核直连|Domestic UDP direct in the kernel|國內 UDP 核心直連|Внутренний UDP напрямую в ядре
++已开启内核绕过：国内 TCP 和 UDP 都不经过核心|Kernel bypass is on: domestic TCP and UDP both skip the core|已開啟核心繞過：國內 TCP 和 UDP 都不經過核心|Обход в ядре включён: внутренний TCP и UDP идут мимо ядра прокси
++视频 / 语音通话、游戏发往国内 IP 的 UDP 不经过核心，减少卡顿；TCP 仍经核心规则。默认开启|UDP to domestic IPs (video / voice calls, games) skips the core to reduce lag; TCP still follows the core rules. On by default|視訊 / 語音通話、遊戲發往國內 IP 的 UDP 不經過核心，減少卡頓；TCP 仍經核心規則。預設開啟|UDP к внутренним IP (видео- и голосовые звонки, игры) идёт мимо ядра прокси, чтобы меньше тормозило; TCP по-прежнему по правилам ядра. Включено по умолчанию
++国内 UDP 内核直连生效（eBPF）|Domestic UDP direct active (eBPF)|國內 UDP 核心直連生效（eBPF）|Внутренний UDP напрямую активен (eBPF)
++国内 UDP 内核直连生效（ipset）|Domestic UDP direct active (ipset)|國內 UDP 核心直連生效（ipset）|Внутренний UDP напрямую активен (ipset)
++本机内核不支持国内 UDP 直连，UDP 仍经核心（%s）|This kernel cannot send domestic UDP direct; UDP still goes through the core (%s)|本機核心不支援國內 UDP 直連，UDP 仍經核心（%s）|Ядро устройства не умеет отправлять внутренний UDP напрямую; UDP по-прежнему идёт через ядро прокси (%s)
++设备没有 ipset，eBPF 也不可用，已降级为核心内规则（%s）|This device has no ipset and eBPF is unavailable; the core rules handle it instead (%s)|裝置沒有 ipset，eBPF 也無法使用，已降級為核心內規則（%s）|На устройстве нет ipset, и eBPF недоступен; вместо этого работают правила ядра прокси (%s)
 +IPv4 %s 段|IPv4 %s ranges|IPv4 %s 段|IPv4: %s диапазонов
 +IPv6 %s 段|IPv6 %s ranges|IPv6 %s 段|IPv6: %s диапазонов
 +IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs IPv6 mode "Enable / Strict"|IPv6 未生效：需要 IPv6「啟用／嚴格」模式|IPv6 не применён: нужен режим IPv6 «Включить / Строгий»
@@ -88863,6 +89050,63 @@ index 0000000..0921695
 +        assertEquals(commandsBefore, BootRecoverySafety93BridgeShadow.commands.size)
 +        assertEquals(0, BootRecoverySafety93ManagerShadow.starts)
 +        assertFalse(prefs.contains("proxyRootBootRestoreSuccessAt"))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CnUdpDirect600Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CnUdpDirect600Test.kt
+new file mode 100644
+index 0000000..d405334
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CnUdpDirect600Test.kt
+@@ -0,0 +1,51 @@
++package io.github.xgl34222220.hetu
++
++import io.github.xgl34222220.hetu.tools.ToolsCnIpState
++import io.github.xgl34222220.hetu.tools.ToolsLoad
++import io.github.xgl34222220.hetu.tools.cnIpKernelStatusText
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.io.File
++
++/**
++ * 6.0.0 (domestic video calls lagging): UDP to CN addresses skips the core by default (policy UDPONLY + AUTO),
++ * through ipset or, without it, the eBPF CN programs; the CNIP page says which one runs.
++ */
++class CnUdpDirect600Test {
++    private val idle = ToolsCnIpState(ToolsLoad.Ready)
++
++    @Test fun thePolicyBodyIsUdpOnlyAndAutomatic() {
++        assertEquals("V4=1\nV6=1\nFORCE=10123\nTCPONLY=0\nUDPONLY=1\nAUTO=1\n", CnipFakeIp.udpPolicyBody("10123"))
++        assertEquals("proxyCnIpUdpDirect", CnipFakeIp.PREF_UDP_DIRECT)
++        assertTrue("on by default", idle.udpDirect)
++    }
++
++    @Test fun theStatusLineNamesTheBackendOfTheDefault() {
++        val ebpf = idle.copy(kernelStatus = "ebpf", kernelUdpOnly = true, kernelV4Entries = 5432)
++        assertEquals("国内 UDP 内核直连生效（eBPF） · IPv4 5432 段", cnIpKernelStatusText(ebpf))
++        assertEquals("国内 UDP 内核直连生效（ipset）", cnIpKernelStatusText(ebpf.copy(kernelStatus = "ipset", kernelV4Entries = 0)))
++        assertEquals("本机内核不支持国内 UDP 直连，UDP 仍经核心（ipset-unavailable,bpf-selinux-denied）",
++            cnIpKernelStatusText(idle.copy(kernelStatus = "off", kernelReason = "ipset-unavailable,bpf-selinux-denied")))
++        assertEquals("重启代理后生效", cnIpKernelStatusText(idle))
++        assertEquals("未开启", cnIpKernelStatusText(idle.copy(udpDirect = false)))
++    }
++
++    @Test fun theFullBypassKeepsItsOwnLinesAndNamesEbpf() {
++        val full = idle.copy(kernelV4 = true, kernelStatus = "ebpf", kernelV4Entries = 10)
++        assertEquals("内核 eBPF 生效（本机没有 ipset） · IPv4 10 段", cnIpKernelStatusText(full))
++        assertEquals("内核 ipset 生效 · IPv4 10 段", cnIpKernelStatusText(full.copy(kernelStatus = "ipset")))
++        assertTrue(cnIpKernelStatusText(full.copy(kernelStatus = "degraded", kernelReason = "ipset-unavailable,bpf-load-permission"))
++            .startsWith("设备没有 ipset，eBPF 也不可用"))
++    }
++
++    @Test fun everyNewLineIsInTheWordTable() {
++        val table = File("src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt").readText()
++        for (key in listOf("国内 UDP 内核直连", "国内 UDP 内核直连生效（eBPF）", "国内 UDP 内核直连生效（ipset）",
++                "本机内核不支持国内 UDP 直连，UDP 仍经核心（%s）", "内核 eBPF 生效（本机没有 ipset）",
++                "设备没有 ipset，eBPF 也不可用，已降级为核心内规则（%s）",
++                "视频 / 语音通话、游戏发往国内 IP 的 UDP 不经过核心，减少卡顿；TCP 仍经核心规则。默认开启")) {
++            assertTrue(key, table.contains("\n$key|"))
++        }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt

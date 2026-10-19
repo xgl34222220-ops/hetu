@@ -2543,10 +2543,15 @@ final class RootProxyManager {
         // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
         String cnipPolicy=policyDir+"/cnip";
         boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
-        if(cnipV4||cnipV6){
-            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
-                    +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n";
-            cmd.append("; printf %s ").append(RootBridge.quote(body)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
+        // 6.0.0 (domestic video calls lagging): with the full bypass off, UDP to CN addresses skips the core's
+        // userspace relay by default; TCP still goes through the core's rules. AUTO: a kernel that can do it
+        // neither with ipset nor with the eBPF CN programs simply runs without it.
+        boolean cnUdp=!(cnipV4||cnipV6)&&prefs.getBoolean(CnipFakeIp.PREF_UDP_DIRECT,true);
+        String cnipBody=cnipV4||cnipV6?"V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
+                +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n"
+                :cnUdp?CnipFakeIp.udpPolicyBody(cnipForceUids()):"";
+        if(!cnipBody.isEmpty()){
+            cmd.append("; printf %s ").append(RootBridge.quote(cnipBody)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
                     .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
                     .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
         }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
@@ -2568,7 +2573,8 @@ final class RootProxyManager {
         // object are deployed only while it is on (hetu-root.sh ignores them when it is off).
         boolean ebpf=prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false);
         cmd.append(EbpfMatcher.policyCommand(policyDir,ebpf));
-        if(ebpf)appendEbpfPayloads(cmd,stage,deploySuffix);
+        // 6.0.0: CNIP uses the object's CN programs on kernels without ipset, so it is deployed whenever CNIP is on.
+        if(ebpf||!cnipBody.isEmpty())appendEbpfPayloads(cmd,stage,deploySuffix);
         // The loader alone also reads and clears ColorOS's eBPF block list for the Google apps
         // (google_firewall_ebpf): wherever the cleanup is on, and on OPPO / OnePlus / realme for
         // the read-only check. It never loads the matcher while policy/ebpf is absent.

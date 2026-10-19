@@ -303,7 +303,11 @@ internal object AdblockVerification {
             else -> "IPv6 DNS 未劫持"
         }
         parts += when (chain.cnip) {
-            "ipset", "iptables" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
+            "ipset", "iptables", "ebpf" -> when {
+                chain.cnipTcpOnly -> "CNIP 内核旁路（仅 TCP）"
+                chain.cnipUdpOnly -> "CNIP 内核旁路（仅 UDP）"
+                else -> "CNIP 内核旁路"
+            }
             "degraded" -> "CNIP 由核心规则处理"
             else -> "CNIP 关闭"
         }
@@ -321,9 +325,15 @@ internal object AdblockVerification {
             "disabled" -> out += "订阅关闭了域名嗅探（sniffer 未启用）：直连 IP 的广告连接没有域名，连接层规则无法识别，只能靠 DNS 层拦截。"
             "pure-ip-off" -> out += "订阅设置了 parse-pure-ip: false：直连 IP 的连接不做嗅探，这部分广告无法按域名识别。"
         }
-        if (chain.cnip == "ipset" || chain.cnip == "iptables") out += if (chain.dnsLayer)
-            "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
-        else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
+        val cnipActive = chain.cnip == "ipset" || chain.cnip == "iptables" || chain.cnip == "ebpf"
+        if (cnipActive && chain.cnipUdpOnly) {
+            out += if (chain.dnsLayer) "国内 UDP 内核直连已开启：发往中国 IP 的 UDP（含 QUIC）不经过核心，这部分广告只靠 DNS 层拦截。"
+            else "国内 UDP 内核直连已开启且当前没有 DNS 层拦截：发往中国 IP 的 UDP（含 QUIC）广告连接不会被拦截。"
+        } else if (cnipActive) {
+            out += if (chain.dnsLayer)
+                "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
+            else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
+        }
         if (!chain.sourceHasDns && !chain.recommendedDns)
             out += "订阅没有 dns: 配置：核心只用系统 DNS（redir-host）。可开启下方「河图推荐 DNS」（fake-ip + 国内 DoH，默认关闭，重启代理后生效）。"
         when {
