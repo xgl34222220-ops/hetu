@@ -29,7 +29,10 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # running proxy, watchdog never cuts a node that is moving data.
 # 2026-10-19: 6.0.0 (versionCode 2104; user: 下一个版本是6.0.0) = 5.5.5 + ColorOS eBPF Google block cleanup (hetu-bpf
 # vendor-uid), sing-box 订阅 / 规则集 from Hetu's own record (rule-set files hot-replaced), sing-box fake-IP TTL 1 s.
-VERSION_CODE, VERSION_NAME = 2104, '6.0.0'
+# 2026-10-20: 6.6.6 (versionCode 2105; user: 做6.6.6 自动组不就是自动切走的吗？而且我测试都有延迟啊) = 6.0.0 + stalled-node
+# watchdog (a node that answers delay tests but returns nothing: auto groups pinned elsewhere, timed return),
+# connection chains with "]" in node names matched again, Google vendor-chain cleanup with One True Awk.
+VERSION_CODE, VERSION_NAME = 2105, '6.6.6'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -424,8 +427,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2104', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "6.0.0"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2105', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "6.6.6"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'
