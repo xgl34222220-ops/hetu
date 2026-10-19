@@ -8,12 +8,16 @@ connections through 故障转移 / 流媒体 / 最终兜底, all on 移动 [无�
 still answered its delay test. Mihomo's url-test / fallback groups only count a failed test URL or a failed
 dial against a node, and the watchdog's probes all went through the Google group, so nothing switched.
 
-* wd_stall_scan reads GET /connections once: a node whose TCP connections to two or more sites sent data and
-  received nothing for WD_STALL_AGE s, with no young connection receiving anything, is stalled.
-* wd_stall_heal pins the url-test / fallback groups on it to the first answering member (fallback order) or the
-  fastest (url-test), never to the stalled node, a node recently seen stalled, a group ending in one or DIRECT;
-  selector groups and a node the user pinned stay as they are and are named in the notice; then only the
-  connections through the stalled node close. Nothing happens while DIRECT fails too.
+* wd_stall_scan reads GET /connections and compares it with the previous read: TCP or QUIC (UDP 443) connections
+  through a node that sent data and received nothing, or received a handshake and nothing since they last sent,
+  for WD_STALL_AGE s are stuck; a node with stuck connections to two or more sites and none of its connections
+  receiving anything since the last read is stalled.
+* wd_stall_heal sends one HTTPS request through a group on the node. When it fails, or the node stalled three
+  times within ten minutes even though it answers, the url-test / fallback groups on it are pinned to the first
+  answering member (fallback order) or the fastest (url-test), never to the stalled node, a node recently seen
+  stalled, a group ending in one or DIRECT, and every connection through it closes; otherwise only its stuck
+  connections close, so that apps reconnect at once. Selector groups and a node the user pinned stay as they are
+  and are named in the notice. Nothing happens while DIRECT fails too.
 * wd_stall_unpin gives the groups back to automatic selection after the pin time (doubled when the same node
   stalls again soon), and forgets a pin the user has changed since.
 * Fixed on the way: wd_conn_match cut every "chains" array at the first "]" (node names like "[两年]"), so the
@@ -25,7 +29,7 @@ HETU_TEST_MIHOMO=<mihomo binary> adds an end-to-end run against a real core with
 """
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 import urllib.request
 import datetime
 import json
@@ -62,8 +66,9 @@ def iso(seconds_ago, tz=0):
     return s.replace('+00:00', 'Z') if tz == 0 else s
 
 
-def conn(cid, chains, age, down=0, up=517, host='www.reddit.com', network='tcp', tz=8, dst=''):
-    return {'id': cid, 'chains': chains, 'age': age, 'down': down, 'up': up, 'host': host, 'network': network, 'tz': tz, 'dst': dst}
+def conn(cid, chains, age, down=0, up=517, host='www.reddit.com', network='tcp', tz=8, dst='', port='443'):
+    return {'id': cid, 'chains': chains, 'age': age, 'down': down, 'up': up, 'host': host, 'network': network, 'tz': tz, 'dst': dst,
+            'port': port}
 
 
 def go_json(obj):
@@ -81,6 +86,10 @@ class StallController:
         self.conns = []
         self.closed = []
         self.direct_ok = True
+        # Groups whose delay test with an https:// URL fails (the request apps make); http:// always answers.
+        self.tls_fail = set()
+        # Keep a connection listed after DELETE (a node so stuck that the close never lands).
+        self.keep_closed = False
         self.put_code = 204
         self.delays = {}
         self.groups = {}
@@ -102,13 +111,17 @@ class StallController:
                     return self.reply(200, owner.connections_json())
                 if len(parts) == 2 and parts[0] == 'connections' and self.command == 'DELETE':
                     owner.closed.append(parts[1])
-                    owner.conns = [c for c in owner.conns if c['id'] != parts[1]]
+                    if not owner.keep_closed:
+                        owner.conns = [c for c in owner.conns if c['id'] != parts[1]]
                     return self.reply(204, '')
                 if parts == ['proxies'] and self.command == 'GET':
                     return self.reply(200, go_json({'proxies': {n: owner.proxy(n) for n in owner.names()}}))
                 if len(parts) == 3 and parts[0] == 'proxies' and parts[2] == 'delay':
                     if parts[1] == 'DIRECT':
                         return self.reply(200, '{"delay":31}') if owner.direct_ok else self.reply(504, '{"message":"Timeout"}')
+                    tls = unquote(parse_qs(url.query).get('url', [''])[0]).startswith('https://')
+                    if tls and parts[1] in owner.tls_fail:
+                        return self.reply(504, '{"message":"Timeout"}')
                     return self.reply(200, '{"delay":88}')
                 if len(parts) == 3 and parts[0] == 'group' and parts[2] == 'delay':
                     d = owner.delays.get(parts[1], {})
@@ -170,7 +183,7 @@ class StallController:
         items = []
         for c in self.conns:
             items.append({'id': c['id'], 'metadata': {'network': c['network'], 'type': 'Tproxy', 'sourceIP': '192.168.2.105',
-                          'destinationIP': c['dst'], 'sourceGeoIP': None, 'host': c['host'], 'dnsMode': 'fake-ip', 'uid': 10385,
+                          'destinationIP': c['dst'], 'sourceGeoIP': None, 'destinationPort': c['port'], 'host': c['host'], 'dnsMode': 'fake-ip', 'uid': 10385,
                           'process': 'io.github.xgl34222220.hetu', 'sniffHost': ''},
                           'upload': c['up'], 'download': c['down'], 'start': iso(c['age'], c['tz']), 'chains': c['chains'],
                           'providerChains': [''] * len(c['chains']), 'rule': 'RuleSet', 'rulePayload': 'GeolocationNotCN'})
@@ -230,12 +243,17 @@ class Case(ShellCase):
         return c
 
     def init(self):
-        return 'COREPID=$$; wd_selfheal_init; WD_DIRECT_URLS=http://direct.test/generate_204; wd_now\n'
+        # One WD_TMP for every shell of a test: the scan compares each read with the previous one.
+        return 'COREPID=$$; wd_selfheal_init; WD_TMP="$RUN/.wdtest"; WD_DIRECT_URLS=http://direct.test/generate_204; wd_now\n'
 
-    def scan(self, c):
-        r = self.sh(self.init() + 'wd_stall_scan "$(date +%s)"; echo "rc=$?"')
+    def scan(self, c, at=None):
+        r = self.sh(self.init() + 'wd_stall_scan "%s"; echo "rc=$?"' % (at if at is not None else '$(date +%s)'))
         self.assertIn('rc=0', r.stdout, r.stderr)
         return [line.split('\t') for line in r.stdout.splitlines() if '\t' in line]
+
+    def stuck(self):
+        f = self.run_dir / '.wdtest.stuck'
+        return sorted(l.split('\t')[1] for l in f.read_text().splitlines()) if f.exists() else []
 
     def pins(self):
         f = self.run_dir / 'state/stall-pins'
@@ -254,10 +272,11 @@ class Scan(Case):
     def test_stalled_node_found_with_brackets_emoji_and_html_escapes(self):
         c = self.ctl()
         c.conns = stalled_conns() + stalled_conns(HK, (MEDIA,), 3)
-        # A node whose young connection is receiving data is alive, however many of its others wait.
-        c.conns += [conn('j%d' % i, [JP, AUTO], age=20, host='h%d.test' % i) for i in range(4)] + [conn('jl', [JP], age=5, down=900)]
+        # A node whose new connection already received more than a handshake is alive, however many others wait.
+        c.conns += [conn('j%d' % i, [JP, AUTO], age=20, host='h%d.test' % i) for i in range(4)] + [conn('jl', [JP], age=5, down=20000)]
         got = sorted(self.scan(c))
-        self.assertEqual(got, sorted([[BAD, '4', '4'], [HK.replace('\\u0026', '&'), '3', '3']]))
+        self.assertEqual(got, sorted([[BAD, '4', '4', '4'], [HK, '3', '3', '3']]))
+        self.assertEqual(self.stuck(), sorted(['s0', 's1', 's2', 's3', 's0', 's1', 's2', 'j0', 'j1', 'j2', 'j3']), 'every stuck connection is listed')
 
     def test_age_boundary_and_time_zones(self):
         c = self.ctl()
@@ -266,7 +285,7 @@ class Scan(Case):
                 c.conns = [conn('a%d' % i, [BAD], age=5, host='h%d' % i, tz=tz) for i in range(5)]
                 self.assertEqual(self.scan(c), [], 'younger than WD_STALL_AGE is not stalled yet')
                 c.conns = [conn('a%d' % i, [BAD], age=11, host='h%d' % i, tz=tz) for i in range(3)]
-                self.assertEqual(self.scan(c), [[BAD, '3', '3']])
+                self.assertEqual(self.scan(c), [[BAD, '3', '3', '3']])
                 c.conns = [conn('a%d' % i, [BAD], age=400, host='h%d' % i, tz=tz) for i in range(5)]
                 self.assertEqual(self.scan(c), [], 'older than 300 s belongs to another episode')
 
@@ -276,17 +295,52 @@ class Scan(Case):
             'one site only': [conn('x%d' % i, [BAD], age=20, host='same.test') for i in range(5)],
             'two connections': [conn('x%d' % i, [BAD], age=20, host='h%d' % i) for i in range(2)],
             'nothing sent yet': [conn('x%d' % i, [BAD], age=20, up=0, host='h%d' % i) for i in range(5)],
-            'udp': [conn('x%d' % i, [BAD], age=20, network='udp', host='h%d' % i) for i in range(5)],
+            'udp, not QUIC': [conn('x%d' % i, [BAD], age=20, network='udp', port='3478', host='h%d' % i) for i in range(5)],
             'direct': [conn('x%d' % i, ['DIRECT'], age=20, host='h%d' % i) for i in range(5)],
             'reject': [conn('x%d' % i, ['REJECT', 'ads'], age=20, host='h%d' % i) for i in range(5)],
-            'young one receiving': [conn('x%d' % i, [BAD], age=20, host='h%d' % i) for i in range(5)] + [conn('y', [BAD, FAILOVER], age=30, down=5)],
+            'new one past a handshake': [conn('x%d' % i, [BAD], age=20, host='h%d' % i) for i in range(5)] + [conn('y', [BAD, FAILOVER], age=30, down=20000)],
         }
         for name, conns in cases.items():
             with self.subTest(name):
+                (self.run_dir / '.wdtest.stalldb').unlink(missing_ok=True)
                 c.conns = conns
                 self.assertEqual(self.scan(c), [])
-        c.conns = cases['two connections'] + [conn('old', [BAD], age=200, down=10 ** 6), conn('ip', [BAD], age=15, host='', dst='104.16.148.4')]
-        self.assertEqual(self.scan(c), [[BAD, '3', '3']], 'an old busy connection does not prove the node works now; an IP is a site')
+        (self.run_dir / '.wdtest.stalldb').unlink(missing_ok=True)
+        c.conns = cases['two connections'] + [conn('old', [BAD], age=200, down=10 ** 6), conn('ip', [BAD], age=15, host='', dst='104.16.148.4'),
+                                              conn('hs', [BAD], age=15, down=4481, host='a.test')]
+        self.assertEqual(self.scan(c), [[BAD, '3', '3', '3']],
+                         'an old busy connection or a handshake does not prove the node works now; an IP is a site')
+
+    def test_quic_counts(self):
+        c = self.ctl()
+        c.conns = [conn('q%d' % i, [BAD, 'Google'], age=15, network='udp', host='h%d.googleapis.com' % i) for i in range(3)]
+        self.assertEqual(self.scan(c), [[BAD, '3', '3', '3']])
+
+    def test_handshake_then_nothing_across_reads(self):
+        """The field report: the first few KB (a TLS handshake) arrive, the request that follows gets nothing."""
+        c = self.ctl()
+        t0 = int(time.time())
+        for name, grow_down_later in (('stalled', False), ('answers later', True)):
+            with self.subTest(name):
+                (self.run_dir / '.wdtest.stalldb').unlink(missing_ok=True)
+                c.conns = [conn('p%d' % i, [BAD, 'Google'], age=12, up=2713, down=4481, host='h%d.test' % i) for i in range(3)]
+                self.assertEqual(self.scan(c, t0), [], 'first read: nothing known yet')
+                for x in c.conns:
+                    x['up'] += 300
+                self.assertEqual(self.scan(c, t0 + 10), [], 'it just sent its request')
+                if grow_down_later:
+                    c.conns[0]['down'] += 1000
+                got = self.scan(c, t0 + 20)
+                self.assertEqual(got, [] if grow_down_later else [[BAD, '3', '3', '0']])
+        # A connection whose last change was a download (idle after its answer) is not waiting.
+        (self.run_dir / '.wdtest.stalldb').unlink(missing_ok=True)
+        c.conns = [conn('i%d' % i, [BAD], age=12, up=2713, down=4481, host='h%d.test' % i) for i in range(3)]
+        self.scan(c, t0)
+        for x in c.conns:
+            x['up'] += 300
+            x['down'] += 900
+        self.scan(c, t0 + 10)
+        self.assertEqual(self.scan(c, t0 + 30), [])
 
     def test_unreadable_list(self):
         r = self.sh('WD_CP=%d; WD_SECRET=x; WD_TMP="$RUN/.wd"; wd_stall_scan "$(date +%%s)"; echo "rc=$?"' % free_port())
@@ -333,17 +387,20 @@ class ParsersFixed(Case):
 
 class Heal(Case):
     def heal(self, c, node=BAD, extra=''):
-        return self.sh(self.init() + extra + 'wd_stall_heal %s 4 4; echo "rc=$?"' % shq(node))
+        return self.sh(self.init() + extra + 'wd_stall_scan "$(date +%%s)" >/dev/null; wd_stall_heal %s 4 4 4; echo "rc=$?"' % shq(node))
 
-    def test_auto_groups_pinned_selectors_named_only_its_connections_closed(self):
+    def test_https_fails_auto_groups_pinned_selectors_named_only_its_connections_closed(self):
         c = self.ctl()
         c.groups = standard_groups()
+        c.tls_fail = {FAILOVER}
         c.delays = {FAILOVER: {BAD: 40, SG: 300, JP: 90}, AUTO: {BAD: 40, SG: 300, JP: 90}}
         c.conns = stalled_conns() + [conn('g', [SG, 'Google'], age=4, down=7), conn('d', ['DIRECT'], age=4, down=7)]
         r = self.heal(c)
         self.assertIn('rc=0', r.stdout, r.stderr)
         self.assertEqual(sorted(c.puts()), sorted([('/proxies/' + FAILOVER, SG), ('/proxies/' + AUTO, JP)]),
                          'fallback keeps its order, url-test takes the fastest; never the stalled node')
+        self.assertIn('/proxies/%s/delay?timeout=5000&url=https://www.gstatic.com/generate_204' % FAILOVER,
+                      [unquote(p) for m, p, b in c.requests if m == 'GET'], 'one HTTPS request through a group on the node')
         self.assertEqual(sorted(c.closed), ['s0', 's1', 's2', 's3'])
         self.assertNotIn(MEDIA, [p for p, _ in c.puts()], 'a selector is the user\'s choice')
         pins = {p[0]: p for p in self.pins()}
@@ -352,28 +409,57 @@ class Heal(Case):
         self.assertTrue(-3 <= int(pins[FAILOVER][3]) - uptime() - 600 <= 1)
         notes = self.notifications()
         self.assertEqual(len(notes), 1)
-        self.assertIn('能测出延迟，但经过它的连接收不到数据（4 个连接、4 个网站）', notes[0])
+        self.assertIn('能测出延迟，但经过它的加密连接收不到数据（4 个连接、4 个网站卡住）', notes[0])
         self.assertIn('「%s」→「%s」' % (FAILOVER, SG), notes[0])
         self.assertIn('约 10 分钟后恢复自动选择', notes[0])
         self.assertIn('手动选择的「%s」也在用它' % MEDIA, notes[0])
-        self.assertIn('stalled node: %s (4 connection(s) to 4 site(s) without data' % BAD, self.log_text())
-        self.assertIn('closed 4 of 6 core connection(s) through it', self.log_text())
+        log = self.log_text()
+        self.assertIn('stalled node: %s (4 stuck connection(s) to 4 site(s), 4 never received data; HTTPS through %s: fail; stall 1 in 600s)' % (BAD, FAILOVER), log)
+        self.assertIn('closed 4 of 6 core connection(s) through it', log)
 
-    def test_user_pin_kept_and_selector_only_closes_nothing(self):
+    def test_https_answers_first_stall_closes_only_the_stuck_ones(self):
+        c = self.ctl()
+        c.groups = standard_groups()
+        c.delays = {FAILOVER: {SG: 300}, AUTO: {JP: 90}}
+        c.conns = stalled_conns() + [conn('live', [BAD, FAILOVER], age=200, down=10 ** 6, host='x.test')]
+        self.heal(c)
+        self.assertEqual(c.puts(), [], 'one stall while HTTPS answers: nothing switched')
+        self.assertEqual(sorted(c.closed), ['s0', 's1', 's2', 's3'], 'only the stuck connections; apps reconnect')
+        self.assertEqual(self.notifications(), [])
+        self.assertIn('HTTPS through %s: ok; stall 1 in 600s); closed its 4 stuck connection(s); manual groups on it: %s' % (FAILOVER, MEDIA), self.log_text())
+
+    def test_repeated_stalls_switch_even_when_https_answers(self):
+        c = self.ctl()
+        c.groups = standard_groups()
+        c.delays = {FAILOVER: {SG: 300}, AUTO: {JP: 90}}
+        c.conns = stalled_conns()
+        self.heal(c, extra='printf "%s\\t%s\\t\\t2\\t%s\\n" "移动 [无限]" "$((WD_NOW-100))" "$((WD_NOW-300))" > "$WD_TMP.stallseen"; ')
+        self.assertEqual(sorted(c.puts()), sorted([('/proxies/' + FAILOVER, SG), ('/proxies/' + AUTO, JP)]))
+        self.assertIn('反复卡住（10 分钟内 3 次）', self.notifications()[0])
+        # An old window starts over.
+        c.requests.clear()
+        self.heal(c, extra='rm -f "$RUN/state/stall-pins"; printf "%s\\t%s\\t\\t2\\t%s\\n" "移动 [无限]" "$((WD_NOW-100))" "$((WD_NOW-700))" > "$WD_TMP.stallseen"; ')
+        self.assertEqual(c.puts(), [])
+
+    def test_user_pin_kept_selector_named_stuck_ones_closed(self):
         c = self.ctl()
         c.groups = standard_groups()
         c.groups[FAILOVER]['fixed'] = BAD
+        c.tls_fail = {FAILOVER}
         del c.groups[AUTO]
-        c.conns = stalled_conns()
+        c.conns = stalled_conns() + [conn('live', [BAD, FAILOVER], age=200, down=10 ** 6, host='x.test')]
         self.heal(c)
         self.assertEqual(c.puts(), [])
-        self.assertEqual(c.closed, [], 'reconnecting through the same node would not help')
-        self.assertIn('「%s」是你固定选择的它，已保持不变' % FAILOVER, self.notifications()[0])
+        self.assertEqual(sorted(c.closed), ['s0', 's1', 's2', 's3'], 'nothing switched: only the stuck ones')
+        note = self.notifications()[0]
+        self.assertIn('「%s」是你固定选择的它，已保持不变' % FAILOVER, note)
+        self.assertIn('已断开卡住的连接让应用重连', note)
 
     def test_own_earlier_pin_is_moved_on(self):
         c = self.ctl()
         c.groups = standard_groups()
         c.groups[FAILOVER].update(now=SG, fixed=SG)
+        c.tls_fail = {'Google'}
         c.delays = {FAILOVER: {BAD: 40, SG: 50, JP: 90}}
         (self.run_dir / 'state/stall-pins').write_text('%s\t%s\t%s\t%d\t600\t%s\n' % (FAILOVER, SG, BAD, uptime() + 500, boot_id()))
         # 移动 stalled a moment ago: neither it nor the now stalled Singapore node is picked.
@@ -387,6 +473,7 @@ class Heal(Case):
             FAILOVER: {'type': 'Fallback', 'all': [BAD, MEDIA, 'DIRECT', HK, SG], 'now': BAD, 'fixed': ''},
             MEDIA: {'type': 'Selector', 'all': [BAD, SG], 'now': BAD},
         }
+        c.tls_fail = {FAILOVER}
         c.delays = {FAILOVER: {BAD: 10, MEDIA: 10, 'DIRECT': 5, SG: 400}}
         self.heal(c)
         self.assertEqual(c.puts(), [('/proxies/' + FAILOVER, SG)], 'not via 流媒体 (ends in 移动), not DIRECT, not the silent 香港 03')
@@ -394,11 +481,12 @@ class Heal(Case):
     def test_no_replacement_or_pin_refused(self):
         c = self.ctl()
         c.groups = standard_groups()
+        c.tls_fail = {FAILOVER}
         c.conns = stalled_conns()
         c.delays = {FAILOVER: {BAD: 40}}
         self.heal(c)
         self.assertEqual(c.puts(), [])
-        self.assertEqual(c.closed, [])
+        self.assertEqual(sorted(c.closed), ['s0', 's1', 's2', 's3'])
         self.assertIn('「%s」、「%s」里没有其他测速正常的节点可换' % (FAILOVER, AUTO), self.notifications()[0])
         self.assertEqual(self.pins(), [])
         c.requests.clear()
@@ -427,16 +515,22 @@ class Heal(Case):
         self.assertEqual((c.puts(), c.closed, self.notifications()), ([], [], []))
         self.assertIn('while DIRECT fails too; nothing changed', self.log_text())
 
-    def test_tick_acts_once_per_gap_and_notifies_once(self):
+    def test_tick_acts_once_per_gap_counts_repeats_and_notifies_once(self):
         c = self.ctl()
         c.groups = standard_groups()
         c.groups[FAILOVER]['fixed'] = BAD
         del c.groups[AUTO]
+        c.keep_closed = True
         c.conns = stalled_conns()
-        # Nothing is pinned or closed (the user's pin, a selector), so the node stays stalled on every pass.
-        r = self.sh(self.init() + 'wd_stall_tick; wd_stall_tick; WD_NOW=$((WD_NOW+61)); wd_stall_tick')
-        self.assertEqual(self.log_text().count('stalled node: %s (' % BAD), 2, r.stderr)
-        self.assertEqual(len(self.notifications()), 1)
+        # The user's pin and a selector: nothing can switch, the closes never land, so it stays stalled on every pass.
+        r = self.sh(self.init() + 'wd_stall_tick; wd_stall_tick; WD_NOW=$((WD_NOW+61)); wd_stall_tick; WD_NOW=$((WD_NOW+61)); wd_stall_tick')
+        log = self.log_text()
+        self.assertEqual(log.count('stalled node: %s (' % BAD), 3, r.stderr)
+        self.assertIn('stall 3 in 600s', log)
+        notes = self.notifications()
+        self.assertEqual(len(notes), 1, 'only the third stall: only the user can change it')
+        self.assertIn('反复卡住（10 分钟内 3 次）', notes[0])
+        self.assertIn('手动选择的「%s」也在用它' % MEDIA, notes[0])
         self.assertEqual(c.puts(), [])
 
     def test_selfheal_tick_runs_the_scan(self):
@@ -677,7 +771,8 @@ class RealMihomo(Case):
         time.sleep(10)
         # The DIRECT check alone is stubbed: Mihomo's DIRECT delay test to a loopback server answers once and then
         # errors on every later call (host-observed with 1.19.31); on a phone it goes to mainland probe hosts.
-        r = self.sh(self.init() + 'wd_delay(){ [ "$1" = DIRECT ]; }; wd_stall_tick; echo "rc=$?"')
+        real = function('wd_delay').replace('wd_delay(){', 'wd_delay_real(){', 1)
+        r = self.sh(self.init() + real + 'wd_delay(){ [ "$1" = DIRECT ] && return 0; wd_delay_real "$@"; }; wd_stall_tick; echo "rc=$?"')
         self.assertIn('rc=0', r.stdout, r.stderr)
         groups = self.api('/proxies')['proxies']
         self.assertEqual((groups[FAILOVER]['now'], groups[FAILOVER]['fixed']), (SG, SG), self.log_text() + r.stderr)
@@ -711,7 +806,9 @@ class Guards(unittest.TestCase):
         heal = function('wd_stall_heal')
         self.assertLess(heal.index('wd_delay DIRECT'), heal.index('wd_groups'), 'DIRECT is checked before anything changes')
         self.assertLess(heal.index('wd_stall_pin'), heal.index('wd_close_through'), 'pinned first, then connections close')
-        self.assertIn('if [ -n "$WSH_SW" ]; then\n    if wd_close_through', heal, 'nothing closes without a pinned group')
+        self.assertIn('if [ -n "$WSH_SW" ]; then\n    if wd_close_through', heal, 'everything through it closes only after a pin')
+        self.assertIn('else wd_stall_close_stuck "$WSH_NODE"', heal, 'otherwise only the stuck connections')
+        self.assertLess(heal.index('WD_STALL_TLS_URL'), heal.index('wd_stall_pick'), 'HTTPS checked before switching')
 
 
 if __name__ == '__main__':

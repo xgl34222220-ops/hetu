@@ -36617,7 +36617,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..efcfa36 100755
+index ae832da..bf1508c 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36680,7 +36680,7 @@ index ae832da..efcfa36 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +100,204 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +100,210 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -36811,6 +36811,12 @@ index ae832da..efcfa36 100755
 +WD_STALL_NOTIFY_GAP=1800
 +WD_STALL_RECENT=900
 +WD_STALL_GROUP_MAX=200
++# Before acting, one HTTPS request goes through the node: the delay URLs are tiny, the pages that stall are not
++# (plain http:// would not even run TLS inside the tunnel). A node that keeps stalling WD_STALL_REPEAT times
++# within WD_STALL_REPEAT_WINDOW s is switched away from even when that request answers.
++WD_STALL_TLS_URL=https://www.gstatic.com/generate_204
++WD_STALL_REPEAT=3
++WD_STALL_REPEAT_WINDOW=600
 +# 3.0.0-3.3.3 armed a 120 s post-stop REJECT of the whole fake-IP range (filter OUTPUT, every UID) in this
 +# chain. It also cut off any other proxy app using the same 198.18/15 fake-IP range, and when ColorOS
 +# killed the detached expiry timer the REJECT stayed until the next Hetu start. It is no longer armed:
@@ -36888,7 +36894,7 @@ index ae832da..efcfa36 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +309,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +315,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -37012,7 +37018,7 @@ index ae832da..efcfa36 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +431,53 @@ acquire_lock(){
+@@ -99,10 +437,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -37068,7 +37074,7 @@ index ae832da..efcfa36 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +563,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +569,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -37092,7 +37098,7 @@ index ae832da..efcfa36 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +612,9 @@ cleanup4(){
+@@ -233,7 +618,9 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -37103,7 +37109,7 @@ index ae832da..efcfa36 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +629,453 @@ cleanup6(){
+@@ -248,13 +635,453 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -37559,7 +37565,7 @@ index ae832da..efcfa36 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +1107,21 @@ findcorepid(){
+@@ -286,8 +1113,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -37582,7 +37588,7 @@ index ae832da..efcfa36 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +1130,8 @@ stopcore(){
+@@ -296,6 +1136,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -37591,7 +37597,7 @@ index ae832da..efcfa36 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,8 +1156,65 @@ stopcore(){
+@@ -320,8 +1162,65 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -37657,7 +37663,7 @@ index ae832da..efcfa36 100755
 
  # procfs reports a zero stat size even when this file contains IPv6 addresses.
  # Install the selected IPv6 policy whenever the kernel supports IPv6, including
-@@ -362,6 +1255,138 @@ v6disabled(){
+@@ -362,6 +1261,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -37796,7 +37802,7 @@ index ae832da..efcfa36 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1481,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1487,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -37894,7 +37900,7 @@ index ae832da..efcfa36 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1589,8 @@ core_return(){
+@@ -473,8 +1595,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -37905,7 +37911,7 @@ index ae832da..efcfa36 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1614,14 @@ append_scoped(){
+@@ -498,12 +1620,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -37922,7 +37928,7 @@ index ae832da..efcfa36 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1629,21 @@ scoped_redirect(){
+@@ -511,17 +1635,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -37947,7 +37953,7 @@ index ae832da..efcfa36 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,15 +1655,532 @@ bypass4(){
+@@ -533,15 +1661,532 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -38480,7 +38486,7 @@ index ae832da..efcfa36 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -710,8 +2349,12 @@ local_destination_return(){
+@@ -710,8 +2355,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -38494,7 +38500,7 @@ index ae832da..efcfa36 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +2374,23 @@ install_mangle4(){
+@@ -731,22 +2380,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -38527,7 +38533,7 @@ index ae832da..efcfa36 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +2405,45 @@ install_mangle6(){
+@@ -761,40 +2411,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -38587,7 +38593,7 @@ index ae832da..efcfa36 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +2471,12 @@ remove_dot_guard(){
+@@ -822,12 +2477,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -38602,7 +38608,7 @@ index ae832da..efcfa36 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +2490,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2496,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -38624,7 +38630,7 @@ index ae832da..efcfa36 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +2515,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2521,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -38668,7 +38674,7 @@ index ae832da..efcfa36 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,22 +2574,134 @@ v6_disable_guard_ready(){
+@@ -921,22 +2580,134 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -38814,7 +38820,7 @@ index ae832da..efcfa36 100755
    if has ss; then
      LS_RAW=$(ss -lnut 2>/dev/null); LS_RC=$?
      if [ "$LS_RC" = 0 ]; then
-@@ -961,10 +2726,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,10 +2732,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -38902,7 +38908,7 @@ index ae832da..efcfa36 100755
  check_start_ports(){
    listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
    M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
-@@ -1019,20 +2860,1149 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2866,1199 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -39716,15 +39722,23 @@ index ae832da..efcfa36 100755
 +  if [ "$WD_ROUTE_NOTIFIED" = 0 ]; then WD_ROUTE_NOTIFIED=1; wd_notify "route-down ${WRH_END:-unknown}" "$WRH_MSG"; fi
 +}
 +# ---- stalled nodes (6.6.6) ------------------------------------------------------------------
-+# One read of GET /connections (Mihomo and sing-box Clash API). Prints "node TAB stalled TAB sites" for each
-+# outbound node (the first chain entry, never DIRECT or a reject) with WD_STALL_MIN TCP connections that sent
-+# data and received none for WD_STALL_AGE s or more (start time against $2 = now in epoch seconds), to at
-+# least WD_STALL_HOSTS different sites, and no TCP connection younger than WD_STALL_LIVE_AGE s that received
-+# anything. A dead network makes every node look like that: the caller checks DIRECT first.
++# One read of GET /connections (Mihomo and sing-box Clash API), compared with the previous read kept in
++# $WD_TMP.stalldb (id TAB upload TAB download TAB upload-grew-at TAB download-grew-at, epoch seconds; 0 = not
++# seen). Only TCP and QUIC (UDP to port 443) through a proxy node (the first chain entry, never DIRECT or a
++# reject) count. A connection is stuck when, for WD_STALL_AGE s or more (start time against $1 = now):
++#   - it sent data and never received any (a TLS or QUIC server always answers first), or
++#   - it received some (a handshake) but nothing since it last sent (the field report: the first few KB, then
++#     nothing while the delay test still answers).
++# A node is stalled with WD_STALL_MIN stuck connections to at least WD_STALL_HOSTS sites while none of its
++# connections received anything since the previous read and no new one already received 16 KiB (more than a
++# handshake). Prints "node TAB stuck TAB sites TAB never-received" per stalled node and writes the stuck
++# connections ("node TAB id") to $WD_TMP.stuck. A dead network looks the same: the caller checks DIRECT first.
 +wd_stall_scan(){
++  : > "$WD_TMP.stuck"
 +  WD_HTTP_TIMEOUT=4; wd_http GET /connections "$WD_TMP.sc" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.sc"; return 1; }
++  [ -f "$WD_TMP.stalldb" ] || : > "$WD_TMP.stalldb"
 +  tr '{' '\n' < "$WD_TMP.sc" | awk -v now="$1" -v age="$WD_STALL_AGE" -v live_age="$WD_STALL_LIVE_AGE" \
-+    -v min="$WD_STALL_MIN" -v sites="$WD_STALL_HOSTS" '
++    -v min="$WD_STALL_MIN" -v sites="$WD_STALL_HOSTS" -v prev="$WD_TMP.stalldb" -v db="$WD_TMP.stalldb.new" -v stuck="$WD_TMP.stuck" '
 +    function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); gsub(/\\"/, "\"", x); return x }
 +    function sv(k,  i, s, j) { i = index($0, "\"" k "\":\""); if (!i) return ""; s = substr($0, i + length(k) + 4); j = index(s, "\""); return j ? substr(s, 1, j - 1) : "" }
 +    function nv(k,  i) { i = index($0, "\"" k "\":"); return i ? substr($0, i + length(k) + 3) + 0 : -1 }
@@ -39737,24 +39751,47 @@ index ae832da..efcfa36 100755
 +      yy = (mo <= 2) ? y - 1 : y; era = int(yy / 400); yoe = yy - era * 400; mp = (mo + 9) % 12
 +      doe = yoe * 365 + int(yoe / 4) - int(yoe / 100) + int((153 * mp + 2) / 5) + d - 1
 +      return (era * 146097 + doe - 719468) * 86400 + substr(t, 12, 2) * 3600 + substr(t, 15, 2) * 60 + substr(t, 18, 2) + off }
-+    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; net = ""; host = ""; dst = ""; ul = -1; dl = -1; st = "" }
++    BEGIN { while ((getline l < prev) > 0) if (split(l, f, "\t") == 5) { pu[f[1]] = f[2]; pd[f[1]] = f[3]; pt[f[1]] = f[4]; pr[f[1]] = f[5] }
++      close(prev); printf "" > db; printf "" > stuck }
++    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; net = ""; host = ""; dst = ""; port = ""; ul = -1; dl = -1; st = "" }
 +      if (id == "") next
 +      if ((x = sv("network")) != "") net = x
 +      if ((x = sv("host")) != "") host = x
 +      if ((x = sv("destinationIP")) != "") dst = x
++      if ((x = sv("destinationPort")) != "") port = x
 +      if ((x = sv("start")) != "") st = x
 +      if ((v = nv("upload")) >= 0) ul = v
 +      if ((v = nv("download")) >= 0) dl = v
 +      if ((i = index($0, "\"chains\":[\"")) > 0) {
 +        s = substr($0, i + 11); j = index(s, "\""); node = j ? u(substr(s, 1, j - 1)) : ""; a = epoch(st)
-+        if (net == "tcp" && node != "" && a >= 0 && node !~ /^(DIRECT|direct|REJECT|REJECT-DROP|PASS|COMPATIBLE|block|reject|dns-out)$/) {
++        if ((net == "tcp" || (net == "udp" && port == "443")) && node != "" && a >= 0 && ul >= 0 && dl >= 0 &&
++            node !~ /^(DIRECT|direct|REJECT|REJECT-DROP|PASS|COMPATIBLE|block|reject|dns-out)$/) {
 +          a = now - a
-+          if (dl > 0 && a <= live_age) live[node] = 1
-+          if (dl == 0 && ul > 0 && a >= age && a <= 300) { n[node]++; h = (host != "") ? host : dst; if (!((node, h) in hs)) { hs[node, h] = 1; nh[node]++ } } }
++          if (id in pu) { tu = (ul > pu[id]) ? now : pt[id]; td = (dl > pd[id]) ? now : pr[id]; grew = (dl > pd[id]); fresh = 0 }
++          else { tu = 0; td = 0; grew = 0; fresh = 1 }
++          print id "\t" ul "\t" dl "\t" tu "\t" td > db
++          if (grew || (fresh && dl >= 16384 && a <= live_age)) live[node] = 1
++          z = (dl == 0 && ul > 0 && a >= age && a <= 300)
++          w = (!z && dl > 0 && tu > 0 && tu > td && now - tu >= age && a <= 600)
++          if (z || w) { n[node]++; if (z) nz[node]++; h = (host != "") ? host : dst; if (!((node, h) in hs)) { hs[node, h] = 1; nh[node]++ }
++            print node "\t" id > stuck } }
 +        id = "" } }
-+    END { for (k in n) if (n[k] >= min && nh[k] >= sites && !(k in live)) print k "\t" n[k] "\t" nh[k] }'
++    END { for (k in n) if (n[k] >= min && nh[k] >= sites && !(k in live)) print k "\t" n[k] "\t" nh[k] "\t" (nz[k] + 0) }'
++  WSS_RC=$?
++  mv -f "$WD_TMP.stalldb.new" "$WD_TMP.stalldb" 2>/dev/null || rm -f "$WD_TMP.stalldb.new"
 +  rm -f "$WD_TMP.sc"
-+  return 0
++  [ "$WSS_RC" = 0 ]
++}
++# Close the stuck connections of node $1 listed by the last scan ($WD_TMP.stuck); WD_CLOSED counts them.
++wd_stall_close_stuck(){
++  WD_CLOSED=0
++  awk -F '\t' -v n="$1" '$1 == n {print $2}' "$WD_TMP.stuck" 2>/dev/null > "$WD_TMP.sids"
++  while IFS= read -r WSC_ID; do
++    case "$WSC_ID" in ''|*[!0-9A-Za-z-]*) continue;; esac
++    wd_http DELETE "/connections/$WSC_ID" "$WD_TMP.act" </dev/null; rm -f "$WD_TMP.act"
++    WD_CLOSED=$((WD_CLOSED+1))
++  done < "$WD_TMP.sids"
++  rm -f "$WD_TMP.sids"
 +}
 +# JSON string body for PUT /proxies/<group>: {"name":"$1"}.
 +wd_json_name(){ printf '{"name":"%s"}' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
@@ -39863,17 +39900,36 @@ index ae832da..efcfa36 100755
 +  done < "$RUN/state/stall-pins"
 +  if [ -s "$RUN/state/stall-pins.keep" ]; then mv -f "$RUN/state/stall-pins.keep" "$RUN/state/stall-pins"; else rm -f "$RUN/state/stall-pins.keep" "$RUN/state/stall-pins"; fi
 +}
-+# A stalled node $1 ($2 connections, $3 sites). The url-test/fallback groups whose current choice it is are
-+# pinned to another node that answers (wd_stall_pick) unless the user pinned it there; then only the
-+# connections through it are closed so that apps reconnect. Selector groups are the user's choice: they
-+# are named in the notice and left as they are. Nothing is done while DIRECT fails too.
++# A stalled node $1 ($2 stuck connections to $3 sites, $4 of them never received anything). Nothing is done while
++# DIRECT fails too, or when no group uses the node now. Otherwise one HTTPS request goes through a group whose
++# current choice it is (provider nodes have no /proxies entry of their own). The url-test/fallback groups on it
++# are pinned to another answering node (wd_stall_pick) when that request fails, or when the node stalled
++# WD_STALL_REPEAT times within WD_STALL_REPEAT_WINDOW s even though it answers (the field report: delay fine,
++# pages not); then every connection through it closes. Otherwise only its stuck connections close, so that
++# apps reconnect at once instead of waiting on them (a new connection often gets through). A group the user
++# pinned to the node and selector groups are the user's choice: named in the notice, never changed.
 +wd_stall_heal(){
-+  WSH_NODE="$1"; WSH_WHAT="$2 connection(s) to $3 site(s) without data"
++  WSH_NODE="$1"; WSH_WHAT="$2 stuck connection(s) to $3 site(s), ${4:-0} never received data"
 +  WSH_DIRECT=1
 +  for WSH_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WSH_U" </dev/null && { WSH_DIRECT=0; break; }; done
 +  if [ "$WSH_DIRECT" != 0 ]; then wd_log "stalled node: $WSH_NODE ($WSH_WHAT) while DIRECT fails too; nothing changed"; return 0; fi
 +  WSH_MAX="${WD_DP_GROUP_MAX:-12}"; WD_DP_GROUP_MAX="$WD_STALL_GROUP_MAX"; wd_groups; WSH_RC=$?; WD_DP_GROUP_MAX="$WSH_MAX"
 +  [ "$WSH_RC" = 0 ] || { rm -f "$WD_TMP.groups"; return 0; }
++  WSH_USER=$(awk -F '\t' -v n="$WSH_NODE" '$3 == n {print $2; exit}' "$WD_TMP.groups" 2>/dev/null)
++  if [ -z "$WSH_USER" ]; then
++    rm -f "$WD_TMP.groups"
++    wd_log "stalled node: $WSH_NODE ($WSH_WHAT) is not the current choice of any group; nothing changed"; return 0
++  fi
++  # The request apps make: HTTPS inside the node's tunnel, not the plain delay URL.
++  wd_delay "$WSH_USER" "$WD_STALL_TLS_URL" </dev/null; case "$?" in 0) WSH_TLS=ok;; 1) WSH_TLS=fail;; *) WSH_TLS=unknown;; esac
++  # Repeats: $WD_TMP.stallseen holds node TAB last-action TAB last-notice TAB count TAB window-start (uptime).
++  WSH_ROW=$(awk -F '\t' -v n="$WSH_NODE" '$1 == n {r = $0} END {print r}' "$WD_TMP.stallseen" 2>/dev/null)
++  WSH_LN=$(printf '%s' "$WSH_ROW" | awk -F '\t' '{print $3}'); WSH_C=$(printf '%s' "$WSH_ROW" | awk -F '\t' '{print $4}'); WSH_W0=$(printf '%s' "$WSH_ROW" | awk -F '\t' '{print $5}')
++  case "$WSH_LN" in ''|*[!0-9]*) WSH_LN="";; esac
++  case "$WSH_C:$WSH_W0" in *[!0-9:]*|:*|*:) WSH_C=0; WSH_W0="$WD_NOW";; esac
++  if [ $((WD_NOW-WSH_W0)) -ge "$WD_STALL_REPEAT_WINDOW" ]; then WSH_C=0; WSH_W0="$WD_NOW"; fi
++  WSH_C=$((WSH_C+1))
++  WSH_SWITCH=0; { [ "$WSH_TLS" = fail ] || [ "$WSH_C" -ge "$WD_STALL_REPEAT" ]; } && WSH_SWITCH=1
 +  WSH_SW=""; WSH_SWLOG=""; WSH_KEPT=""; WSH_MANUAL=""; WSH_NONE=""; WD_PIN_TTL="$WD_STALL_PIN_TTL"
 +  cp "$WD_TMP.groups" "$WD_TMP.sg" 2>/dev/null || : > "$WD_TMP.sg"
 +  while IFS= read -r WSH_L; do
@@ -39886,35 +39942,34 @@ index ae832da..efcfa36 100755
 +        if [ -n "$WSH_F" ] && ! awk -F '\t' -v g="$WSH_G" -v p="$WSH_F" '$1 == g && $2 == p {f = 1} END {exit !f}' "$RUN/state/stall-pins" 2>/dev/null; then
 +          WSH_KEPT="${WSH_KEPT:+$WSH_KEPT、}「$WSH_G」"; continue
 +        fi
++        [ "$WSH_SWITCH" = 1 ] || continue
 +        if wd_stall_pick "$WSH_G" "$WSH_T" "$WSH_NODE" && wd_stall_pin "$WSH_G" "$WD_PICK" "$WSH_NODE"; then
 +          WSH_SW="${WSH_SW:+$WSH_SW、}「$WSH_G」→「$WD_PICK」"; WSH_SWLOG="${WSH_SWLOG:+$WSH_SWLOG, }$WSH_G→$WD_PICK"
 +        else WSH_NONE="${WSH_NONE:+$WSH_NONE、}「$WSH_G」"; fi;;
 +      Selector) WSH_MANUAL="${WSH_MANUAL:+$WSH_MANUAL、}「$WSH_G」";;
-+      *) WSH_NONE="${WSH_NONE:+$WSH_NONE、}「$WSH_G」";;
++      *) [ "$WSH_SWITCH" = 0 ] || WSH_NONE="${WSH_NONE:+$WSH_NONE、}「$WSH_G」";;
 +    esac
 +  done < "$WD_TMP.sg"
 +  rm -f "$WD_TMP.sg" "$WD_TMP.groups"
-+  # No group uses it any more (switched away meanwhile; its old connections are still waiting): only logged.
-+  if [ -z "$WSH_SW$WSH_MANUAL$WSH_KEPT$WSH_NONE" ]; then
-+    wd_log "stalled node: $WSH_NODE ($WSH_WHAT) is not the current choice of any group; nothing changed"; return 0
-+  fi
-+  WSH_CLOSED=""
 +  if [ -n "$WSH_SW" ]; then
 +    if wd_close_through "$WSH_NODE$WD_TAB"; then WSH_CLOSED="closed $WD_CLOSED of $WD_CLOSE_SEEN core connection(s) through it"
 +    else WSH_CLOSED="closed no connection (connection list unreadable)"; fi
++  else wd_stall_close_stuck "$WSH_NODE"; WSH_CLOSED="closed its $WD_CLOSED stuck connection(s)"; fi
++  wd_log "stalled node: $WSH_NODE ($WSH_WHAT; HTTPS through $WSH_USER: $WSH_TLS; stall $WSH_C in ${WD_STALL_REPEAT_WINDOW}s)${WSH_SWLOG:+; pinned $WSH_SWLOG for ${WD_PIN_TTL}s}; $WSH_CLOSED${WSH_MANUAL:+; manual groups on it: $(printf '%s' "$WSH_MANUAL" | sed 's/[「」]//g; s/、/, /g')}${WSH_KEPT:+; pinned there by the user: $(printf '%s' "$WSH_KEPT" | sed 's/[「」]//g; s/、/, /g')}${WSH_NONE:+; no other answering node in: $(printf '%s' "$WSH_NONE" | sed 's/[「」]//g; s/、/, /g')}"
++  # A notice when something was switched, or when the node keeps stalling and only the user can change it.
++  WSH_NOTE=0
++  if [ -n "$WSH_SW" ] || { [ "$WSH_SWITCH" = 1 ] && [ -n "$WSH_MANUAL$WSH_KEPT$WSH_NONE" ]; }; then
++    { [ -z "$WSH_LN" ] || [ $((WD_NOW-WSH_LN)) -ge "$WD_STALL_NOTIFY_GAP" ]; } && WSH_NOTE=1
 +  fi
-+  wd_log "stalled node: $WSH_NODE ($WSH_WHAT, its delay test may still pass)${WSH_SWLOG:+; pinned $WSH_SWLOG for ${WD_PIN_TTL}s}${WSH_CLOSED:+; $WSH_CLOSED}${WSH_MANUAL:+; manual groups on it: $(printf '%s' "$WSH_MANUAL" | sed 's/[「」]//g; s/、/, /g')}${WSH_KEPT:+; pinned there by the user: $(printf '%s' "$WSH_KEPT" | sed 's/[「」]//g; s/、/, /g')}${WSH_NONE:+; no other answering node in: $(printf '%s' "$WSH_NONE" | sed 's/[「」]//g; s/、/, /g')}"
-+  WSH_LN=$(awk -F '\t' -v n="$WSH_NODE" '$1 == n {a = $3} END {print a}' "$WD_TMP.stallseen" 2>/dev/null)
-+  case "$WSH_LN" in ''|*[!0-9]*) WSH_LN="";; esac
-+  WSH_NOTE=0; { [ -z "$WSH_LN" ] || [ $((WD_NOW-WSH_LN)) -ge "$WD_STALL_NOTIFY_GAP" ]; } && WSH_NOTE=1
 +  { awk -F '\t' -v n="$WSH_NODE" '$1 != n' "$WD_TMP.stallseen" 2>/dev/null
-+    printf '%s\t%s\t%s\n' "$WSH_NODE" "$WD_NOW" "$([ "$WSH_NOTE" = 1 ] && echo "$WD_NOW" || echo "$WSH_LN")"; } > "$WD_TMP.stallseen.new" 2>/dev/null &&
++    printf '%s\t%s\t%s\t%s\t%s\n' "$WSH_NODE" "$WD_NOW" "$([ "$WSH_NOTE" = 1 ] && echo "$WD_NOW" || echo "$WSH_LN")" "$WSH_C" "$WSH_W0"; } > "$WD_TMP.stallseen.new" 2>/dev/null &&
 +    mv -f "$WD_TMP.stallseen.new" "$WD_TMP.stallseen" 2>/dev/null || true
 +  [ "$WSH_NOTE" = 1 ] || return 0
-+  WSH_MSG="节点「$WSH_NODE」能测出延迟，但经过它的连接收不到数据（$2 个连接、$3 个网站）。"
++  if [ "$WSH_TLS" = fail ]; then WSH_MSG="节点「$WSH_NODE」能测出延迟，但经过它的加密连接收不到数据（$2 个连接、$3 个网站卡住）。"
++  else WSH_MSG="节点「$WSH_NODE」反复卡住（$((WD_STALL_REPEAT_WINDOW/60)) 分钟内 $WSH_C 次）：能测出延迟，但连接连上后收不到数据（这次 $2 个连接、$3 个网站）。"; fi
 +  if [ -n "$WSH_SW" ]; then
 +    WSH_MSG="$WSH_MSG已把自动选择的$WSH_SW，并断开了经过它的连接让应用重连；约 $((WD_PIN_TTL/60)) 分钟后恢复自动选择。"
-+  fi
++  else WSH_MSG="${WSH_MSG}已断开卡住的连接让应用重连。"; fi
 +  [ -z "$WSH_MANUAL" ] || WSH_MSG="$WSH_MSG手动选择的$WSH_MANUAL也在用它，河图不会替你改，请在「面板 › 策略组」里换一个节点。"
 +  [ -z "$WSH_KEPT" ] || WSH_MSG="$WSH_MSG$WSH_KEPT是你固定选择的它，已保持不变。"
 +  [ -z "$WSH_NONE" ] || WSH_MSG="$WSH_MSG$WSH_NONE里没有其他测速正常的节点可换。"
@@ -39926,11 +39981,12 @@ index ae832da..efcfa36 100755
 +  WST_EPOCH=$(date +%s 2>/dev/null); case "$WST_EPOCH" in ''|*[!0-9]*) return 0;; esac
 +  wd_stall_scan "$WST_EPOCH" > "$WD_TMP.stalled" 2>/dev/null || { rm -f "$WD_TMP.stalled"; return 0; }
 +  while IFS= read -r WST_L; do
-+    WST_NODE=${WST_L%%"$WD_TAB"*}; WST_R=${WST_L#*"$WD_TAB"}; WST_N=${WST_R%%"$WD_TAB"*}; WST_H=${WST_R#*"$WD_TAB"}
++    WST_NODE=${WST_L%%"$WD_TAB"*}; WST_R=${WST_L#*"$WD_TAB"}; WST_N=${WST_R%%"$WD_TAB"*}; WST_R=${WST_R#*"$WD_TAB"}
++    WST_H=${WST_R%%"$WD_TAB"*}; WST_Z=${WST_R#*"$WD_TAB"}
 +    [ -n "$WST_NODE" ] || continue
 +    WST_LA=$(awk -F '\t' -v n="$WST_NODE" '$1 == n {a = $2} END {print a}' "$WD_TMP.stallseen" 2>/dev/null)
 +    case "$WST_LA" in ''|*[!0-9]*) ;; *) [ $((WD_NOW-WST_LA)) -ge "$WD_STALL_ACT_GAP" ] || continue;; esac
-+    wd_stall_heal "$WST_NODE" "$WST_N" "$WST_H" </dev/null
++    wd_stall_heal "$WST_NODE" "$WST_N" "$WST_H" "$WST_Z" </dev/null
 +  done < "$WD_TMP.stalled"
 +  rm -f "$WD_TMP.stalled"
 +}
@@ -40060,7 +40116,7 @@ index ae832da..efcfa36 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +4015,45 @@ probe_core_owner(){
+@@ -1045,9 +4071,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -40107,7 +40163,7 @@ index ae832da..efcfa36 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +4064,29 @@ core_identity_prepare(){
+@@ -1058,14 +4120,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -40141,7 +40197,7 @@ index ae832da..efcfa36 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +4100,9 @@ core_launch(){
+@@ -1079,8 +4156,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -40153,7 +40209,7 @@ index ae832da..efcfa36 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,26 +4169,82 @@ core_tune(){
+@@ -1147,26 +4225,82 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -40237,7 +40293,7 @@ index ae832da..efcfa36 100755
    GF_FILE="$RUN/.google-firewall.$$"
    for GF_TOOL in xt4q xt6q; do
      for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
-@@ -1176,8 +4254,8 @@ google_firewall_cleanup(){
+@@ -1176,8 +4310,8 @@ google_firewall_cleanup(){
        while IFS= read -r GF_RULE; do
          # Quotes/comments and inverted/range UID matches are deliberately left intact.
          case "$GF_RULE" in *\"*|*\'*) continue;; esac
@@ -40248,7 +40304,7 @@ index ae832da..efcfa36 100755
            $1=="-A" && $2==c {
              uid="";target="";inverted=0
              for(i=3;i<=NF;i++) {
-@@ -1208,33 +4286,128 @@ google_firewall_cleanup(){
+@@ -1208,33 +4342,128 @@ google_firewall_cleanup(){
      tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
    fi
  }
@@ -40381,7 +40437,7 @@ index ae832da..efcfa36 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +4415,16 @@ start(){
+@@ -1242,8 +4471,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -40391,15 +40447,15 @@ index ae832da..efcfa36 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +4434,98 @@ start(){
+@@ -1253,75 +4490,98 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -40536,7 +40592,7 @@ index ae832da..efcfa36 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +4537,94 @@ start(){
+@@ -1333,19 +4593,94 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -40637,7 +40693,7 @@ index ae832da..efcfa36 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +4637,8 @@ status(){
+@@ -1358,6 +4693,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -40646,7 +40702,7 @@ index ae832da..efcfa36 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1375,6 +4656,7 @@ status(){
+@@ -1375,6 +4712,7 @@ status(){
    DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
    PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
    GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
@@ -40654,7 +40710,7 @@ index ae832da..efcfa36 100755
    TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
    CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
    case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
-@@ -1407,6 +4689,12 @@ status(){
+@@ -1407,6 +4745,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -40667,7 +40723,7 @@ index ae832da..efcfa36 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +4775,34 @@ status(){
+@@ -1487,13 +4831,34 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -40704,7 +40760,7 @@ index ae832da..efcfa36 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +4926,8 @@ health_collect(){
+@@ -1617,6 +4982,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -40713,7 +40769,7 @@ index ae832da..efcfa36 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +4977,18 @@ health_restore_table(){
+@@ -1666,16 +5033,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -40734,7 +40790,7 @@ index ae832da..efcfa36 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +5037,7 @@ health_repair(){ (
+@@ -1724,7 +5093,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -40743,7 +40799,7 @@ index ae832da..efcfa36 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +5070,481 @@ health_json(){ (
+@@ -1757,6 +5126,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -41225,7 +41281,7 @@ index ae832da..efcfa36 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +5562,33 @@ case "${1:-status}" in
+@@ -1774,10 +5618,33 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;

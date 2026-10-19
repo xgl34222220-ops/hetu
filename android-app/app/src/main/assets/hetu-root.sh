@@ -227,6 +227,12 @@ WD_STALL_ACT_GAP=60
 WD_STALL_NOTIFY_GAP=1800
 WD_STALL_RECENT=900
 WD_STALL_GROUP_MAX=200
+# Before acting, one HTTPS request goes through the node: the delay URLs are tiny, the pages that stall are not
+# (plain http:// would not even run TLS inside the tunnel). A node that keeps stalling WD_STALL_REPEAT times
+# within WD_STALL_REPEAT_WINDOW s is switched away from even when that request answers.
+WD_STALL_TLS_URL=https://www.gstatic.com/generate_204
+WD_STALL_REPEAT=3
+WD_STALL_REPEAT_WINDOW=600
 # 3.0.0-3.3.3 armed a 120 s post-stop REJECT of the whole fake-IP range (filter OUTPUT, every UID) in this
 # chain. It also cut off any other proxy app using the same 198.18/15 fake-IP range, and when ColorOS
 # killed the detached expiry timer the REJECT stayed until the next Hetu start. It is no longer armed:
@@ -3670,15 +3676,23 @@ wd_route_heal(){
   if [ "$WD_ROUTE_NOTIFIED" = 0 ]; then WD_ROUTE_NOTIFIED=1; wd_notify "route-down ${WRH_END:-unknown}" "$WRH_MSG"; fi
 }
 # ---- stalled nodes (6.6.6) ------------------------------------------------------------------
-# One read of GET /connections (Mihomo and sing-box Clash API). Prints "node TAB stalled TAB sites" for each
-# outbound node (the first chain entry, never DIRECT or a reject) with WD_STALL_MIN TCP connections that sent
-# data and received none for WD_STALL_AGE s or more (start time against $2 = now in epoch seconds), to at
-# least WD_STALL_HOSTS different sites, and no TCP connection younger than WD_STALL_LIVE_AGE s that received
-# anything. A dead network makes every node look like that: the caller checks DIRECT first.
+# One read of GET /connections (Mihomo and sing-box Clash API), compared with the previous read kept in
+# $WD_TMP.stalldb (id TAB upload TAB download TAB upload-grew-at TAB download-grew-at, epoch seconds; 0 = not
+# seen). Only TCP and QUIC (UDP to port 443) through a proxy node (the first chain entry, never DIRECT or a
+# reject) count. A connection is stuck when, for WD_STALL_AGE s or more (start time against $1 = now):
+#   - it sent data and never received any (a TLS or QUIC server always answers first), or
+#   - it received some (a handshake) but nothing since it last sent (the field report: the first few KB, then
+#     nothing while the delay test still answers).
+# A node is stalled with WD_STALL_MIN stuck connections to at least WD_STALL_HOSTS sites while none of its
+# connections received anything since the previous read and no new one already received 16 KiB (more than a
+# handshake). Prints "node TAB stuck TAB sites TAB never-received" per stalled node and writes the stuck
+# connections ("node TAB id") to $WD_TMP.stuck. A dead network looks the same: the caller checks DIRECT first.
 wd_stall_scan(){
+  : > "$WD_TMP.stuck"
   WD_HTTP_TIMEOUT=4; wd_http GET /connections "$WD_TMP.sc" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.sc"; return 1; }
+  [ -f "$WD_TMP.stalldb" ] || : > "$WD_TMP.stalldb"
   tr '{' '\n' < "$WD_TMP.sc" | awk -v now="$1" -v age="$WD_STALL_AGE" -v live_age="$WD_STALL_LIVE_AGE" \
-    -v min="$WD_STALL_MIN" -v sites="$WD_STALL_HOSTS" '
+    -v min="$WD_STALL_MIN" -v sites="$WD_STALL_HOSTS" -v prev="$WD_TMP.stalldb" -v db="$WD_TMP.stalldb.new" -v stuck="$WD_TMP.stuck" '
     function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); gsub(/\\"/, "\"", x); return x }
     function sv(k,  i, s, j) { i = index($0, "\"" k "\":\""); if (!i) return ""; s = substr($0, i + length(k) + 4); j = index(s, "\""); return j ? substr(s, 1, j - 1) : "" }
     function nv(k,  i) { i = index($0, "\"" k "\":"); return i ? substr($0, i + length(k) + 3) + 0 : -1 }
@@ -3691,24 +3705,47 @@ wd_stall_scan(){
       yy = (mo <= 2) ? y - 1 : y; era = int(yy / 400); yoe = yy - era * 400; mp = (mo + 9) % 12
       doe = yoe * 365 + int(yoe / 4) - int(yoe / 100) + int((153 * mp + 2) / 5) + d - 1
       return (era * 146097 + doe - 719468) * 86400 + substr(t, 12, 2) * 3600 + substr(t, 15, 2) * 60 + substr(t, 18, 2) + off }
-    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; net = ""; host = ""; dst = ""; ul = -1; dl = -1; st = "" }
+    BEGIN { while ((getline l < prev) > 0) if (split(l, f, "\t") == 5) { pu[f[1]] = f[2]; pd[f[1]] = f[3]; pt[f[1]] = f[4]; pr[f[1]] = f[5] }
+      close(prev); printf "" > db; printf "" > stuck }
+    { if ((i = index($0, "\"id\":\"")) > 0) { s = substr($0, i + 6); j = index(s, "\""); id = j ? substr(s, 1, j - 1) : ""; net = ""; host = ""; dst = ""; port = ""; ul = -1; dl = -1; st = "" }
       if (id == "") next
       if ((x = sv("network")) != "") net = x
       if ((x = sv("host")) != "") host = x
       if ((x = sv("destinationIP")) != "") dst = x
+      if ((x = sv("destinationPort")) != "") port = x
       if ((x = sv("start")) != "") st = x
       if ((v = nv("upload")) >= 0) ul = v
       if ((v = nv("download")) >= 0) dl = v
       if ((i = index($0, "\"chains\":[\"")) > 0) {
         s = substr($0, i + 11); j = index(s, "\""); node = j ? u(substr(s, 1, j - 1)) : ""; a = epoch(st)
-        if (net == "tcp" && node != "" && a >= 0 && node !~ /^(DIRECT|direct|REJECT|REJECT-DROP|PASS|COMPATIBLE|block|reject|dns-out)$/) {
+        if ((net == "tcp" || (net == "udp" && port == "443")) && node != "" && a >= 0 && ul >= 0 && dl >= 0 &&
+            node !~ /^(DIRECT|direct|REJECT|REJECT-DROP|PASS|COMPATIBLE|block|reject|dns-out)$/) {
           a = now - a
-          if (dl > 0 && a <= live_age) live[node] = 1
-          if (dl == 0 && ul > 0 && a >= age && a <= 300) { n[node]++; h = (host != "") ? host : dst; if (!((node, h) in hs)) { hs[node, h] = 1; nh[node]++ } } }
+          if (id in pu) { tu = (ul > pu[id]) ? now : pt[id]; td = (dl > pd[id]) ? now : pr[id]; grew = (dl > pd[id]); fresh = 0 }
+          else { tu = 0; td = 0; grew = 0; fresh = 1 }
+          print id "\t" ul "\t" dl "\t" tu "\t" td > db
+          if (grew || (fresh && dl >= 16384 && a <= live_age)) live[node] = 1
+          z = (dl == 0 && ul > 0 && a >= age && a <= 300)
+          w = (!z && dl > 0 && tu > 0 && tu > td && now - tu >= age && a <= 600)
+          if (z || w) { n[node]++; if (z) nz[node]++; h = (host != "") ? host : dst; if (!((node, h) in hs)) { hs[node, h] = 1; nh[node]++ }
+            print node "\t" id > stuck } }
         id = "" } }
-    END { for (k in n) if (n[k] >= min && nh[k] >= sites && !(k in live)) print k "\t" n[k] "\t" nh[k] }'
+    END { for (k in n) if (n[k] >= min && nh[k] >= sites && !(k in live)) print k "\t" n[k] "\t" nh[k] "\t" (nz[k] + 0) }'
+  WSS_RC=$?
+  mv -f "$WD_TMP.stalldb.new" "$WD_TMP.stalldb" 2>/dev/null || rm -f "$WD_TMP.stalldb.new"
   rm -f "$WD_TMP.sc"
-  return 0
+  [ "$WSS_RC" = 0 ]
+}
+# Close the stuck connections of node $1 listed by the last scan ($WD_TMP.stuck); WD_CLOSED counts them.
+wd_stall_close_stuck(){
+  WD_CLOSED=0
+  awk -F '\t' -v n="$1" '$1 == n {print $2}' "$WD_TMP.stuck" 2>/dev/null > "$WD_TMP.sids"
+  while IFS= read -r WSC_ID; do
+    case "$WSC_ID" in ''|*[!0-9A-Za-z-]*) continue;; esac
+    wd_http DELETE "/connections/$WSC_ID" "$WD_TMP.act" </dev/null; rm -f "$WD_TMP.act"
+    WD_CLOSED=$((WD_CLOSED+1))
+  done < "$WD_TMP.sids"
+  rm -f "$WD_TMP.sids"
 }
 # JSON string body for PUT /proxies/<group>: {"name":"$1"}.
 wd_json_name(){ printf '{"name":"%s"}' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
@@ -3817,17 +3854,36 @@ wd_stall_unpin(){
   done < "$RUN/state/stall-pins"
   if [ -s "$RUN/state/stall-pins.keep" ]; then mv -f "$RUN/state/stall-pins.keep" "$RUN/state/stall-pins"; else rm -f "$RUN/state/stall-pins.keep" "$RUN/state/stall-pins"; fi
 }
-# A stalled node $1 ($2 connections, $3 sites). The url-test/fallback groups whose current choice it is are
-# pinned to another node that answers (wd_stall_pick) unless the user pinned it there; then only the
-# connections through it are closed so that apps reconnect. Selector groups are the user's choice: they
-# are named in the notice and left as they are. Nothing is done while DIRECT fails too.
+# A stalled node $1 ($2 stuck connections to $3 sites, $4 of them never received anything). Nothing is done while
+# DIRECT fails too, or when no group uses the node now. Otherwise one HTTPS request goes through a group whose
+# current choice it is (provider nodes have no /proxies entry of their own). The url-test/fallback groups on it
+# are pinned to another answering node (wd_stall_pick) when that request fails, or when the node stalled
+# WD_STALL_REPEAT times within WD_STALL_REPEAT_WINDOW s even though it answers (the field report: delay fine,
+# pages not); then every connection through it closes. Otherwise only its stuck connections close, so that
+# apps reconnect at once instead of waiting on them (a new connection often gets through). A group the user
+# pinned to the node and selector groups are the user's choice: named in the notice, never changed.
 wd_stall_heal(){
-  WSH_NODE="$1"; WSH_WHAT="$2 connection(s) to $3 site(s) without data"
+  WSH_NODE="$1"; WSH_WHAT="$2 stuck connection(s) to $3 site(s), ${4:-0} never received data"
   WSH_DIRECT=1
   for WSH_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WSH_U" </dev/null && { WSH_DIRECT=0; break; }; done
   if [ "$WSH_DIRECT" != 0 ]; then wd_log "stalled node: $WSH_NODE ($WSH_WHAT) while DIRECT fails too; nothing changed"; return 0; fi
   WSH_MAX="${WD_DP_GROUP_MAX:-12}"; WD_DP_GROUP_MAX="$WD_STALL_GROUP_MAX"; wd_groups; WSH_RC=$?; WD_DP_GROUP_MAX="$WSH_MAX"
   [ "$WSH_RC" = 0 ] || { rm -f "$WD_TMP.groups"; return 0; }
+  WSH_USER=$(awk -F '\t' -v n="$WSH_NODE" '$3 == n {print $2; exit}' "$WD_TMP.groups" 2>/dev/null)
+  if [ -z "$WSH_USER" ]; then
+    rm -f "$WD_TMP.groups"
+    wd_log "stalled node: $WSH_NODE ($WSH_WHAT) is not the current choice of any group; nothing changed"; return 0
+  fi
+  # The request apps make: HTTPS inside the node's tunnel, not the plain delay URL.
+  wd_delay "$WSH_USER" "$WD_STALL_TLS_URL" </dev/null; case "$?" in 0) WSH_TLS=ok;; 1) WSH_TLS=fail;; *) WSH_TLS=unknown;; esac
+  # Repeats: $WD_TMP.stallseen holds node TAB last-action TAB last-notice TAB count TAB window-start (uptime).
+  WSH_ROW=$(awk -F '\t' -v n="$WSH_NODE" '$1 == n {r = $0} END {print r}' "$WD_TMP.stallseen" 2>/dev/null)
+  WSH_LN=$(printf '%s' "$WSH_ROW" | awk -F '\t' '{print $3}'); WSH_C=$(printf '%s' "$WSH_ROW" | awk -F '\t' '{print $4}'); WSH_W0=$(printf '%s' "$WSH_ROW" | awk -F '\t' '{print $5}')
+  case "$WSH_LN" in ''|*[!0-9]*) WSH_LN="";; esac
+  case "$WSH_C:$WSH_W0" in *[!0-9:]*|:*|*:) WSH_C=0; WSH_W0="$WD_NOW";; esac
+  if [ $((WD_NOW-WSH_W0)) -ge "$WD_STALL_REPEAT_WINDOW" ]; then WSH_C=0; WSH_W0="$WD_NOW"; fi
+  WSH_C=$((WSH_C+1))
+  WSH_SWITCH=0; { [ "$WSH_TLS" = fail ] || [ "$WSH_C" -ge "$WD_STALL_REPEAT" ]; } && WSH_SWITCH=1
   WSH_SW=""; WSH_SWLOG=""; WSH_KEPT=""; WSH_MANUAL=""; WSH_NONE=""; WD_PIN_TTL="$WD_STALL_PIN_TTL"
   cp "$WD_TMP.groups" "$WD_TMP.sg" 2>/dev/null || : > "$WD_TMP.sg"
   while IFS= read -r WSH_L; do
@@ -3840,35 +3896,34 @@ wd_stall_heal(){
         if [ -n "$WSH_F" ] && ! awk -F '\t' -v g="$WSH_G" -v p="$WSH_F" '$1 == g && $2 == p {f = 1} END {exit !f}' "$RUN/state/stall-pins" 2>/dev/null; then
           WSH_KEPT="${WSH_KEPT:+$WSH_KEPT、}「$WSH_G」"; continue
         fi
+        [ "$WSH_SWITCH" = 1 ] || continue
         if wd_stall_pick "$WSH_G" "$WSH_T" "$WSH_NODE" && wd_stall_pin "$WSH_G" "$WD_PICK" "$WSH_NODE"; then
           WSH_SW="${WSH_SW:+$WSH_SW、}「$WSH_G」→「$WD_PICK」"; WSH_SWLOG="${WSH_SWLOG:+$WSH_SWLOG, }$WSH_G→$WD_PICK"
         else WSH_NONE="${WSH_NONE:+$WSH_NONE、}「$WSH_G」"; fi;;
       Selector) WSH_MANUAL="${WSH_MANUAL:+$WSH_MANUAL、}「$WSH_G」";;
-      *) WSH_NONE="${WSH_NONE:+$WSH_NONE、}「$WSH_G」";;
+      *) [ "$WSH_SWITCH" = 0 ] || WSH_NONE="${WSH_NONE:+$WSH_NONE、}「$WSH_G」";;
     esac
   done < "$WD_TMP.sg"
   rm -f "$WD_TMP.sg" "$WD_TMP.groups"
-  # No group uses it any more (switched away meanwhile; its old connections are still waiting): only logged.
-  if [ -z "$WSH_SW$WSH_MANUAL$WSH_KEPT$WSH_NONE" ]; then
-    wd_log "stalled node: $WSH_NODE ($WSH_WHAT) is not the current choice of any group; nothing changed"; return 0
-  fi
-  WSH_CLOSED=""
   if [ -n "$WSH_SW" ]; then
     if wd_close_through "$WSH_NODE$WD_TAB"; then WSH_CLOSED="closed $WD_CLOSED of $WD_CLOSE_SEEN core connection(s) through it"
     else WSH_CLOSED="closed no connection (connection list unreadable)"; fi
+  else wd_stall_close_stuck "$WSH_NODE"; WSH_CLOSED="closed its $WD_CLOSED stuck connection(s)"; fi
+  wd_log "stalled node: $WSH_NODE ($WSH_WHAT; HTTPS through $WSH_USER: $WSH_TLS; stall $WSH_C in ${WD_STALL_REPEAT_WINDOW}s)${WSH_SWLOG:+; pinned $WSH_SWLOG for ${WD_PIN_TTL}s}; $WSH_CLOSED${WSH_MANUAL:+; manual groups on it: $(printf '%s' "$WSH_MANUAL" | sed 's/[「」]//g; s/、/, /g')}${WSH_KEPT:+; pinned there by the user: $(printf '%s' "$WSH_KEPT" | sed 's/[「」]//g; s/、/, /g')}${WSH_NONE:+; no other answering node in: $(printf '%s' "$WSH_NONE" | sed 's/[「」]//g; s/、/, /g')}"
+  # A notice when something was switched, or when the node keeps stalling and only the user can change it.
+  WSH_NOTE=0
+  if [ -n "$WSH_SW" ] || { [ "$WSH_SWITCH" = 1 ] && [ -n "$WSH_MANUAL$WSH_KEPT$WSH_NONE" ]; }; then
+    { [ -z "$WSH_LN" ] || [ $((WD_NOW-WSH_LN)) -ge "$WD_STALL_NOTIFY_GAP" ]; } && WSH_NOTE=1
   fi
-  wd_log "stalled node: $WSH_NODE ($WSH_WHAT, its delay test may still pass)${WSH_SWLOG:+; pinned $WSH_SWLOG for ${WD_PIN_TTL}s}${WSH_CLOSED:+; $WSH_CLOSED}${WSH_MANUAL:+; manual groups on it: $(printf '%s' "$WSH_MANUAL" | sed 's/[「」]//g; s/、/, /g')}${WSH_KEPT:+; pinned there by the user: $(printf '%s' "$WSH_KEPT" | sed 's/[「」]//g; s/、/, /g')}${WSH_NONE:+; no other answering node in: $(printf '%s' "$WSH_NONE" | sed 's/[「」]//g; s/、/, /g')}"
-  WSH_LN=$(awk -F '\t' -v n="$WSH_NODE" '$1 == n {a = $3} END {print a}' "$WD_TMP.stallseen" 2>/dev/null)
-  case "$WSH_LN" in ''|*[!0-9]*) WSH_LN="";; esac
-  WSH_NOTE=0; { [ -z "$WSH_LN" ] || [ $((WD_NOW-WSH_LN)) -ge "$WD_STALL_NOTIFY_GAP" ]; } && WSH_NOTE=1
   { awk -F '\t' -v n="$WSH_NODE" '$1 != n' "$WD_TMP.stallseen" 2>/dev/null
-    printf '%s\t%s\t%s\n' "$WSH_NODE" "$WD_NOW" "$([ "$WSH_NOTE" = 1 ] && echo "$WD_NOW" || echo "$WSH_LN")"; } > "$WD_TMP.stallseen.new" 2>/dev/null &&
+    printf '%s\t%s\t%s\t%s\t%s\n' "$WSH_NODE" "$WD_NOW" "$([ "$WSH_NOTE" = 1 ] && echo "$WD_NOW" || echo "$WSH_LN")" "$WSH_C" "$WSH_W0"; } > "$WD_TMP.stallseen.new" 2>/dev/null &&
     mv -f "$WD_TMP.stallseen.new" "$WD_TMP.stallseen" 2>/dev/null || true
   [ "$WSH_NOTE" = 1 ] || return 0
-  WSH_MSG="节点「$WSH_NODE」能测出延迟，但经过它的连接收不到数据（$2 个连接、$3 个网站）。"
+  if [ "$WSH_TLS" = fail ]; then WSH_MSG="节点「$WSH_NODE」能测出延迟，但经过它的加密连接收不到数据（$2 个连接、$3 个网站卡住）。"
+  else WSH_MSG="节点「$WSH_NODE」反复卡住（$((WD_STALL_REPEAT_WINDOW/60)) 分钟内 $WSH_C 次）：能测出延迟，但连接连上后收不到数据（这次 $2 个连接、$3 个网站）。"; fi
   if [ -n "$WSH_SW" ]; then
     WSH_MSG="$WSH_MSG已把自动选择的$WSH_SW，并断开了经过它的连接让应用重连；约 $((WD_PIN_TTL/60)) 分钟后恢复自动选择。"
-  fi
+  else WSH_MSG="${WSH_MSG}已断开卡住的连接让应用重连。"; fi
   [ -z "$WSH_MANUAL" ] || WSH_MSG="$WSH_MSG手动选择的$WSH_MANUAL也在用它，河图不会替你改，请在「面板 › 策略组」里换一个节点。"
   [ -z "$WSH_KEPT" ] || WSH_MSG="$WSH_MSG$WSH_KEPT是你固定选择的它，已保持不变。"
   [ -z "$WSH_NONE" ] || WSH_MSG="$WSH_MSG$WSH_NONE里没有其他测速正常的节点可换。"
@@ -3880,11 +3935,12 @@ wd_stall_tick(){
   WST_EPOCH=$(date +%s 2>/dev/null); case "$WST_EPOCH" in ''|*[!0-9]*) return 0;; esac
   wd_stall_scan "$WST_EPOCH" > "$WD_TMP.stalled" 2>/dev/null || { rm -f "$WD_TMP.stalled"; return 0; }
   while IFS= read -r WST_L; do
-    WST_NODE=${WST_L%%"$WD_TAB"*}; WST_R=${WST_L#*"$WD_TAB"}; WST_N=${WST_R%%"$WD_TAB"*}; WST_H=${WST_R#*"$WD_TAB"}
+    WST_NODE=${WST_L%%"$WD_TAB"*}; WST_R=${WST_L#*"$WD_TAB"}; WST_N=${WST_R%%"$WD_TAB"*}; WST_R=${WST_R#*"$WD_TAB"}
+    WST_H=${WST_R%%"$WD_TAB"*}; WST_Z=${WST_R#*"$WD_TAB"}
     [ -n "$WST_NODE" ] || continue
     WST_LA=$(awk -F '\t' -v n="$WST_NODE" '$1 == n {a = $2} END {print a}' "$WD_TMP.stallseen" 2>/dev/null)
     case "$WST_LA" in ''|*[!0-9]*) ;; *) [ $((WD_NOW-WST_LA)) -ge "$WD_STALL_ACT_GAP" ] || continue;; esac
-    wd_stall_heal "$WST_NODE" "$WST_N" "$WST_H" </dev/null
+    wd_stall_heal "$WST_NODE" "$WST_N" "$WST_H" "$WST_Z" </dev/null
   done < "$WD_TMP.stalled"
   rm -f "$WD_TMP.stalled"
 }

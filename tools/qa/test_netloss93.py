@@ -79,7 +79,8 @@ SELFHEAL_VARS = ('CG_ESCAPE_GATE', 'CG_ESCAPE_V1', 'CG_ESCAPED', 'SETSID', 'SETS
                  'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT', 'WD_CLOSE_MAX', 'WD_BUSY_GAP',
                  # 6.6.6 stalled-node watchdog
                  'WD_STALL_EVERY', 'WD_STALL_AGE', 'WD_STALL_LIVE_AGE', 'WD_STALL_MIN', 'WD_STALL_HOSTS', 'WD_STALL_PIN_TTL',
-                 'WD_STALL_PIN_MAX', 'WD_STALL_ACT_GAP', 'WD_STALL_NOTIFY_GAP', 'WD_STALL_RECENT', 'WD_STALL_GROUP_MAX')
+                 'WD_STALL_PIN_MAX', 'WD_STALL_ACT_GAP', 'WD_STALL_NOTIFY_GAP', 'WD_STALL_RECENT', 'WD_STALL_GROUP_MAX',
+                 'WD_STALL_TLS_URL', 'WD_STALL_REPEAT', 'WD_STALL_REPEAT_WINDOW')
 HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape', 'wd_log', 'wd_log_body', 'wd_now',
            'wd_notify', 'wd_http', 'wd_dns_probe', 'wd_core_frozen', 'wd_selfheal_init', 'wd_net_sig', 'wd_net_watch',
            'wd_liveness', 'wd_restart_allowed', 'wd_restart_core', 'wd_heal_notice', 'wd_recover', 'wd_egress_target',
@@ -88,7 +89,7 @@ HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape'
            'wd_budget_left', 'wd_groups', 'wd_conn_match', 'wd_close_through', 'wd_conn_busy', 'wd_heal_chain', 'wd_node_heal',
            'wd_proxy_heal', 'wd_dataplane_heal', 'wd_cache_lost', 'wd_fakeip_heal', 'foreign_tun_links',
            'wd_stall_scan', 'wd_json_name', 'wd_stall_end', 'wd_stall_recent', 'wd_stall_pick', 'wd_stall_pin',
-           'wd_stall_unpin', 'wd_stall_heal', 'wd_stall_tick')
+           'wd_stall_unpin', 'wd_stall_heal', 'wd_stall_tick', 'wd_stall_close_stuck')
 
 
 class Controller:

@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "9bde7de876d413ba87297630c4ac655d5be6cadb6b28cc3722955388ff5196b6",
+  "patchSha256": "b78092fa27b9af51348ba15ff237ea392e6ce748f98e49d97cc7111a24ce661f",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -480,7 +480,7 @@
     "android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf": "dc671038dc008f468ff69a68c83fffc925207c8565f319ca9ce23891d166fa08",
     "android-app/app/src/main/assets/hetu-bpf/hetu_match.o": "096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de",
     "android-app/app/src/main/assets/hetu-bpf/x86_64/hetu-bpf": "ed3f241d2d8ad9b4867325083090d6b580c15d36b3873e44a61a389e887ae779",
-    "android-app/app/src/main/assets/hetu-root.sh": "47228fa602ae3e8bf49c2ea8def6afbaedb8024ff7351d2c13f2145394e25f79",
+    "android-app/app/src/main/assets/hetu-root.sh": "4626bad0939f43d6c1c8794f9dcf7b42c9cfbfbf262548ee61efafb8a4b2940a",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "a7357e8b7dc27bfde749eedfdfa13aa8547c0287a3b1f1dd3830e6c0a4683c22",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "0212634c3ca8d17c3b00a1a74457b1a088c6001473c2ad6e06d22c3b256540db",
@@ -1044,12 +1044,12 @@
     "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
   },
   "runtimePayloadCount": 23,
-  "rootScriptSha256": "47228fa602ae3e8bf49c2ea8def6afbaedb8024ff7351d2c13f2145394e25f79",
+  "rootScriptSha256": "4626bad0939f43d6c1c8794f9dcf7b42c9cfbfbf262548ee61efafb8a4b2940a",
   "autostartScriptSha256": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
   "authorizedRootPayloadDeltas": {
     "android-app/app/src/main/assets/hetu-root.sh": {
       "before": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
-      "after": "47228fa602ae3e8bf49c2ea8def6afbaedb8024ff7351d2c13f2145394e25f79"
+      "after": "4626bad0939f43d6c1c8794f9dcf7b42c9cfbfbf262548ee61efafb8a4b2940a"
     },
     "android-app/app/src/main/assets/hetu-autostart.sh": {
       "before": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
@@ -1136,7 +1136,7 @@
     "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
     "tools/qa/test_fast_start93.py": "8a3014b5841151e49ddc8f03bd31d06e5b2c449b19c44ac0ff599c61195af796",
     "tools/qa/test_i18n93.py": "59725902a88214812c7d22481f815879f55568d1401ea49b5bd421bfcfcf7d52",
-    "tools/qa/test_netloss93.py": "d42705ea55adf24c1b8fe3d04f6cdc3c44bc800aa13e9fde02a62adb2c616f88",
+    "tools/qa/test_netloss93.py": "54ee78260043e7ff05710deee4a8ce856cd93d6a16abf8aa0c4c9abe7fb386ce",
     "tools/qa/test_netmatch93.py": "c27218a7c93976697ec6089ef1dc7734d120a50134fa6d4ef67e5521a610d585",
     "tools/qa/test_netshare93.py": "1d353bd0ee8f2230e07350573efd5600a880bffd7729ed45c43e20e90380ccb9",
     "tools/qa/test_network_recovery_stress.py": "0a2abc21457cc4936bdbbc5cec53ea71d12c8a2aaa356661890b94a51f2ff179",
