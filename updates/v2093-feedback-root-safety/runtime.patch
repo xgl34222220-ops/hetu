@@ -54396,10 +54396,10 @@ index 76318e4..618767e 100644
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
 new file mode 100644
-index 0000000..12c27dc
+index 0000000..a7fc705
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
-@@ -0,0 +1,2403 @@
+@@ -0,0 +1,2513 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.BufferedInputStream;
@@ -54442,6 +54442,12 @@ index 0000000..12c27dc
 +    static final String TAG_TPROXY = "hetu-tproxy";
 +    static final String TAG_REDIRECT = "hetu-redirect";
 +    static final String TAG_DNS_IN = "hetu-dns-in";
++    /** Hetu's DNS port on ::1 (IPv6 local queries) and on every address (hotspot clients); see {@link #dnsInTags}. */
++    static final String TAG_DNS_IN6 = "hetu-dns-in6";
++    static final String TAG_DNS_LAN = "hetu-dns-lan";
++    /** sing-box's own TUN inbound in TUN mode (device hetu0, like Mihomo's tun). */
++    static final String TAG_TUN = "hetu-tun";
++    static final String TUN_DEVICE = "hetu0";
 +    static final String TAG_EGRESS = "hetu-egress-probe";
 +    static final String TAG_DIRECT = "DIRECT";
 +    static final String TAG_BLOCK = "REJECT";
@@ -54530,6 +54536,15 @@ index 0000000..12c27dc
 +        /** Category names (lower case) in that geosite.dat / geoip.dat; null when they could not be read (taken as present). */
 +        Set<String> geositeNames, geoipNames;
 +        boolean cnIpDirect;
++        /**
++         * TUN mode (sing-box only): Android packages the TUN routes ({@code include_package}, the whitelist scope) or
++         * leaves out ({@code exclude_package}); see {@link #tunPackages}. Unused in the netfilter modes.
++         */
++        List<String> tunIncludePackages = Collections.emptyList(), tunExcludePackages = Collections.emptyList();
++        /** ::1 can be bound on this device (RootProxyManager probes it): the DNS port also listens there. */
++        boolean loopback6 = true;
++        /** 共享网络 (hotspot / tethering clients) is on: Hysteria says its DNS port does not serve them. */
++        boolean sharedNetwork;
 +        List<String> adblock = Collections.emptyList(), adblockAllow = Collections.emptyList();
 +        /**
 +         * Resolves the Hysteria server host name before start. The Hysteria client looks the server up with
@@ -54635,8 +54650,8 @@ index 0000000..12c27dc
 +        if (source == null || source.trim().isEmpty()) throw new IOException("源配置为空");
 +        Kind k = kind(core);
 +        if (k == Kind.MIHOMO) throw new IOException("Mihomo 使用 MihomoStartupConfig 生成启动配置");
-+        if (o.mode != ProxyRuntimeProfile.Mode.TPROXY && o.mode != ProxyRuntimeProfile.Mode.REDIRECT)
-+            throw new IOException(core.label + " 仅支持 Root TPROXY / Redirect 模式");
++        if (!ProxyRuntimeProfile.capability(core, o.mode).available)
++            throw new IOException(core.label + " 不支持 " + o.mode.label + " 模式（可用 TPROXY / Redirect / Enhance" + (k == Kind.SING_BOX ? " / TUN" : "") + "）");
 +        List<String> warnings = new ArrayList<>();
 +        if (isNativeFor(core, source)) {
 +            // The built-in starter template (BundledCoreTemplates) ships placeholder nodes on example.invalid.
@@ -54742,6 +54757,65 @@ index 0000000..12c27dc
 +    }
 +
 +    static String listenAll(Options o) { return o.ipv6 ? "::" : "0.0.0.0"; }
++
++    /** Enhance mode: the TPROXY listener takes UDP only, TCP comes through the Redirect listener. */
++    static boolean enhance(Options o) { return o.mode == ProxyRuntimeProfile.Mode.ENHANCE; }
++
++    /** sing-box inbounds whose traffic is sniffed (domain, DNS protocol): Hetu's ingress, plus the TUN in TUN mode. */
++    static List<String> sniffInbounds(Options o) {
++        List<String> tags = new ArrayList<>();
++        if (o.mode == ProxyRuntimeProfile.Mode.TUN) tags.add(TAG_TUN);
++        tags.add(TAG_TPROXY); tags.add(TAG_REDIRECT);
++        tags.addAll(o.dnsPort > 0 ? dnsInTags(o) : Collections.singletonList(TAG_DNS_IN));
++        return tags;
++    }
++
++    /**
++     * Where Hetu's DNS port listens for sing-box / Xray / V2Fly. hetu-root.sh hijacks DNS with a nat REDIRECT, which
++     * points an app's query at 127.0.0.1 (::1 for IPv6); a listener on the wildcard address answers it from the
++     * phone's own address instead, conntrack cannot map that reply back, and Android's resolver (a connected UDP
++     * socket) never sees it: every lookup through these cores timed out (5.5.5, host test with real binaries; Mihomo
++     * answers from the redirected address). So the port listens on the loopback addresses, where a reply leaves from
++     * the address the query was redirected to, and on the wildcard address for hotspot clients (PREROUTING REDIRECT
++     * to the interface address, answered from that address). The listeners share the port with SO_REUSEADDR /
++     * SO_REUSEPORT (sing-box reuse_addr; Xray and V2Fly set SO_REUSEPORT on every listener).
++     */
++    static List<String> dnsInTags(Options o) {
++        if (o.dnsPort <= 0) return Collections.emptyList();
++        return dnsV6Loopback(o) ? Arrays.asList(TAG_DNS_IN, TAG_DNS_IN6, TAG_DNS_LAN) : Arrays.asList(TAG_DNS_IN, TAG_DNS_LAN);
++    }
++
++    static boolean dnsV6Loopback(Options o) { return o.ipv6 && o.loopback6; }
++
++    /** The listen address of each {@link #dnsInTags} tag. */
++    static String dnsListen(String tag, Options o) {
++        return TAG_DNS_IN.equals(tag) ? "127.0.0.1" : TAG_DNS_IN6.equals(tag) ? "::1" : listenAll(o);
++    }
++
++    static final String TUN_ADDRESS_V4 = "172.19.0.1/30";
++    static final String TUN_ADDRESS_V6 = "fdfe:dcba:9877::1/126";
++    /** The private ranges MihomoStartupConfig keeps out of its TUN (route-exclude-address). */
++    static final List<String> TUN_ROUTE_EXCLUDE = Collections.unmodifiableList(Arrays.asList(
++            "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7", "fe80::/10"));
++
++    /**
++     * {include, exclude} packages for the TUN, the rule MihomoStartupConfig.appendTun applies: the whitelist scope
++     * routes the selected apps minus the ones a DIRECT rule names (none left is an error); the other scopes leave
++     * out the selected (blacklist) and DIRECT packages.
++     */
++    static List<List<String>> tunPackages(ProxyRuntimeProfile.AppScope scope, Set<String> packages, Set<String> directPackages) throws IOException {
++        TreeSet<String> selected = new TreeSet<>();
++        if (scope != ProxyRuntimeProfile.AppScope.CORE && packages != null) selected.addAll(packages);
++        TreeSet<String> direct = new TreeSet<>();
++        if (directPackages != null) direct.addAll(directPackages);
++        if (scope == ProxyRuntimeProfile.AppScope.WHITELIST) {
++            selected.removeAll(direct);
++            if (selected.isEmpty()) throw new IOException("TUN 仅所选应用代理模式被 DIRECT 规则全部排除");
++            return Arrays.asList(new ArrayList<>(selected), Collections.emptyList());
++        }
++        selected.addAll(direct);
++        return Arrays.asList(Collections.emptyList(), new ArrayList<>(selected));
++    }
 +
 +    // ================================================================== Mihomo profile model
 +
@@ -55421,8 +55495,8 @@ index 0000000..12c27dc
 +            List<Object> rules = new ArrayList<>();
 +            List<Object> ruleSets = new ArrayList<>();
 +            Set<String> ruleSetTags = new LinkedHashSet<>();
-+            rules.add(map("inbound", Arrays.asList(TAG_TPROXY, TAG_REDIRECT, TAG_DNS_IN), "action", "sniff"));
-+            if (o.dnsPort > 0) rules.add(map("inbound", Collections.singletonList(TAG_DNS_IN), "action", "hijack-dns"));
++            rules.add(map("inbound", sniffInbounds(o), "action", "sniff"));
++            if (o.dnsPort > 0) rules.add(map("inbound", dnsInTags(o), "action", "hijack-dns"));
 +            rules.add(map("protocol", "dns", "action", "hijack-dns"));
 +            boolean adblock = adblock(o, rules, ruleSets, ruleSetTags);
 +            for (Rule r : p.rules) {
@@ -55680,12 +55754,31 @@ index 0000000..12c27dc
 +
 +        static List<Object> inbounds(Options o) {
 +            List<Object> in = new ArrayList<>();
-+            String network = o.tcp && o.udp ? null : (o.udp ? "udp" : "tcp");
++            // Enhance: TCP arrives through Redirect, the TPROXY port takes UDP only (hetu-root.sh enhance capture).
++            String network = enhance(o) ? "udp" : o.tcp && o.udp ? null : (o.udp ? "udp" : "tcp");
++            if (o.mode == ProxyRuntimeProfile.Mode.TUN) in.add(tun(o));
 +            if (o.tproxyPort > 0) in.add(map("type", "tproxy", "tag", TAG_TPROXY, "listen", listenAll(o), "listen_port", o.tproxyPort, "network", network));
 +            if (o.redirectPort > 0) in.add(map("type", "redirect", "tag", TAG_REDIRECT, "listen", listenAll(o), "listen_port", o.redirectPort));
-+            if (o.dnsPort > 0) in.add(map("type", "direct", "tag", TAG_DNS_IN, "listen", listenAll(o), "listen_port", o.dnsPort));
++            for (String tag : dnsInTags(o))
++                in.add(map("type", "direct", "tag", tag, "listen", dnsListen(tag, o), "listen_port", o.dnsPort, "reuse_addr", true));
 +            in.add(map("type", "http", "tag", TAG_EGRESS, "listen", "127.0.0.1", "listen_port", o.egressPort));
 +            return in;
++        }
++
++        /**
++         * The TUN inbound, the sing-box counterpart of MihomoStartupConfig's tun block (same sing-tun library):
++         * device hetu0, auto/strict route, system UIDs 0-9999 (Hetu runs the core as root) and private ranges kept
++         * out, DNS hijacked by the protocol rule in route, app scope as include/exclude_package.
++         */
++        static Map<String, Object> tun(Options o) {
++            LinkedHashMap<String, Object> t = map("type", "tun", "tag", TAG_TUN, "interface_name", TUN_DEVICE,
++                    "address", o.ipv6 ? Arrays.asList(TUN_ADDRESS_V4, TUN_ADDRESS_V6) : Collections.singletonList(TUN_ADDRESS_V4),
++                    "mtu", 9000, "auto_route", true, "strict_route", true, "stack", "mixed",
++                    "exclude_uid_range", Collections.singletonList("0:9999"),
++                    "route_exclude_address", TUN_ROUTE_EXCLUDE);
++            if (!o.tunIncludePackages.isEmpty()) t.put("include_package", new ArrayList<>(o.tunIncludePackages));
++            if (!o.tunExcludePackages.isEmpty()) t.put("exclude_package", new ArrayList<>(o.tunExcludePackages));
++            return t;
 +        }
 +
 +        static Map<String, Object> experimental(Options o) {
@@ -55962,7 +56055,7 @@ index 0000000..12c27dc
 +            outbounds.add(map("tag", TAG_DNS_OUT, "protocol", "dns"));
 +
 +            List<Object> rules = new ArrayList<>();
-+            if (o.dnsPort > 0) rules.add(map("type", "field", "inboundTag", Collections.singletonList(TAG_DNS_IN), "outboundTag", TAG_DNS_OUT));
++            if (o.dnsPort > 0) rules.add(map("type", "field", "inboundTag", dnsInTags(o), "outboundTag", TAG_DNS_OUT));
 +            rules.add(map("type", "field", "inboundTag", Arrays.asList(TAG_TPROXY, TAG_REDIRECT), "port", 53, "outboundTag", TAG_DNS_OUT));
 +            boolean adblock = false;
 +            if (!o.adblock.isEmpty()) {
@@ -56195,7 +56288,7 @@ index 0000000..12c27dc
 +        static List<Object> inbounds(Options o, boolean fakeIp) {
 +            List<Object> in = new ArrayList<>();
 +            List<String> sniff = fakeIp ? Arrays.asList("http", "tls", "quic", "fakedns") : Arrays.asList("http", "tls", "quic");
-+            String network = o.tcp && o.udp ? "tcp,udp" : (o.udp ? "udp" : "tcp");
++            String network = enhance(o) ? "udp" : o.tcp && o.udp ? "tcp,udp" : (o.udp ? "udp" : "tcp");
 +            if (o.tproxyPort > 0)
 +                in.add(map("tag", TAG_TPROXY, "listen", listenAll(o), "port", o.tproxyPort, "protocol", "dokodemo-door",
 +                        "settings", map("network", network, "followRedirect", true),
@@ -56206,8 +56299,8 @@ index 0000000..12c27dc
 +                        "settings", map("network", "tcp", "followRedirect", true),
 +                        "streamSettings", map("sockopt", map("tproxy", "redirect")),
 +                        "sniffing", map("enabled", true, "destOverride", sniff, "routeOnly", true)));
-+            if (o.dnsPort > 0)
-+                in.add(map("tag", TAG_DNS_IN, "listen", listenAll(o), "port", o.dnsPort, "protocol", "dokodemo-door",
++            for (String tag : dnsInTags(o))
++                in.add(map("tag", tag, "listen", dnsListen(tag, o), "port", o.dnsPort, "protocol", "dokodemo-door",
 +                        "settings", map("address", DEFAULT_REMOTE_DNS, "port", 53, "network", "tcp,udp")));
 +            in.add(map("tag", TAG_EGRESS, "listen", "127.0.0.1", "port", o.egressPort, "protocol", "http"));
 +            return in;
@@ -56399,6 +56492,7 @@ index 0000000..12c27dc
 +            String direct = DEFAULT_DIRECT_DNS;
 +            for (String d : p.directDns) { String h = d.replaceFirst("^udp://", ""); if (isIp(h.replaceAll(":\\d+$", ""))) { direct = h; break; } }
 +            appendHetu(y, o, direct.contains(":") ? direct : direct + ":53", remoteDnsForForwarding(p));
++            sharedDnsWarning(o, warnings);
 +            return new Result(y.toString(), false, warnings, 1, "", "", false);
 +        }
 +
@@ -56410,6 +56504,11 @@ index 0000000..12c27dc
 +            return DEFAULT_REMOTE_DNS + ":53";
 +        }
 +
++        static void sharedDnsWarning(Options o, List<String> warnings) {
++            if (o.sharedNetwork && o.dnsPort > 0)
++                warnings.add("Hysteria 的 DNS 只监听本机：开启共享网络时，热点设备的 DNS 请求不经 Hysteria 解析（可改用 sing-box / Xray）");
++        }
++
 +        static void appendHetu(StringBuilder y, Options o, String resolver, String remoteDns) {
 +            y.append("# --- Hetu runtime isolation ---\n");
 +            // 5.1.0: listen first and connect on the first connection. Without it the client exits when the server is
@@ -56419,15 +56518,21 @@ index 0000000..12c27dc
 +            // Go's resolver has no system DNS on Android; resolve the server name explicitly.
 +            y.append("resolver:\n  type: udp\n  udp:\n    addr: ").append(resolver).append("\n    timeout: 4s\n");
 +            if (o.tproxyPort > 0) {
-+                if (o.tcp) y.append("tcpTProxy:\n  listen: :").append(o.tproxyPort).append('\n');
++                if (o.tcp && !enhance(o)) y.append("tcpTProxy:\n  listen: :").append(o.tproxyPort).append('\n');
 +                if (o.udp) y.append("udpTProxy:\n  listen: :").append(o.tproxyPort).append("\n  timeout: 60s\n");
 +            }
 +            if (o.redirectPort > 0) y.append("tcpRedirect:\n  listen: :").append(o.redirectPort).append('\n');
 +            y.append("http:\n  listen: 127.0.0.1:").append(o.egressPort).append('\n');
 +            if (o.dnsPort > 0) {
-+                // DNS is answered by the remote resolver through the Hysteria tunnel (no fake-IP).
-+                y.append("tcpForwarding:\n  - listen: :").append(o.dnsPort).append("\n    remote: ").append(remoteDns).append('\n');
-+                y.append("udpForwarding:\n  - listen: :").append(o.dnsPort).append("\n    remote: ").append(remoteDns).append("\n    timeout: 20s\n");
++                // DNS is answered by the remote resolver through the Hysteria tunnel (no fake-IP). Loopback only
++                // (dnsInTags): the forwarders cannot share the port with a wildcard listener, so hotspot clients'
++                // DNS is not served by Hysteria.
++                List<String> listen = new ArrayList<>(Collections.singletonList("127.0.0.1:" + o.dnsPort));
++                if (dnsV6Loopback(o)) listen.add("'[::1]:" + o.dnsPort + "'");
++                y.append("tcpForwarding:\n");
++                for (String l : listen) y.append("  - listen: ").append(l).append("\n    remote: ").append(remoteDns).append('\n');
++                y.append("udpForwarding:\n");
++                for (String l : listen) y.append("  - listen: ").append(l).append("\n    remote: ").append(remoteDns).append("\n    timeout: 20s\n");
 +            }
 +        }
 +
@@ -56475,6 +56580,7 @@ index 0000000..12c27dc
 +        if (hasLazy) tailText = tailText.replaceFirst("lazy: true\\n", "");
 +        y.append(tailText);
 +        warnings.add("Hysteria 是单服务器客户端：规则分流、策略组、面板与测速不可用");
++        Hysteria.sharedDnsWarning(o, warnings);
 +        return new Result(y.toString(), true, warnings, 1, "", "", false);
 +    }
 +
@@ -56529,7 +56635,7 @@ index 0000000..12c27dc
 +        Map<String, Object> root = CoreJson.parseObject(source);
 +        List<String> cleanup = ConfigReferenceCleaner.singBox(root);
 +        warnings.addAll(cleanup);
-+        if (root.containsKey("inbounds")) warnings.add("已由河图接管 sing-box 入站（TPROXY/DNS/本地探针）");
++        if (root.containsKey("inbounds")) warnings.add(o.mode == ProxyRuntimeProfile.Mode.TUN ? "已由河图接管 sing-box 入站（TUN/DNS/本地探针）" : "已由河图接管 sing-box 入站（TPROXY/DNS/本地探针）");
 +        root.put("inbounds", SingBox.inbounds(o));
 +        List<Object> outbounds = asList(root.get("outbounds"));
 +        if (outbounds.isEmpty()) throw new IOException("sing-box 配置缺少 outbounds");
@@ -56538,8 +56644,8 @@ index 0000000..12c27dc
 +        if (route == null) { route = new LinkedHashMap<>(); root.put("route", route); }
 +        if (route.remove("default_mark") != null) warnings.add("已移除 route.default_mark（Android 上会覆盖 netd 网络标记）");
 +        List<Object> rules = new ArrayList<>();
-+        rules.add(map("inbound", Arrays.asList(TAG_TPROXY, TAG_REDIRECT, TAG_DNS_IN), "action", "sniff"));
-+        if (o.dnsPort > 0) rules.add(map("inbound", Collections.singletonList(TAG_DNS_IN), "action", "hijack-dns"));
++        rules.add(map("inbound", sniffInbounds(o), "action", "sniff"));
++        if (o.dnsPort > 0) rules.add(map("inbound", dnsInTags(o), "action", "hijack-dns"));
 +        rules.add(map("protocol", "dns", "action", "hijack-dns"));
 +        List<Object> ruleSets = new ArrayList<>(asList(route.get("rule_set")));
 +        Set<String> rsTags = new HashSet<>();
@@ -56548,6 +56654,10 @@ index 0000000..12c27dc
 +        rules.addAll(asList(route.get("rules")));
 +        route.put("rules", rules);
 +        if (!ruleSets.isEmpty()) route.put("rule_set", ruleSets);
++        if (o.mode == ProxyRuntimeProfile.Mode.TUN && Boolean.FALSE.equals(route.get("auto_detect_interface"))) {
++            route.put("auto_detect_interface", true);
++            warnings.add("TUN 模式已开启 route.auto_detect_interface（否则核心自己的出站会绕回 TUN）");
++        }
 +        if (!route.containsKey("auto_detect_interface")) route.put("auto_detect_interface", true);
 +        if (!root.containsKey("dns")) {
 +            root.put("dns", map("servers", Arrays.asList(SingBox.dnsServer(DEFAULT_DIRECT_DNS, "dns-direct", null), SingBox.dnsServer(DEFAULT_REMOTE_DNS, "dns-remote", null)), "final", "dns-remote"));
@@ -56583,7 +56693,7 @@ index 0000000..12c27dc
 +        for (Object ob : outbounds) if ("hetu-adblock".equals(str(asMap(ob), "tag"))) hasBlock = true;
 +        boolean adblock = false;
 +        List<Object> head = new ArrayList<>();
-+        if (o.dnsPort > 0) head.add(map("type", "field", "inboundTag", Collections.singletonList(TAG_DNS_IN), "outboundTag", TAG_DNS_OUT));
++        if (o.dnsPort > 0) head.add(map("type", "field", "inboundTag", dnsInTags(o), "outboundTag", TAG_DNS_OUT));
 +        head.add(map("type", "field", "inboundTag", Arrays.asList(TAG_TPROXY, TAG_REDIRECT), "port", 53, "outboundTag", TAG_DNS_OUT));
 +        if (!o.adblock.isEmpty()) {
 +            List<String> blocked = subtractAllowed(o.adblock, o.adblockAllow);
@@ -56804,7 +56914,7 @@ index 0000000..12c27dc
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
-index b914f23..4e4166d 100644
+index b914f23..9acdf80 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
 @@ -35,6 +35,77 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
@@ -56814,7 +56924,7 @@ index b914f23..4e4166d 100644
 +/**
 + * What each downloadable core can do in Hetu's Root runtime.
 + *
-+ * Every core runs behind the same Root TPROXY / Redirect capture (hetu-root.sh launches it with its own
++ * Every core runs behind the same Root TPROXY / Redirect / Enhance capture (hetu-root.sh launches it with its own
 + * CLI from run/state/core.kind; ProxyCoreConfig writes its native config or converts the Clash/Mihomo
 + * profile). Features that need Mihomo's Clash controller degrade per core with an explicit
 + * "此核心不支持" state instead of a connection error:
@@ -56876,9 +56986,9 @@ index b914f23..4e4166d 100644
 +    /** One line for the core picker: modes and which panel features work. */
 +    @JvmStatic fun featureSummary(core: ProxyRuntimeProfile.Core): String = when {
 +        mihomo(core) -> ""
-+        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
-+        clashApi(core) -> "TPROXY / Redirect · 面板与测速经 clash_api · 不支持热重载"
-+        else -> "TPROXY / Redirect · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
++        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect / Enhance · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
++        clashApi(core) -> "TPROXY / Redirect / Enhance / TUN · 面板与测速经 clash_api · 不支持热重载"
++        else -> "TPROXY / Redirect / Enhance · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
 +    }
 +}
 +
@@ -59385,10 +59495,10 @@ index 56b04c2..3f79c11 100644
      private boolean matches(String value,Set<String>s,boolean ignore){if(s.isEmpty())return true;for(String x:s)if(ignore?x.equalsIgnoreCase(value):x.equals(value))return true;return false;}
      private String clean(String s){if(s==null||"<unknown ssid>".equalsIgnoreCase(s))return"";if(s.length()>1&&s.startsWith("\"")&&s.endsWith("\""))return s.substring(1,s.length()-1);return s;}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java
-index 4f146e4..58d0845 100644
+index 4f146e4..bb7c791 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java
-@@ -44,12 +44,23 @@ final class ProxyRuntimeProfile {
+@@ -44,12 +44,30 @@ final class ProxyRuntimeProfile {
      ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked,boolean cnIpDirect){this(core,mode,ipv6,appScope,dnsHijack,autoOverwrite,tcp,udp,quicBlocked,cnIpDirect,false);}
      ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked,boolean cnIpDirect,boolean adblockChain){this.core=core;this.mode=mode;this.ipv6=ipv6;this.appScope=appScope;this.dnsHijack=dnsHijack;this.autoOverwrite=autoOverwrite;this.tcp=tcp;this.udp=udp;this.quicBlocked=quicBlocked;this.cnIpDirect=cnIpDirect;this.adblockChain=adblockChain;}
 
@@ -59403,18 +59513,25 @@ index 4f146e4..58d0845 100644
 -        if(!mihomo)return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 已进入核心/配置模型，但运行后端正在接入，当前不会假报可用");
 +        if(!mihomo){
 +            // sing-box / Xray / V2Fly / Hysteria run behind the same Root netfilter capture:
-+            // a TPROXY (TCP+UDP) or Redirect (TCP) inbound plus Hetu's DNS port. App scope, shared
-+            // network, CIDR/interface bypass and QUIC control are netfilter features, core-independent.
++            // a TPROXY (TCP+UDP), Redirect (TCP) or Enhance (TCP Redirect + UDP TPROXY) inbound plus Hetu's DNS
++            // port. App scope, shared network, CIDR/interface bypass and QUIC control are netfilter features,
++            // core-independent. TUN is the core's own device (hetu0): sing-box has one (the same sing-tun Mihomo
++            // uses), Xray / V2Fly / Hysteria do not. eBPF redirects into Mihomo's TUN and stays Mihomo-only.
++            boolean singBox=core==Core.SING_BOX||core==Core.SING_BOX_REF1ND;
 +            switch(mode){
 +                case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
 +                case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
-+                default:return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 在河图 Root 运行链中支持 TPROXY 与 Redirect；"+mode.label+" 仅 Mihomo 可用");
++                case ENHANCE:return new Capability(true,true,true,true,true,true,true,true,true,"");
++                case TUN:
++                    if(singBox)return new Capability(true,true,true,true,true,false,true,true,true,"");
++                    return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 没有自己的 TUN 设备，可用 TPROXY、Redirect 与 Enhance；TUN 仅 Mihomo / sing-box 可用");
++                default:return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 在河图 Root 运行链中支持 TPROXY、Redirect 与 Enhance；"+mode.label+" 仅 Mihomo 可用");
 +            }
 +        }
          switch(mode){
              case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
              case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
-@@ -61,6 +72,34 @@ final class ProxyRuntimeProfile {
+@@ -61,6 +79,34 @@ final class ProxyRuntimeProfile {
          }
      }
 
@@ -59424,7 +59541,7 @@ index 4f146e4..58d0845 100644
 +     */
 +    static Mode runnableMode(Core core,Mode mode){return capability(core,mode).available?mode:Mode.TPROXY;}
 +
-+    /** The Mihomo-only mode (TUN / Enhance / eBPF) a pick of another core replaced with TPROXY; restored on a pick of Mihomo. */
++    /** The Mihomo-only mode (eBPF, or TUN for a core without one) a pick of another core replaced with TPROXY; restored on a pick of Mihomo. */
 +    static final String MIHOMO_MODE_KEY="proxyMihomoModeBeforeCore";
 +
 +    /**
@@ -59850,7 +59967,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..8ec8b4e 100644
+index 9cd82da..f62a3ae 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,17 +21,91 @@ final class RootProxyManager {
@@ -60069,7 +60186,7 @@ index 9cd82da..8ec8b4e 100644
      Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
          return prepare(profile,0);
      }
-@@ -309,33 +421,358 @@ final class RootProxyManager {
+@@ -309,33 +421,381 @@ final class RootProxyManager {
      private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
          RootBridge.requireWorkerThread();
          String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
@@ -60123,7 +60240,8 @@ index 9cd82da..8ec8b4e 100644
 +        recordStartupDiagnostics(cleaned.notices,safeDiagnostics(()->StartupDiagnostics.mihomo(cleaned.text,generated.yaml,profile,
 +                generated.tproxyPort,generated.redirectPort,profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF&&prefs.getBoolean("proxyMihomoDnsForward",true),
 +                MihomoStartupConfig.DNS_PORT,controllerPort,controllerPort==fixedControllerPort,fakeIps.ipv4,fakeIps.ipv6)));
-+        writeStartupCopy(startup);
+         writeStartupCopy(startup);
+-        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
 +        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature),override);
 +    }
 +
@@ -60214,7 +60332,7 @@ index 9cd82da..8ec8b4e 100644
 +        RootProxyPolicy policy=loadPolicy(profile);
 +        ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
 +        int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
-+        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock);
++        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock,policy);
 +        ProxyCoreConfig.Result converted=ProxyCoreConfig.build(profile.core,source,options,this::fetchProvider);
 +        List<ProxyCoreConfig.RuleSetFile> ruleSetFiles=new ArrayList<>();
 +        ProxyCoreConfig.Result built=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX?localRuleSets(converted,ruleSetFiles):converted;
@@ -60239,8 +60357,7 @@ index 9cd82da..8ec8b4e 100644
 +                +built.config+(built.config.endsWith("\n")?"":"\n")
 +                +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
 +                +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
-         writeStartupCopy(startup);
--        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
++        writeStartupCopy(startup);
 +        Prepared prepared=new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature);
 +        prepared.ruleSetFiles=ruleSetFiles;
 +        return withOverride(prepared,override);
@@ -60304,15 +60421,26 @@ index 9cd82da..8ec8b4e 100644
 +        return cache.isFile()&&cache.length()>0?Files.readAllBytes(cache.toPath()):null;
 +    }
 +
-+    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock)throws IOException{
++    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock,RootProxyPolicy policy)throws IOException{
 +        ProxyCoreConfig.Options o=new ProxyCoreConfig.Options();
 +        o.mode=profile.mode;
 +        if(profile.mode==ProxyRuntimeProfile.Mode.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
-+        else{
++        else if(profile.mode==ProxyRuntimeProfile.Mode.TUN){
++            // sing-box's own TUN (hetu0) takes the traffic; no netfilter listener. App scope as packages, like Mihomo's tun.
++            // The editor check (policy null) needs no packages: sing-box check does not look at them.
++            if(policy!=null){
++                List<List<String>> packages=ProxyCoreConfig.tunPackages(profile.appScope,selectedTunPackages(),policy.directPackages);
++                o.tunIncludePackages=packages.get(0);
++                o.tunExcludePackages=packages.get(1);
++            }
++        }else{
++            // Redirect, and Enhance (TCP Redirect + UDP TPROXY).
 +            o.redirectPort=MihomoStartupConfig.REDIRECT_PORT;
-+            if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
++            if(profile.mode==ProxyRuntimeProfile.Mode.ENHANCE||profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
 +        }
 +        o.dnsPort=profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.OFF?0:MihomoStartupConfig.DNS_PORT;
++        o.loopback6=loopback6Bindable();
++        o.sharedNetwork=policy!=null&&policy.sharedNetwork;
 +        o.controllerPort=controllerPort;
 +        o.egressPort=MihomoStartupConfig.egressProbePort(controllerPort);
 +        o.secret=controllerSecret();
@@ -60332,6 +60460,18 @@ index 9cd82da..8ec8b4e 100644
 +        }
 +        o.hostResolver=this::resolveServerHost;
 +        return o;
++    }
++
++    /**
++     * ::1 exists (IPv6 is not switched off on lo): the core's DNS port also listens there (ProxyCoreConfig.dnsInTags),
++     * else a bind of ::1 would stop the core at start. The App shares the network namespace hetu-root.sh starts it in.
++     */
++    private static boolean loopback6Bindable(){
++        try(DatagramSocket probe=new DatagramSocket(new InetSocketAddress(InetAddress.getByName("::1"),0))){
++            return probe.isBound();
++        }catch(IOException|SecurityException unavailable){
++            return false;
++        }
 +    }
 +
 +    /**
@@ -60436,7 +60576,7 @@ index 9cd82da..8ec8b4e 100644
      }
 
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
-@@ -346,13 +783,15 @@ final class RootProxyManager {
+@@ -346,13 +806,15 @@ final class RootProxyManager {
                  +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                  +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                  +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
@@ -60453,7 +60593,7 @@ index 9cd82da..8ec8b4e 100644
      }
 
      private void installHotReloadFiles(Prepared p)throws Exception{
-@@ -378,17 +817,75 @@ final class RootProxyManager {
+@@ -378,17 +840,75 @@ final class RootProxyManager {
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
@@ -60530,7 +60670,7 @@ index 9cd82da..8ec8b4e 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +901,7 @@ final class RootProxyManager {
+@@ -404,7 +924,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -60539,7 +60679,7 @@ index 9cd82da..8ec8b4e 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,10 +909,11 @@ final class RootProxyManager {
+@@ -412,10 +932,11 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -60552,7 +60692,7 @@ index 9cd82da..8ec8b4e 100644
                      .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                      .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                      .putBoolean("proxyAdblockLastEffective",effective)
-@@ -469,29 +967,84 @@ final class RootProxyManager {
+@@ -469,29 +990,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -60645,7 +60785,7 @@ index 9cd82da..8ec8b4e 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -501,28 +1054,81 @@ final class RootProxyManager {
+@@ -501,28 +1077,81 @@ final class RootProxyManager {
              return stop();
          }finally{CONTROL_LOCK.unlock();}
      }
@@ -60735,7 +60875,7 @@ index 9cd82da..8ec8b4e 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +1141,11 @@ final class RootProxyManager {
+@@ -535,7 +1164,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -60748,7 +60888,7 @@ index 9cd82da..8ec8b4e 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +1154,8 @@ final class RootProxyManager {
+@@ -544,7 +1177,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -60758,7 +60898,7 @@ index 9cd82da..8ec8b4e 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +1163,7 @@ final class RootProxyManager {
+@@ -552,7 +1186,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -60767,7 +60907,7 @@ index 9cd82da..8ec8b4e 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -563,7 +1174,12 @@ final class RootProxyManager {
+@@ -563,7 +1197,12 @@ final class RootProxyManager {
          // during the transaction remain pending; fallback health is reported
          // separately through the effective/error fields, not a restart loop.
          String requestedSettingsSignature=ProxyRuntimeSettings.captureRequest(profile,prefs);
@@ -60780,7 +60920,7 @@ index 9cd82da..8ec8b4e 100644
          Prepared p;
          try{
              p=prepare(profile,restartControllerPort);
-@@ -575,20 +1191,32 @@ final class RootProxyManager {
+@@ -575,20 +1214,32 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -60820,7 +60960,7 @@ index 9cd82da..8ec8b4e 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +1226,7 @@ final class RootProxyManager {
+@@ -598,7 +1249,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -60829,7 +60969,7 @@ index 9cd82da..8ec8b4e 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +1251,6 @@ final class RootProxyManager {
+@@ -623,7 +1274,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -60837,7 +60977,7 @@ index 9cd82da..8ec8b4e 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -649,8 +1276,8 @@ final class RootProxyManager {
+@@ -649,8 +1299,8 @@ final class RootProxyManager {
          String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
          String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
          String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
@@ -60848,7 +60988,7 @@ index 9cd82da..8ec8b4e 100644
          String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
          JSONObject result;
          String[] bootArgs=new String[]{
-@@ -659,15 +1286,26 @@ final class RootProxyManager {
+@@ -659,15 +1309,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -60877,7 +61017,7 @@ index 9cd82da..8ec8b4e 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,7 +1335,21 @@ final class RootProxyManager {
+@@ -697,7 +1358,21 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -60900,7 +61040,7 @@ index 9cd82da..8ec8b4e 100644
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
                  .put("dnsHijack",profile.dnsHijack.id)
-@@ -723,10 +1375,17 @@ final class RootProxyManager {
+@@ -723,10 +1398,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -60918,7 +61058,7 @@ index 9cd82da..8ec8b4e 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -738,6 +1397,7 @@ final class RootProxyManager {
+@@ -738,6 +1420,7 @@ final class RootProxyManager {
                  // their own effective/error fields; they must not create an endless "restart again"
                  // loop by leaving the generic settings signature permanently different.
                  .putString("proxyRootAppliedSettings",requestedSettingsSignature)
@@ -60926,7 +61066,7 @@ index 9cd82da..8ec8b4e 100644
                  .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                  .remove(ProxyRuntimeSettings.DIRTY_KEY)
                  .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
-@@ -749,11 +1409,20 @@ final class RootProxyManager {
+@@ -749,11 +1432,20 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -60947,15 +61087,15 @@ index 9cd82da..8ec8b4e 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1430,49 @@ final class RootProxyManager {
+@@ -761,10 +1453,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
 -            }finally{CONTROL_LOCK.unlock();}
 +            }finally{if(ownIntent)START_INTENT.remove();CONTROL_LOCK.unlock();}
-         }
-     }
-
++        }
++    }
++
 +    private void recoverFailedHandoff(boolean nativeSucceeded,boolean nativeAttempted,boolean coordinatorEntered)throws Exception{
 +        if(nativeSucceeded){
 +            rollbackUnpublishedStart();
@@ -60969,9 +61109,9 @@ index 9cd82da..8ec8b4e 100644
 +                prefs.edit().putString("proxyAutoRecoveryError","启动结果未确认，已保留代理与过滤接管现场；请检查后停止")
 +                        .putString("proxyNetworkIntegrity","unknown").apply();
 +            }
-+        }
-+    }
-+
+         }
+     }
+
 +    private void rollbackUnpublishedStart()throws Exception{
 +        // Still owns CONTROL_LOCK: a newer start cannot be destroyed by this cleanup.
 +        Long previousStop=STOP_DEADLINE.get();
@@ -60998,7 +61138,7 @@ index 9cd82da..8ec8b4e 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -777,8 +1485,16 @@ final class RootProxyManager {
+@@ -777,8 +1508,16 @@ final class RootProxyManager {
                  bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                  bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                  bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
@@ -61017,7 +61157,7 @@ index 9cd82da..8ec8b4e 100644
      }
 
      private void installAutostart(Prepared p,String[] args)throws Exception{
-@@ -789,10 +1505,12 @@ final class RootProxyManager {
+@@ -789,10 +1528,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -61032,7 +61172,7 @@ index 9cd82da..8ec8b4e 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1520,40 @@ final class RootProxyManager {
+@@ -802,20 +1543,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -61078,7 +61218,7 @@ index 9cd82da..8ec8b4e 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1563,26 @@ final class RootProxyManager {
+@@ -825,19 +1586,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -61109,7 +61249,7 @@ index 9cd82da..8ec8b4e 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1590,42 @@ final class RootProxyManager {
+@@ -845,31 +1613,42 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -61168,7 +61308,7 @@ index 9cd82da..8ec8b4e 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1635,7 @@ final class RootProxyManager {
+@@ -879,7 +1658,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -61177,7 +61317,7 @@ index 9cd82da..8ec8b4e 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1695,7 @@ final class RootProxyManager {
+@@ -939,7 +1718,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -61186,7 +61326,7 @@ index 9cd82da..8ec8b4e 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1015,13 +1771,14 @@ final class RootProxyManager {
+@@ -1015,13 +1794,14 @@ final class RootProxyManager {
      String diagnostics(){
          RootBridge.requireWorkerThread();
          DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
@@ -61202,7 +61342,7 @@ index 9cd82da..8ec8b4e 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1048,7 +1805,7 @@ final class RootProxyManager {
+@@ -1048,7 +1828,7 @@ final class RootProxyManager {
          report.section("最近启动耗时（毫秒）", "time="+prefs.getLong("proxyRootLastStartupAt",0L)+"\n"
                  +prefs.getString("proxyRootLastStartupTiming","尚无启动记录"),2000);
          try{
@@ -61211,7 +61351,7 @@ index 9cd82da..8ec8b4e 100644
              if(source!=null){
                  byte[] contents=configs.read(source).getBytes(StandardCharsets.UTF_8);
                  report.section("源配置标识", "bytes="+contents.length+"\nsha256="
-@@ -1059,7 +1816,7 @@ final class RootProxyManager {
+@@ -1059,7 +1839,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -61220,7 +61360,7 @@ index 9cd82da..8ec8b4e 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1828,22 @@ final class RootProxyManager {
+@@ -1071,22 +1851,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -61248,7 +61388,7 @@ index 9cd82da..8ec8b4e 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1856,7 @@ final class RootProxyManager {
+@@ -1099,7 +1879,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -61257,7 +61397,7 @@ index 9cd82da..8ec8b4e 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1127,6 +1884,11 @@ final class RootProxyManager {
+@@ -1127,6 +1907,11 @@ final class RootProxyManager {
                  // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
                  if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
                  StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
@@ -61269,7 +61409,7 @@ index 9cd82da..8ec8b4e 100644
                  int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                  destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                          .append(" uid=").append(metadata.optInt("uid",-1))
-@@ -1147,17 +1909,17 @@ final class RootProxyManager {
+@@ -1147,17 +1932,17 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -61290,7 +61430,7 @@ index 9cd82da..8ec8b4e 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1167,6 +1929,15 @@ final class RootProxyManager {
+@@ -1167,6 +1952,15 @@ final class RootProxyManager {
                      +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
              device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
              report.section("系统网络与消息排查线索",device,2500);
@@ -61306,7 +61446,7 @@ index 9cd82da..8ec8b4e 100644
              MihomoControllerClient controller=new MihomoControllerClient(context);
              String mode14=controller.configs().optString("mode","unknown");
              JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
-@@ -1194,6 +1965,31 @@ final class RootProxyManager {
+@@ -1194,6 +1988,31 @@ final class RootProxyManager {
      }
      File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
 
@@ -61338,7 +61478,7 @@ index 9cd82da..8ec8b4e 100644
      private void writeStartupCopy(String text)throws IOException{
          File target=startupFile(),dir=target.getParentFile();
          if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
-@@ -1207,10 +2003,14 @@ final class RootProxyManager {
+@@ -1207,10 +2026,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -61355,7 +61495,7 @@ index 9cd82da..8ec8b4e 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +2024,10 @@ final class RootProxyManager {
+@@ -1224,6 +2047,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -61366,7 +61506,7 @@ index 9cd82da..8ec8b4e 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +2045,7 @@ final class RootProxyManager {
+@@ -1241,7 +2068,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -61375,7 +61515,7 @@ index 9cd82da..8ec8b4e 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +2055,46 @@ final class RootProxyManager {
+@@ -1251,11 +2078,46 @@ final class RootProxyManager {
          }
      }
 
@@ -61386,7 +61526,7 @@ index 9cd82da..8ec8b4e 100644
 +     * answers "does this run under the selected core".
 +     */
 +    private void validateNativeText(String text,ProxyRuntimeProfile profile)throws Exception{
-+        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null);
++        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null,null);
 +        options.hostResolver=null;
 +        ProxyCoreConfig.Result built=ProxyCoreConfig.build(profile.core,text,options,this::fetchProvider);
 +        File stage=new File(context.getCacheDir(),"hetu-config-validator");
@@ -61423,7 +61563,7 @@ index 9cd82da..8ec8b4e 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +2108,155 @@ final class RootProxyManager {
+@@ -1269,14 +2131,155 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -61582,7 +61722,7 @@ index 9cd82da..8ec8b4e 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2269,7 @@ final class RootProxyManager {
+@@ -1289,7 +2292,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -61591,7 +61731,7 @@ index 9cd82da..8ec8b4e 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2293,7 @@ final class RootProxyManager {
+@@ -1313,7 +2316,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -61600,7 +61740,7 @@ index 9cd82da..8ec8b4e 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2313,28 @@ final class RootProxyManager {
+@@ -1333,13 +2336,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -61630,7 +61770,7 @@ index 9cd82da..8ec8b4e 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2361,54 @@ final class RootProxyManager {
+@@ -1366,13 +2384,54 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -61685,7 +61825,7 @@ index 9cd82da..8ec8b4e 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2420,12 @@ final class RootProxyManager {
+@@ -1384,7 +2443,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -61699,7 +61839,7 @@ index 9cd82da..8ec8b4e 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2434,13 @@ final class RootProxyManager {
+@@ -1393,6 +2457,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -61713,7 +61853,7 @@ index 9cd82da..8ec8b4e 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,22 +2460,96 @@ final class RootProxyManager {
+@@ -1412,22 +2483,96 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -64792,7 +64932,7 @@ index e743350..50e5171 100644
              else -> {
                  if (!state.running) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
-index 2243235..b8d6493 100644
+index 2243235..d461169 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
 @@ -1,5 +1,7 @@
@@ -64824,7 +64964,7 @@ index 2243235..b8d6493 100644
          listOf("v2fly", "hysteria").mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
              HxMenuItem(item.label, { onPick(item.id) }, selected = item.id == current, enabled = item.id !in otherSelected,
 -                description = "独立核心 · 仅下载管理")
-+                description = if (item.runtimeReady) "独立核心 · Root TPROXY / Redirect" else "独立核心 · 暂不支持运行")
++                description = if (item.runtimeReady) "独立核心 · Root TPROXY / Redirect / Enhance" else "独立核心 · 暂不支持运行")
          }
 -        Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
 +        Text(ht("不改变正在运行的代理"), color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
@@ -72897,7 +73037,7 @@ index bb42974..966d773 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 2b4638e..8187c2a 100644
+index 2b4638e..6922f33 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 @@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
@@ -73135,7 +73275,7 @@ index 2b4638e..8187c2a 100644
 +                .map {
 +                    val capability = ProxyRuntimeProfile.capability(profile.core, it)
 +                    if (capability.available) HxChoice(it.id, it.label, ht(modeDescription(it)))
-+                    else HxChoice(it.id, it.label, ht("仅 Mihomo 可用"), enabled = false)
++                    else HxChoice(it.id, it.label, ht(if (it == ProxyRuntimeProfile.Mode.TUN) "仅 Mihomo / sing-box 可用" else "仅 Mihomo 可用"), enabled = false)
 +                },
              selected = profile.mode.id,
              onPick = { putString("proxyBaseMode", it); choice = null },
@@ -81151,7 +81291,7 @@ index 9841062..4f452b7 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..3ebdb95 100644
+index 578ce9d..a93e6a2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -81198,7 +81338,7 @@ index 578ce9d..3ebdb95 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,443 @@ private val vocabularyConnection = """
+@@ -969,16 +990,445 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -81207,6 +81347,8 @@ index 578ce9d..3ebdb95 100644
 +当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
 +内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
 +内置模板 · 跟随 Mihomo 当前配置|Bundled template · follows the current Mihomo config|內建範本 · 跟隨 Mihomo 目前設定|Встроенный шаблон · следует текущей конфигурации Mihomo
++仅 Mihomo 可用|Mihomo only|僅 Mihomo 可用|Только Mihomo
++仅 Mihomo / sing-box 可用|Mihomo / sing-box only|僅 Mihomo / sing-box 可用|Только Mihomo / sing-box
 +尚无配置|No configurations yet|尚無設定|Конфигураций пока нет
 +在 工具 › 配置管理 导入配置后会显示在这里|Configurations imported in Tools › Configurations appear here|在 工具 › 設定管理 匯入設定後會顯示在這裡|Импортированные в «Инструменты › Конфигурации» появятся здесь
 +只读查看 · 点右上角编辑|Read-only · tap edit at the top right|唯讀檢視 · 點右上角編輯|Только чтение · нажмите «Изменить» справа вверху
@@ -88085,10 +88227,10 @@ index 0000000..c0a9ffb
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt
 new file mode 100644
-index 0000000..0ae5f90
+index 0000000..b86e3f8
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,195 @@
 +package io.github.xgl34222220.hetu
 +
 +import org.junit.Assert.assertEquals
@@ -88097,7 +88239,7 @@ index 0000000..0ae5f90
 +import org.junit.Test
 +
 +/**
-+ * Core download/runtime mapping: every downloadable core runs in Root TPROXY / Redirect, and the
++ * Core download/runtime mapping: every downloadable core runs in Root TPROXY / Redirect / Enhance (sing-box also TUN), and the
 + * Clash-controller features degrade per core with an explicit "此核心不支持" state. Asset names are
 + * the real release names (MetaCubeX/mihomo v1.19.32, lux5am/mihomo-smart Prerelease-Alpha,
 + * SagerNet/sing-box v1.14.3, reF1nd/sing-box-releases, XTLS/Xray-core v26.10.10,
@@ -88220,7 +88362,9 @@ index 0000000..0ae5f90
 +            assertTrue(core.id, ProxyCoreSupport.runtimeSupported(core))
 +            assertTrue(core.id, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TPROXY).available)
 +            assertTrue(core.id, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.REDIRECT).available)
-+            assertEquals(core.id, mihomoFamily, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TUN).available)
++            assertTrue(core.id, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.ENHANCE).available)
++            assertEquals(core.id, mihomoFamily || core.id.startsWith("sing-box"), ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TUN).available)
++            assertEquals(core.id, mihomoFamily, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.EBPF).available)
 +            assertEquals("", ProxyCoreSupport.unsupportedReason(core))
 +            assertEquals(core.id, mihomoFamily, ProxyCoreSupport.hotReload(core))
 +            assertEquals(core.id, mihomoFamily || core.id.startsWith("sing-box"), ProxyCoreSupport.panel(core))
@@ -88284,10 +88428,10 @@ index 0000000..0ae5f90
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreStart510Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreStart510Test.java
 new file mode 100644
-index 0000000..8d67282
+index 0000000..b3fe345
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreStart510Test.java
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,399 @@
 +package io.github.xgl34222220.hetu;
 +
 +import android.app.Application;
@@ -88312,6 +88456,8 @@ index 0000000..8d67282
 + * 拿不到的规则集在转换配置中连同依赖它的规则一起跳过（与 Mihomo 缺少 provider 时照常启动一致），原生配置保留远程。
 + * 另：选了其它核心而保存的模式是 TUN / Enhance / eBPF 时，启动不再把核心改回 Mihomo，只把模式换成 TPROXY；内置模板跟随
 + * Mihomo 当前选中的配置（而不只是内置配置）；Hysteria 先监听再连服务器；Xray / V2Fly 自己应答看门狗的存活查询。
++ * 5.5.5：Enhance 对所有核心开放，sing-box 可用自己的 TUN；DNS 端口改为监听回环地址（另加通配地址给热点设备），
++ * 应答从被 REDIRECT 到的地址发出，Android 解析器的已连接 UDP 套接字才收得到（之前其它核心的应用 DNS 全部超时）。
 + */
 +@RunWith(RobolectricTestRunner.class)
 +@Config(sdk = {35}, application = Application.class)
@@ -88461,8 +88607,14 @@ index 0000000..8d67282
 +    }
 +
 +    @Test public void aNonMihomoCoreKeepsItsCoreAndRunsInTproxyInsteadOfTurningIntoMihomo() throws Exception {
-+        for (ProxyRuntimeProfile.Mode m : new ProxyRuntimeProfile.Mode[]{ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.Mode.EBPF})
-+            assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.SING_BOX, m));
++        // 5.5.5: Enhance runs on every core, TUN on sing-box (its own TUN); eBPF stays Mihomo-only.
++        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Mode.EBPF));
++        assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.SING_BOX_REF1ND, ProxyRuntimeProfile.Mode.TUN));
++        for (ProxyRuntimeProfile.Mode m : new ProxyRuntimeProfile.Mode[]{ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.Mode.EBPF})
++            for (ProxyRuntimeProfile.Core c : new ProxyRuntimeProfile.Core[]{ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA})
++                assertEquals(c.label + " " + m.label, ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(c, m));
++        for (ProxyRuntimeProfile.Core c : ProxyRuntimeProfile.Core.values())
++            assertEquals(c.label, ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.runnableMode(c, ProxyRuntimeProfile.Mode.ENHANCE));
 +        assertEquals(ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.REDIRECT));
 +        assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TUN));
 +        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.MIXED));
@@ -88522,7 +88674,7 @@ index 0000000..8d67282
 +        Application app = ApplicationProvider.getApplicationContext();
 +        android.content.SharedPreferences p = app.getSharedPreferences("hetu", 0);
 +        p.edit().clear().commit();
-+        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Mode.TUN));
++        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.TUN));
 +        assertEquals("tun", p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
 +        assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TPROXY));
 +        assertNull(p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
@@ -88530,9 +88682,153 @@ index 0000000..8d67282
 +        ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.EBPF);
 +        assertEquals(ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.REDIRECT));
 +        assertNull(p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
-+        // A mode every core runs is neither changed nor remembered.
++        // A mode the picked core runs is neither changed nor remembered.
 +        assertEquals(ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.HYSTERIA, ProxyRuntimeProfile.Mode.REDIRECT));
++        assertEquals(ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Mode.ENHANCE));
++        assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Mode.TUN));
 +        assertNull(p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
++    }
++
++    private static final String SS = "proxies:\n  - {name: HK, type: ss, server: 192.0.2.1, port: 8388, cipher: aes-128-gcm, password: p}\nrules:\n  - MATCH,HK\n";
++
++    private static ProxyCoreConfig.Options modeOptions(ProxyRuntimeProfile.Mode mode) {
++        ProxyCoreConfig.Options o = new ProxyCoreConfig.Options();
++        o.mode = mode; o.dnsPort = 11053; o.controllerPort = 29090; o.egressPort = 29150; o.secret = "s";
++        if (mode == ProxyRuntimeProfile.Mode.TPROXY) o.tproxyPort = 19898;
++        if (mode == ProxyRuntimeProfile.Mode.REDIRECT || mode == ProxyRuntimeProfile.Mode.ENHANCE) o.redirectPort = 19897;
++        if (mode == ProxyRuntimeProfile.Mode.ENHANCE) o.tproxyPort = 19898;
++        return o;
++    }
++
++    private static Map<String, Object> inbound(List<Object> inbounds, String tag) {
++        for (Object i : inbounds) if (tag.equals(map(i).get("tag"))) return map(i);
++        return null;
++    }
++
++    @Test public void enhanceTakesTcpThroughRedirectAndUdpThroughTproxyOnEveryCore() throws Exception {
++        ProxyCoreConfig.Options o = modeOptions(ProxyRuntimeProfile.Mode.ENHANCE);
++        List<Object> sing = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config).get("inbounds"));
++        assertEquals("udp", inbound(sing, ProxyCoreConfig.TAG_TPROXY).get("network"));
++        assertEquals(19897, ((Number) inbound(sing, ProxyCoreConfig.TAG_REDIRECT).get("listen_port")).intValue());
++        assertNull("no TUN outside TUN mode", inbound(sing, ProxyCoreConfig.TAG_TUN));
++        List<Object> xray = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.XRAY, SS, o, u -> null).config).get("inbounds"));
++        assertEquals("udp", map(inbound(xray, ProxyCoreConfig.TAG_TPROXY).get("settings")).get("network"));
++        assertEquals("tcp", map(inbound(xray, ProxyCoreConfig.TAG_REDIRECT).get("settings")).get("network"));
++        String hy2 = "proxies:\n  - {name: HY, type: hysteria2, server: 192.0.2.9, port: 443, password: pw-long, sni: a.example.com}\nrules:\n  - MATCH,HY\n";
++        String hysteria = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).config;
++        assertTrue(hysteria, hysteria.contains("udpTProxy:\n  listen: :19898\n") && hysteria.contains("tcpRedirect:\n  listen: :19897\n"));
++        assertFalse("TCP is redirected, not TPROXY'd", hysteria.contains("tcpTProxy:"));
++        // TPROXY mode is unchanged: one listener for TCP and UDP.
++        List<Object> tproxy = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS,
++                modeOptions(ProxyRuntimeProfile.Mode.TPROXY), u -> null).config).get("inbounds"));
++        assertFalse(inbound(tproxy, ProxyCoreConfig.TAG_TPROXY).containsKey("network"));
++    }
++
++    @Test public void singBoxTunModeRunsItsOwnTunLikeMihomosTunBlock() throws Exception {
++        ProxyCoreConfig.Options o = modeOptions(ProxyRuntimeProfile.Mode.TUN);
++        o.tunExcludePackages = Arrays.asList("com.example.bank", "com.tencent.mm");
++        Map<String, Object> root = CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config);
++        List<Object> inbounds = list(root.get("inbounds"));
++        Map<String, Object> tun = inbound(inbounds, ProxyCoreConfig.TAG_TUN);
++        assertNotNull(tun);
++        assertEquals("tun", tun.get("type"));
++        assertEquals("hetu0", tun.get("interface_name"));
++        assertEquals(Boolean.TRUE, tun.get("auto_route"));
++        assertEquals(Boolean.TRUE, tun.get("strict_route"));
++        assertEquals(Collections.singletonList("0:9999"), tun.get("exclude_uid_range"));
++        assertTrue(((List<?>) tun.get("route_exclude_address")).containsAll(Arrays.asList("192.168.0.0/16", "10.0.0.0/8", "fc00::/7")));
++        assertEquals(Arrays.asList("com.example.bank", "com.tencent.mm"), tun.get("exclude_package"));
++        assertFalse(tun.containsKey("include_package"));
++        assertEquals(2, ((List<?>) tun.get("address")).size());
++        assertNull("no netfilter listener in TUN mode", inbound(inbounds, ProxyCoreConfig.TAG_TPROXY));
++        assertNull(inbound(inbounds, ProxyCoreConfig.TAG_REDIRECT));
++        assertNotNull("Hetu's DNS port stays", inbound(inbounds, ProxyCoreConfig.TAG_DNS_IN));
++        Map<String, Object> route = map(root.get("route"));
++        assertEquals(Boolean.TRUE, route.get("auto_detect_interface"));
++        List<Object> rules = list(route.get("rules"));
++        assertTrue(((List<?>) map(rules.get(0)).get("inbound")).contains(ProxyCoreConfig.TAG_TUN));
++        assertEquals("sniff", map(rules.get(0)).get("action"));
++        boolean dnsHijack = false;
++        for (Object r : rules) if ("dns".equals(map(r).get("protocol")) && "hijack-dns".equals(map(r).get("action"))) dnsHijack = true;
++        assertTrue("DNS inside the TUN is answered by sing-box", dnsHijack);
++
++        // A native sing-box file: Hetu's TUN replaces its inbounds, and auto_detect_interface is forced on.
++        o.ipv6 = false; o.tunExcludePackages = Collections.emptyList(); o.tunIncludePackages = Collections.singletonList("org.example.browser");
++        String own = "{\"inbounds\":[{\"type\":\"mixed\",\"listen_port\":7890}],\"outbounds\":[{\"type\":\"direct\",\"tag\":\"d\"}],\"route\":{\"auto_detect_interface\":false}}";
++        ProxyCoreConfig.Result r = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, own, o, u -> null);
++        Map<String, Object> nat = CoreJson.parseObject(r.config);
++        Map<String, Object> ntun = inbound(list(nat.get("inbounds")), ProxyCoreConfig.TAG_TUN);
++        assertEquals(Collections.singletonList("org.example.browser"), ntun.get("include_package"));
++        assertEquals(Collections.singletonList(ProxyCoreConfig.TUN_ADDRESS_V4), ntun.get("address"));
++        assertEquals(Boolean.TRUE, map(nat.get("route")).get("auto_detect_interface"));
++        assertTrue(r.warningText(), r.warningText().contains("auto_detect_interface"));
++    }
++
++    @Test public void tunAppScopeFollowsMihomosIncludeAndExcludeRule() throws Exception {
++        Set<String> picked = new TreeSet<>(Arrays.asList("com.b", "com.a"));
++        Set<String> direct = Collections.singleton("com.d");
++        assertEquals(Arrays.asList(Collections.emptyList(), Arrays.asList("com.a", "com.b", "com.d")),
++                ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.BLACKLIST, picked, direct));
++        assertEquals(Arrays.asList(Collections.emptyList(), Collections.singletonList("com.d")),
++                ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.CORE, picked, direct));
++        assertEquals(Arrays.asList(Arrays.asList("com.a", "com.b"), Collections.emptyList()),
++                ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.WHITELIST, new TreeSet<>(Arrays.asList("com.a", "com.b", "com.d")), direct));
++        try {
++            ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.WHITELIST, Collections.singleton("com.d"), direct);
++            fail("a whitelist emptied by DIRECT rules would route nothing");
++        } catch (IOException expected) {
++            assertTrue(expected.getMessage().contains("DIRECT"));
++        }
++        // The startup options take the packages only in TUN mode, from the same policy the start uses.
++        String root = new String(Files.readAllBytes(new File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").toPath()), StandardCharsets.UTF_8);
++        String options = root.substring(root.indexOf("private ProxyCoreConfig.Options nativeOptions("), root.indexOf("o.dnsPort=profile.dnsHijack"));
++        assertTrue(options, options.contains("ProxyCoreConfig.tunPackages(profile.appScope,selectedTunPackages(),policy.directPackages)"));
++        assertTrue(options, options.contains("profile.mode==ProxyRuntimeProfile.Mode.ENHANCE||profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY"));
++    }
++
++    @Test public void theDnsPortAnswersFromTheAddressHetuRedirectedTheQueryTo() throws Exception {
++        // hetu-root.sh REDIRECTs an app's DNS to 127.0.0.1 (::1); a wildcard listener answered from the phone's own
++        // address, which Android's connected resolver socket drops. Loopback listeners + a wildcard one for hotspot clients.
++        ProxyCoreConfig.Options o = modeOptions(ProxyRuntimeProfile.Mode.TPROXY);
++        List<Object> sing = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config).get("inbounds"));
++        assertEquals("127.0.0.1", inbound(sing, ProxyCoreConfig.TAG_DNS_IN).get("listen"));
++        assertEquals("::1", inbound(sing, ProxyCoreConfig.TAG_DNS_IN6).get("listen"));
++        assertEquals("::", inbound(sing, ProxyCoreConfig.TAG_DNS_LAN).get("listen"));
++        for (String tag : ProxyCoreConfig.dnsInTags(o)) {
++            assertEquals(tag, Boolean.TRUE, inbound(sing, tag).get("reuse_addr"));
++            assertEquals(tag, 11053, ((Number) inbound(sing, tag).get("listen_port")).intValue());
++        }
++        Map<String, Object> route = map(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config).get("route"));
++        boolean hijack = false;
++        for (Object r : list(route.get("rules")))
++            if ("hijack-dns".equals(map(r).get("action")) && ProxyCoreConfig.dnsInTags(o).equals(map(r).get("inbound"))) hijack = true;
++        assertTrue("every DNS listener is answered by sing-box's DNS", hijack);
++
++        o.loopback6 = false;
++        assertEquals(Arrays.asList(ProxyCoreConfig.TAG_DNS_IN, ProxyCoreConfig.TAG_DNS_LAN), ProxyCoreConfig.dnsInTags(o));
++        Map<String, Object> xray = CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.XRAY, SS, o, u -> null).config);
++        assertEquals("127.0.0.1", inbound(list(xray.get("inbounds")), ProxyCoreConfig.TAG_DNS_IN).get("listen"));
++        assertEquals("::", inbound(list(xray.get("inbounds")), ProxyCoreConfig.TAG_DNS_LAN).get("listen"));
++        assertNull("no ::1 listener where ::1 cannot be bound", inbound(list(xray.get("inbounds")), ProxyCoreConfig.TAG_DNS_IN6));
++        boolean dnsOut = false;
++        for (Object r : list(map(xray.get("routing")).get("rules")))
++            if (ProxyCoreConfig.TAG_DNS_OUT.equals(map(r).get("outboundTag")) && ProxyCoreConfig.dnsInTags(o).equals(map(r).get("inboundTag"))) dnsOut = true;
++        assertTrue(dnsOut);
++
++        // Hysteria's forwarders cannot share the port with a wildcard listener: loopback only.
++        o.loopback6 = true;
++        String hy2 = "proxies:\n  - {name: HY, type: hysteria2, server: 192.0.2.9, port: 443, password: pw-long, sni: a.example.com}\nrules:\n  - MATCH,HY\n";
++        String hysteria = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).config;
++        assertTrue(hysteria, hysteria.contains("udpForwarding:\n  - listen: 127.0.0.1:11053\n") && hysteria.contains("  - listen: '[::1]:11053'\n"));
++        assertFalse(hysteria, hysteria.contains("listen: :11053"));
++        assertFalse(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).warningText().contains("共享网络"));
++        o.sharedNetwork = true;
++        assertTrue("hotspot clients are told their DNS is not served", ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).warningText().contains("共享网络"));
++        o.ipv6 = false;
++        assertFalse(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).config.contains("[::1]"));
++
++        String root = new String(Files.readAllBytes(new File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").toPath()), StandardCharsets.UTF_8);
++        assertTrue(root.contains("o.loopback6=loopback6Bindable();"));
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt
@@ -94065,10 +94361,10 @@ index 0000000..b922ac5
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyCoreConfigGoldenTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyCoreConfigGoldenTest.kt
 new file mode 100644
-index 0000000..7b14fa2
+index 0000000..6480835
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyCoreConfigGoldenTest.kt
-@@ -0,0 +1,194 @@
+@@ -0,0 +1,200 @@
 +package io.github.xgl34222220.hetu
 +
 +import org.json.JSONArray
@@ -94247,11 +94543,17 @@ index 0000000..7b14fa2
 +        assertNotNull(error)
 +        assertTrue(error is IOException)
 +        assertTrue(error!!.message!!.contains("Clash/Mihomo"))
++        // 5.5.5: sing-box runs its own TUN; Xray has none, and eBPF stays Mihomo-only.
 +        val tun = runCatching {
-+            ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, resource("singbox-native.json"),
++            ProxyCoreConfig.build(ProxyRuntimeProfile.Core.XRAY, resource("xray-native.json"),
 +                options().apply { mode = ProxyRuntimeProfile.Mode.TUN }) { null }
 +        }.exceptionOrNull()
 +        assertTrue(tun!!.message!!.contains("TPROXY"))
++        val ebpf = runCatching {
++            ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, resource("singbox-native.json"),
++                options().apply { mode = ProxyRuntimeProfile.Mode.EBPF }) { null }
++        }.exceptionOrNull()
++        assertTrue(ebpf!!.message!!.contains("TUN"))
 +    }
 +
 +    @Test fun adblockAllowListIsSubtractedForXray() {
@@ -97472,10 +97774,10 @@ index 0000000..af760ec
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml b/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml
 new file mode 100644
-index 0000000..916e06f
+index 0000000..e346f7b
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,39 @@
 +# Hetu: Hysteria 2 client generated from Clash/Mihomo node "KR Hy2"
 +server: "hy2.example.com:8443"
 +auth: "hpw"
@@ -97504,18 +97806,23 @@ index 0000000..916e06f
 +http:
 +  listen: 127.0.0.1:29150
 +tcpForwarding:
-+  - listen: :11053
++  - listen: 127.0.0.1:11053
++    remote: 1.1.1.1:53
++  - listen: '[::1]:11053'
 +    remote: 1.1.1.1:53
 +udpForwarding:
-+  - listen: :11053
++  - listen: 127.0.0.1:11053
++    remote: 1.1.1.1:53
++    timeout: 20s
++  - listen: '[::1]:11053'
 +    remote: 1.1.1.1:53
 +    timeout: 20s
 diff --git a/android-app/app/src/test/resources/multicore/golden/hysteria-native-out.yaml b/android-app/app/src/test/resources/multicore/golden/hysteria-native-out.yaml
 new file mode 100644
-index 0000000..87ab59a
+index 0000000..8595d25
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/hysteria-native-out.yaml
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,35 @@
 +# Hetu: native Hysteria 2 client config; ingress replaced by Hetu
 +server: hy.example.com:443
 +auth: secret-pass
@@ -97540,18 +97847,23 @@ index 0000000..87ab59a
 +http:
 +  listen: 127.0.0.1:29150
 +tcpForwarding:
-+  - listen: :11053
++  - listen: 127.0.0.1:11053
++    remote: 1.1.1.1:53
++  - listen: '[::1]:11053'
 +    remote: 1.1.1.1:53
 +udpForwarding:
-+  - listen: :11053
++  - listen: 127.0.0.1:11053
++    remote: 1.1.1.1:53
++    timeout: 20s
++  - listen: '[::1]:11053'
 +    remote: 1.1.1.1:53
 +    timeout: 20s
 diff --git a/android-app/app/src/test/resources/multicore/golden/singbox-converted.json b/android-app/app/src/test/resources/multicore/golden/singbox-converted.json
 new file mode 100644
-index 0000000..c0407bc
+index 0000000..87583fb
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/singbox-converted.json
-@@ -0,0 +1,403 @@
+@@ -0,0 +1,418 @@
 +{
 +  "log": {
 +    "level": "info",
@@ -97601,8 +97913,23 @@ index 0000000..c0407bc
 +    {
 +      "type": "direct",
 +      "tag": "hetu-dns-in",
++      "listen": "127.0.0.1",
++      "listen_port": 11053,
++      "reuse_addr": true
++    },
++    {
++      "type": "direct",
++      "tag": "hetu-dns-in6",
++      "listen": "::1",
++      "listen_port": 11053,
++      "reuse_addr": true
++    },
++    {
++      "type": "direct",
++      "tag": "hetu-dns-lan",
 +      "listen": "::",
-+      "listen_port": 11053
++      "listen_port": 11053,
++      "reuse_addr": true
 +    },
 +    {
 +      "type": "http",
@@ -97775,11 +98102,11 @@ index 0000000..c0407bc
 +  "route": {
 +    "rules": [
 +      {
-+        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in"],
++        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "action": "sniff"
 +      },
 +      {
-+        "inbound": ["hetu-dns-in"],
++        "inbound": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "action": "hijack-dns"
 +      },
 +      {
@@ -97957,10 +98284,10 @@ index 0000000..c0407bc
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/singbox-native-out.json b/android-app/app/src/test/resources/multicore/golden/singbox-native-out.json
 new file mode 100644
-index 0000000..c2af766
+index 0000000..653dbb1
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/singbox-native-out.json
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,135 @@
 +{
 +  "log": {
 +    "level": "warn"
@@ -97985,8 +98312,23 @@ index 0000000..c2af766
 +    {
 +      "type": "direct",
 +      "tag": "hetu-dns-in",
++      "listen": "127.0.0.1",
++      "listen_port": 11053,
++      "reuse_addr": true
++    },
++    {
++      "type": "direct",
++      "tag": "hetu-dns-in6",
++      "listen": "::1",
++      "listen_port": 11053,
++      "reuse_addr": true
++    },
++    {
++      "type": "direct",
++      "tag": "hetu-dns-lan",
 +      "listen": "::",
-+      "listen_port": 11053
++      "listen_port": 11053,
++      "reuse_addr": true
 +    },
 +    {
 +      "type": "http",
@@ -98015,11 +98357,11 @@ index 0000000..c2af766
 +  "route": {
 +    "rules": [
 +      {
-+        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in"],
++        "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "action": "sniff"
 +      },
 +      {
-+        "inbound": ["hetu-dns-in"],
++        "inbound": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "action": "hijack-dns"
 +      },
 +      {
@@ -98083,10 +98425,10 @@ index 0000000..c2af766
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/v2ray-converted.json b/android-app/app/src/test/resources/multicore/golden/v2ray-converted.json
 new file mode 100644
-index 0000000..feecad3
+index 0000000..5c0eb39
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/v2ray-converted.json
-@@ -0,0 +1,280 @@
+@@ -0,0 +1,302 @@
 +{
 +  "log": {
 +    "loglevel": "warning"
@@ -98128,6 +98470,28 @@ index 0000000..feecad3
 +    },
 +    {
 +      "tag": "hetu-dns-in",
++      "listen": "127.0.0.1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-in6",
++      "listen": "::1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-lan",
 +      "listen": "::",
 +      "port": 11053,
 +      "protocol": "dokodemo-door",
@@ -98260,7 +98624,7 @@ index 0000000..feecad3
 +    "rules": [
 +      {
 +        "type": "field",
-+        "inboundTag": ["hetu-dns-in"],
++        "inboundTag": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "outboundTag": "hetu-dns-out"
 +      },
 +      {
@@ -98369,10 +98733,10 @@ index 0000000..feecad3
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/v2ray-native-out.json b/android-app/app/src/test/resources/multicore/golden/v2ray-native-out.json
 new file mode 100644
-index 0000000..44d2c68
+index 0000000..ffabb8a
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/v2ray-native-out.json
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,143 @@
 +{
 +  "log": {
 +    "loglevel": "warning"
@@ -98400,6 +98764,28 @@ index 0000000..44d2c68
 +    },
 +    {
 +      "tag": "hetu-dns-in",
++      "listen": "127.0.0.1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-in6",
++      "listen": "::1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-lan",
 +      "listen": "::",
 +      "port": 11053,
 +      "protocol": "dokodemo-door",
@@ -98465,7 +98851,7 @@ index 0000000..44d2c68
 +    "rules": [
 +      {
 +        "type": "field",
-+        "inboundTag": ["hetu-dns-in"],
++        "inboundTag": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "outboundTag": "hetu-dns-out"
 +      },
 +      {
@@ -98496,10 +98882,10 @@ index 0000000..44d2c68
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/xray-converted.json b/android-app/app/src/test/resources/multicore/golden/xray-converted.json
 new file mode 100644
-index 0000000..d47d851
+index 0000000..f3b9d68
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/xray-converted.json
-@@ -0,0 +1,346 @@
+@@ -0,0 +1,368 @@
 +{
 +  "log": {
 +    "loglevel": "warning"
@@ -98541,6 +98927,28 @@ index 0000000..d47d851
 +    },
 +    {
 +      "tag": "hetu-dns-in",
++      "listen": "127.0.0.1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-in6",
++      "listen": "::1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-lan",
 +      "listen": "::",
 +      "port": 11053,
 +      "protocol": "dokodemo-door",
@@ -98739,7 +99147,7 @@ index 0000000..d47d851
 +    "rules": [
 +      {
 +        "type": "field",
-+        "inboundTag": ["hetu-dns-in"],
++        "inboundTag": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "outboundTag": "hetu-dns-out"
 +      },
 +      {
@@ -98848,10 +99256,10 @@ index 0000000..d47d851
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/xray-native-out.json b/android-app/app/src/test/resources/multicore/golden/xray-native-out.json
 new file mode 100644
-index 0000000..44d2c68
+index 0000000..ffabb8a
 --- /dev/null
 +++ b/android-app/app/src/test/resources/multicore/golden/xray-native-out.json
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,143 @@
 +{
 +  "log": {
 +    "loglevel": "warning"
@@ -98879,6 +99287,28 @@ index 0000000..44d2c68
 +    },
 +    {
 +      "tag": "hetu-dns-in",
++      "listen": "127.0.0.1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-in6",
++      "listen": "::1",
++      "port": 11053,
++      "protocol": "dokodemo-door",
++      "settings": {
++        "address": "1.1.1.1",
++        "port": 53,
++        "network": "tcp,udp"
++      }
++    },
++    {
++      "tag": "hetu-dns-lan",
 +      "listen": "::",
 +      "port": 11053,
 +      "protocol": "dokodemo-door",
@@ -98944,7 +99374,7 @@ index 0000000..44d2c68
 +    "rules": [
 +      {
 +        "type": "field",
-+        "inboundTag": ["hetu-dns-in"],
++        "inboundTag": ["hetu-dns-in", "hetu-dns-in6", "hetu-dns-lan"],
 +        "outboundTag": "hetu-dns-out"
 +      },
 +      {

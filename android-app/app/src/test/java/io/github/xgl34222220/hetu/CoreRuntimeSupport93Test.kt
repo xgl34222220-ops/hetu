@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Core download/runtime mapping: every downloadable core runs in Root TPROXY / Redirect, and the
+ * Core download/runtime mapping: every downloadable core runs in Root TPROXY / Redirect / Enhance (sing-box also TUN), and the
  * Clash-controller features degrade per core with an explicit "此核心不支持" state. Asset names are
  * the real release names (MetaCubeX/mihomo v1.19.32, lux5am/mihomo-smart Prerelease-Alpha,
  * SagerNet/sing-box v1.14.3, reF1nd/sing-box-releases, XTLS/Xray-core v26.10.10,
@@ -129,7 +129,9 @@ class CoreRuntimeSupport93Test {
             assertTrue(core.id, ProxyCoreSupport.runtimeSupported(core))
             assertTrue(core.id, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TPROXY).available)
             assertTrue(core.id, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.REDIRECT).available)
-            assertEquals(core.id, mihomoFamily, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TUN).available)
+            assertTrue(core.id, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.ENHANCE).available)
+            assertEquals(core.id, mihomoFamily || core.id.startsWith("sing-box"), ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TUN).available)
+            assertEquals(core.id, mihomoFamily, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.EBPF).available)
             assertEquals("", ProxyCoreSupport.unsupportedReason(core))
             assertEquals(core.id, mihomoFamily, ProxyCoreSupport.hotReload(core))
             assertEquals(core.id, mihomoFamily || core.id.startsWith("sing-box"), ProxyCoreSupport.panel(core))

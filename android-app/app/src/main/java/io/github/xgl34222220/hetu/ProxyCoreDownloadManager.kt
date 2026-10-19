@@ -38,7 +38,7 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
 /**
  * What each downloadable core can do in Hetu's Root runtime.
  *
- * Every core runs behind the same Root TPROXY / Redirect capture (hetu-root.sh launches it with its own
+ * Every core runs behind the same Root TPROXY / Redirect / Enhance capture (hetu-root.sh launches it with its own
  * CLI from run/state/core.kind; ProxyCoreConfig writes its native config or converts the Clash/Mihomo
  * profile). Features that need Mihomo's Clash controller degrade per core with an explicit
  * "此核心不支持" state instead of a connection error:
@@ -100,9 +100,9 @@ internal object ProxyCoreSupport {
     /** One line for the core picker: modes and which panel features work. */
     @JvmStatic fun featureSummary(core: ProxyRuntimeProfile.Core): String = when {
         mihomo(core) -> ""
-        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
-        clashApi(core) -> "TPROXY / Redirect · 面板与测速经 clash_api · 不支持热重载"
-        else -> "TPROXY / Redirect · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
+        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect / Enhance · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
+        clashApi(core) -> "TPROXY / Redirect / Enhance / TUN · 面板与测速经 clash_api · 不支持热重载"
+        else -> "TPROXY / Redirect / Enhance · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
     }
 }
 

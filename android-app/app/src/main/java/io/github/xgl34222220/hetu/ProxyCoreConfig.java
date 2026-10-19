@@ -40,6 +40,12 @@ final class ProxyCoreConfig {
     static final String TAG_TPROXY = "hetu-tproxy";
     static final String TAG_REDIRECT = "hetu-redirect";
     static final String TAG_DNS_IN = "hetu-dns-in";
+    /** Hetu's DNS port on ::1 (IPv6 local queries) and on every address (hotspot clients); see {@link #dnsInTags}. */
+    static final String TAG_DNS_IN6 = "hetu-dns-in6";
+    static final String TAG_DNS_LAN = "hetu-dns-lan";
+    /** sing-box's own TUN inbound in TUN mode (device hetu0, like Mihomo's tun). */
+    static final String TAG_TUN = "hetu-tun";
+    static final String TUN_DEVICE = "hetu0";
     static final String TAG_EGRESS = "hetu-egress-probe";
     static final String TAG_DIRECT = "DIRECT";
     static final String TAG_BLOCK = "REJECT";
@@ -128,6 +134,15 @@ final class ProxyCoreConfig {
         /** Category names (lower case) in that geosite.dat / geoip.dat; null when they could not be read (taken as present). */
         Set<String> geositeNames, geoipNames;
         boolean cnIpDirect;
+        /**
+         * TUN mode (sing-box only): Android packages the TUN routes ({@code include_package}, the whitelist scope) or
+         * leaves out ({@code exclude_package}); see {@link #tunPackages}. Unused in the netfilter modes.
+         */
+        List<String> tunIncludePackages = Collections.emptyList(), tunExcludePackages = Collections.emptyList();
+        /** ::1 can be bound on this device (RootProxyManager probes it): the DNS port also listens there. */
+        boolean loopback6 = true;
+        /** 共享网络 (hotspot / tethering clients) is on: Hysteria says its DNS port does not serve them. */
+        boolean sharedNetwork;
         List<String> adblock = Collections.emptyList(), adblockAllow = Collections.emptyList();
         /**
          * Resolves the Hysteria server host name before start. The Hysteria client looks the server up with
@@ -233,8 +248,8 @@ final class ProxyCoreConfig {
         if (source == null || source.trim().isEmpty()) throw new IOException("源配置为空");
         Kind k = kind(core);
         if (k == Kind.MIHOMO) throw new IOException("Mihomo 使用 MihomoStartupConfig 生成启动配置");
-        if (o.mode != ProxyRuntimeProfile.Mode.TPROXY && o.mode != ProxyRuntimeProfile.Mode.REDIRECT)
-            throw new IOException(core.label + " 仅支持 Root TPROXY / Redirect 模式");
+        if (!ProxyRuntimeProfile.capability(core, o.mode).available)
+            throw new IOException(core.label + " 不支持 " + o.mode.label + " 模式（可用 TPROXY / Redirect / Enhance" + (k == Kind.SING_BOX ? " / TUN" : "") + "）");
         List<String> warnings = new ArrayList<>();
         if (isNativeFor(core, source)) {
             // The built-in starter template (BundledCoreTemplates) ships placeholder nodes on example.invalid.
@@ -340,6 +355,65 @@ final class ProxyCoreConfig {
     }
 
     static String listenAll(Options o) { return o.ipv6 ? "::" : "0.0.0.0"; }
+
+    /** Enhance mode: the TPROXY listener takes UDP only, TCP comes through the Redirect listener. */
+    static boolean enhance(Options o) { return o.mode == ProxyRuntimeProfile.Mode.ENHANCE; }
+
+    /** sing-box inbounds whose traffic is sniffed (domain, DNS protocol): Hetu's ingress, plus the TUN in TUN mode. */
+    static List<String> sniffInbounds(Options o) {
+        List<String> tags = new ArrayList<>();
+        if (o.mode == ProxyRuntimeProfile.Mode.TUN) tags.add(TAG_TUN);
+        tags.add(TAG_TPROXY); tags.add(TAG_REDIRECT);
+        tags.addAll(o.dnsPort > 0 ? dnsInTags(o) : Collections.singletonList(TAG_DNS_IN));
+        return tags;
+    }
+
+    /**
+     * Where Hetu's DNS port listens for sing-box / Xray / V2Fly. hetu-root.sh hijacks DNS with a nat REDIRECT, which
+     * points an app's query at 127.0.0.1 (::1 for IPv6); a listener on the wildcard address answers it from the
+     * phone's own address instead, conntrack cannot map that reply back, and Android's resolver (a connected UDP
+     * socket) never sees it: every lookup through these cores timed out (5.5.5, host test with real binaries; Mihomo
+     * answers from the redirected address). So the port listens on the loopback addresses, where a reply leaves from
+     * the address the query was redirected to, and on the wildcard address for hotspot clients (PREROUTING REDIRECT
+     * to the interface address, answered from that address). The listeners share the port with SO_REUSEADDR /
+     * SO_REUSEPORT (sing-box reuse_addr; Xray and V2Fly set SO_REUSEPORT on every listener).
+     */
+    static List<String> dnsInTags(Options o) {
+        if (o.dnsPort <= 0) return Collections.emptyList();
+        return dnsV6Loopback(o) ? Arrays.asList(TAG_DNS_IN, TAG_DNS_IN6, TAG_DNS_LAN) : Arrays.asList(TAG_DNS_IN, TAG_DNS_LAN);
+    }
+
+    static boolean dnsV6Loopback(Options o) { return o.ipv6 && o.loopback6; }
+
+    /** The listen address of each {@link #dnsInTags} tag. */
+    static String dnsListen(String tag, Options o) {
+        return TAG_DNS_IN.equals(tag) ? "127.0.0.1" : TAG_DNS_IN6.equals(tag) ? "::1" : listenAll(o);
+    }
+
+    static final String TUN_ADDRESS_V4 = "172.19.0.1/30";
+    static final String TUN_ADDRESS_V6 = "fdfe:dcba:9877::1/126";
+    /** The private ranges MihomoStartupConfig keeps out of its TUN (route-exclude-address). */
+    static final List<String> TUN_ROUTE_EXCLUDE = Collections.unmodifiableList(Arrays.asList(
+            "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7", "fe80::/10"));
+
+    /**
+     * {include, exclude} packages for the TUN, the rule MihomoStartupConfig.appendTun applies: the whitelist scope
+     * routes the selected apps minus the ones a DIRECT rule names (none left is an error); the other scopes leave
+     * out the selected (blacklist) and DIRECT packages.
+     */
+    static List<List<String>> tunPackages(ProxyRuntimeProfile.AppScope scope, Set<String> packages, Set<String> directPackages) throws IOException {
+        TreeSet<String> selected = new TreeSet<>();
+        if (scope != ProxyRuntimeProfile.AppScope.CORE && packages != null) selected.addAll(packages);
+        TreeSet<String> direct = new TreeSet<>();
+        if (directPackages != null) direct.addAll(directPackages);
+        if (scope == ProxyRuntimeProfile.AppScope.WHITELIST) {
+            selected.removeAll(direct);
+            if (selected.isEmpty()) throw new IOException("TUN 仅所选应用代理模式被 DIRECT 规则全部排除");
+            return Arrays.asList(new ArrayList<>(selected), Collections.emptyList());
+        }
+        selected.addAll(direct);
+        return Arrays.asList(Collections.emptyList(), new ArrayList<>(selected));
+    }
 
     // ================================================================== Mihomo profile model
 
@@ -1019,8 +1093,8 @@ final class ProxyCoreConfig {
             List<Object> rules = new ArrayList<>();
             List<Object> ruleSets = new ArrayList<>();
             Set<String> ruleSetTags = new LinkedHashSet<>();
-            rules.add(map("inbound", Arrays.asList(TAG_TPROXY, TAG_REDIRECT, TAG_DNS_IN), "action", "sniff"));
-            if (o.dnsPort > 0) rules.add(map("inbound", Collections.singletonList(TAG_DNS_IN), "action", "hijack-dns"));
+            rules.add(map("inbound", sniffInbounds(o), "action", "sniff"));
+            if (o.dnsPort > 0) rules.add(map("inbound", dnsInTags(o), "action", "hijack-dns"));
             rules.add(map("protocol", "dns", "action", "hijack-dns"));
             boolean adblock = adblock(o, rules, ruleSets, ruleSetTags);
             for (Rule r : p.rules) {
@@ -1278,12 +1352,31 @@ final class ProxyCoreConfig {
 
         static List<Object> inbounds(Options o) {
             List<Object> in = new ArrayList<>();
-            String network = o.tcp && o.udp ? null : (o.udp ? "udp" : "tcp");
+            // Enhance: TCP arrives through Redirect, the TPROXY port takes UDP only (hetu-root.sh enhance capture).
+            String network = enhance(o) ? "udp" : o.tcp && o.udp ? null : (o.udp ? "udp" : "tcp");
+            if (o.mode == ProxyRuntimeProfile.Mode.TUN) in.add(tun(o));
             if (o.tproxyPort > 0) in.add(map("type", "tproxy", "tag", TAG_TPROXY, "listen", listenAll(o), "listen_port", o.tproxyPort, "network", network));
             if (o.redirectPort > 0) in.add(map("type", "redirect", "tag", TAG_REDIRECT, "listen", listenAll(o), "listen_port", o.redirectPort));
-            if (o.dnsPort > 0) in.add(map("type", "direct", "tag", TAG_DNS_IN, "listen", listenAll(o), "listen_port", o.dnsPort));
+            for (String tag : dnsInTags(o))
+                in.add(map("type", "direct", "tag", tag, "listen", dnsListen(tag, o), "listen_port", o.dnsPort, "reuse_addr", true));
             in.add(map("type", "http", "tag", TAG_EGRESS, "listen", "127.0.0.1", "listen_port", o.egressPort));
             return in;
+        }
+
+        /**
+         * The TUN inbound, the sing-box counterpart of MihomoStartupConfig's tun block (same sing-tun library):
+         * device hetu0, auto/strict route, system UIDs 0-9999 (Hetu runs the core as root) and private ranges kept
+         * out, DNS hijacked by the protocol rule in route, app scope as include/exclude_package.
+         */
+        static Map<String, Object> tun(Options o) {
+            LinkedHashMap<String, Object> t = map("type", "tun", "tag", TAG_TUN, "interface_name", TUN_DEVICE,
+                    "address", o.ipv6 ? Arrays.asList(TUN_ADDRESS_V4, TUN_ADDRESS_V6) : Collections.singletonList(TUN_ADDRESS_V4),
+                    "mtu", 9000, "auto_route", true, "strict_route", true, "stack", "mixed",
+                    "exclude_uid_range", Collections.singletonList("0:9999"),
+                    "route_exclude_address", TUN_ROUTE_EXCLUDE);
+            if (!o.tunIncludePackages.isEmpty()) t.put("include_package", new ArrayList<>(o.tunIncludePackages));
+            if (!o.tunExcludePackages.isEmpty()) t.put("exclude_package", new ArrayList<>(o.tunExcludePackages));
+            return t;
         }
 
         static Map<String, Object> experimental(Options o) {
@@ -1560,7 +1653,7 @@ final class ProxyCoreConfig {
             outbounds.add(map("tag", TAG_DNS_OUT, "protocol", "dns"));
 
             List<Object> rules = new ArrayList<>();
-            if (o.dnsPort > 0) rules.add(map("type", "field", "inboundTag", Collections.singletonList(TAG_DNS_IN), "outboundTag", TAG_DNS_OUT));
+            if (o.dnsPort > 0) rules.add(map("type", "field", "inboundTag", dnsInTags(o), "outboundTag", TAG_DNS_OUT));
             rules.add(map("type", "field", "inboundTag", Arrays.asList(TAG_TPROXY, TAG_REDIRECT), "port", 53, "outboundTag", TAG_DNS_OUT));
             boolean adblock = false;
             if (!o.adblock.isEmpty()) {
@@ -1793,7 +1886,7 @@ final class ProxyCoreConfig {
         static List<Object> inbounds(Options o, boolean fakeIp) {
             List<Object> in = new ArrayList<>();
             List<String> sniff = fakeIp ? Arrays.asList("http", "tls", "quic", "fakedns") : Arrays.asList("http", "tls", "quic");
-            String network = o.tcp && o.udp ? "tcp,udp" : (o.udp ? "udp" : "tcp");
+            String network = enhance(o) ? "udp" : o.tcp && o.udp ? "tcp,udp" : (o.udp ? "udp" : "tcp");
             if (o.tproxyPort > 0)
                 in.add(map("tag", TAG_TPROXY, "listen", listenAll(o), "port", o.tproxyPort, "protocol", "dokodemo-door",
                         "settings", map("network", network, "followRedirect", true),
@@ -1804,8 +1897,8 @@ final class ProxyCoreConfig {
                         "settings", map("network", "tcp", "followRedirect", true),
                         "streamSettings", map("sockopt", map("tproxy", "redirect")),
                         "sniffing", map("enabled", true, "destOverride", sniff, "routeOnly", true)));
-            if (o.dnsPort > 0)
-                in.add(map("tag", TAG_DNS_IN, "listen", listenAll(o), "port", o.dnsPort, "protocol", "dokodemo-door",
+            for (String tag : dnsInTags(o))
+                in.add(map("tag", tag, "listen", dnsListen(tag, o), "port", o.dnsPort, "protocol", "dokodemo-door",
                         "settings", map("address", DEFAULT_REMOTE_DNS, "port", 53, "network", "tcp,udp")));
             in.add(map("tag", TAG_EGRESS, "listen", "127.0.0.1", "port", o.egressPort, "protocol", "http"));
             return in;
@@ -1997,6 +2090,7 @@ final class ProxyCoreConfig {
             String direct = DEFAULT_DIRECT_DNS;
             for (String d : p.directDns) { String h = d.replaceFirst("^udp://", ""); if (isIp(h.replaceAll(":\\d+$", ""))) { direct = h; break; } }
             appendHetu(y, o, direct.contains(":") ? direct : direct + ":53", remoteDnsForForwarding(p));
+            sharedDnsWarning(o, warnings);
             return new Result(y.toString(), false, warnings, 1, "", "", false);
         }
 
@@ -2008,6 +2102,11 @@ final class ProxyCoreConfig {
             return DEFAULT_REMOTE_DNS + ":53";
         }
 
+        static void sharedDnsWarning(Options o, List<String> warnings) {
+            if (o.sharedNetwork && o.dnsPort > 0)
+                warnings.add("Hysteria 的 DNS 只监听本机：开启共享网络时，热点设备的 DNS 请求不经 Hysteria 解析（可改用 sing-box / Xray）");
+        }
+
         static void appendHetu(StringBuilder y, Options o, String resolver, String remoteDns) {
             y.append("# --- Hetu runtime isolation ---\n");
             // 5.1.0: listen first and connect on the first connection. Without it the client exits when the server is
@@ -2017,15 +2116,21 @@ final class ProxyCoreConfig {
             // Go's resolver has no system DNS on Android; resolve the server name explicitly.
             y.append("resolver:\n  type: udp\n  udp:\n    addr: ").append(resolver).append("\n    timeout: 4s\n");
             if (o.tproxyPort > 0) {
-                if (o.tcp) y.append("tcpTProxy:\n  listen: :").append(o.tproxyPort).append('\n');
+                if (o.tcp && !enhance(o)) y.append("tcpTProxy:\n  listen: :").append(o.tproxyPort).append('\n');
                 if (o.udp) y.append("udpTProxy:\n  listen: :").append(o.tproxyPort).append("\n  timeout: 60s\n");
             }
             if (o.redirectPort > 0) y.append("tcpRedirect:\n  listen: :").append(o.redirectPort).append('\n');
             y.append("http:\n  listen: 127.0.0.1:").append(o.egressPort).append('\n');
             if (o.dnsPort > 0) {
-                // DNS is answered by the remote resolver through the Hysteria tunnel (no fake-IP).
-                y.append("tcpForwarding:\n  - listen: :").append(o.dnsPort).append("\n    remote: ").append(remoteDns).append('\n');
-                y.append("udpForwarding:\n  - listen: :").append(o.dnsPort).append("\n    remote: ").append(remoteDns).append("\n    timeout: 20s\n");
+                // DNS is answered by the remote resolver through the Hysteria tunnel (no fake-IP). Loopback only
+                // (dnsInTags): the forwarders cannot share the port with a wildcard listener, so hotspot clients'
+                // DNS is not served by Hysteria.
+                List<String> listen = new ArrayList<>(Collections.singletonList("127.0.0.1:" + o.dnsPort));
+                if (dnsV6Loopback(o)) listen.add("'[::1]:" + o.dnsPort + "'");
+                y.append("tcpForwarding:\n");
+                for (String l : listen) y.append("  - listen: ").append(l).append("\n    remote: ").append(remoteDns).append('\n');
+                y.append("udpForwarding:\n");
+                for (String l : listen) y.append("  - listen: ").append(l).append("\n    remote: ").append(remoteDns).append("\n    timeout: 20s\n");
             }
         }
 
@@ -2073,6 +2178,7 @@ final class ProxyCoreConfig {
         if (hasLazy) tailText = tailText.replaceFirst("lazy: true\\n", "");
         y.append(tailText);
         warnings.add("Hysteria 是单服务器客户端：规则分流、策略组、面板与测速不可用");
+        Hysteria.sharedDnsWarning(o, warnings);
         return new Result(y.toString(), true, warnings, 1, "", "", false);
     }
 
@@ -2127,7 +2233,7 @@ final class ProxyCoreConfig {
         Map<String, Object> root = CoreJson.parseObject(source);
         List<String> cleanup = ConfigReferenceCleaner.singBox(root);
         warnings.addAll(cleanup);
-        if (root.containsKey("inbounds")) warnings.add("已由河图接管 sing-box 入站（TPROXY/DNS/本地探针）");
+        if (root.containsKey("inbounds")) warnings.add(o.mode == ProxyRuntimeProfile.Mode.TUN ? "已由河图接管 sing-box 入站（TUN/DNS/本地探针）" : "已由河图接管 sing-box 入站（TPROXY/DNS/本地探针）");
         root.put("inbounds", SingBox.inbounds(o));
         List<Object> outbounds = asList(root.get("outbounds"));
         if (outbounds.isEmpty()) throw new IOException("sing-box 配置缺少 outbounds");
@@ -2136,8 +2242,8 @@ final class ProxyCoreConfig {
         if (route == null) { route = new LinkedHashMap<>(); root.put("route", route); }
         if (route.remove("default_mark") != null) warnings.add("已移除 route.default_mark（Android 上会覆盖 netd 网络标记）");
         List<Object> rules = new ArrayList<>();
-        rules.add(map("inbound", Arrays.asList(TAG_TPROXY, TAG_REDIRECT, TAG_DNS_IN), "action", "sniff"));
-        if (o.dnsPort > 0) rules.add(map("inbound", Collections.singletonList(TAG_DNS_IN), "action", "hijack-dns"));
+        rules.add(map("inbound", sniffInbounds(o), "action", "sniff"));
+        if (o.dnsPort > 0) rules.add(map("inbound", dnsInTags(o), "action", "hijack-dns"));
         rules.add(map("protocol", "dns", "action", "hijack-dns"));
         List<Object> ruleSets = new ArrayList<>(asList(route.get("rule_set")));
         Set<String> rsTags = new HashSet<>();
@@ -2146,6 +2252,10 @@ final class ProxyCoreConfig {
         rules.addAll(asList(route.get("rules")));
         route.put("rules", rules);
         if (!ruleSets.isEmpty()) route.put("rule_set", ruleSets);
+        if (o.mode == ProxyRuntimeProfile.Mode.TUN && Boolean.FALSE.equals(route.get("auto_detect_interface"))) {
+            route.put("auto_detect_interface", true);
+            warnings.add("TUN 模式已开启 route.auto_detect_interface（否则核心自己的出站会绕回 TUN）");
+        }
         if (!route.containsKey("auto_detect_interface")) route.put("auto_detect_interface", true);
         if (!root.containsKey("dns")) {
             root.put("dns", map("servers", Arrays.asList(SingBox.dnsServer(DEFAULT_DIRECT_DNS, "dns-direct", null), SingBox.dnsServer(DEFAULT_REMOTE_DNS, "dns-remote", null)), "final", "dns-remote"));
@@ -2181,7 +2291,7 @@ final class ProxyCoreConfig {
         for (Object ob : outbounds) if ("hetu-adblock".equals(str(asMap(ob), "tag"))) hasBlock = true;
         boolean adblock = false;
         List<Object> head = new ArrayList<>();
-        if (o.dnsPort > 0) head.add(map("type", "field", "inboundTag", Collections.singletonList(TAG_DNS_IN), "outboundTag", TAG_DNS_OUT));
+        if (o.dnsPort > 0) head.add(map("type", "field", "inboundTag", dnsInTags(o), "outboundTag", TAG_DNS_OUT));
         head.add(map("type", "field", "inboundTag", Arrays.asList(TAG_TPROXY, TAG_REDIRECT), "port", 53, "outboundTag", TAG_DNS_OUT));
         if (!o.adblock.isEmpty()) {
             List<String> blocked = subtractAllowed(o.adblock, o.adblockAllow);

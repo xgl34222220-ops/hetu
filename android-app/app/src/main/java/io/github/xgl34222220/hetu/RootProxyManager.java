@@ -555,7 +555,7 @@ final class RootProxyManager {
         RootProxyPolicy policy=loadPolicy(profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
-        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock);
+        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock,policy);
         ProxyCoreConfig.Result converted=ProxyCoreConfig.build(profile.core,source,options,this::fetchProvider);
         List<ProxyCoreConfig.RuleSetFile> ruleSetFiles=new ArrayList<>();
         ProxyCoreConfig.Result built=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX?localRuleSets(converted,ruleSetFiles):converted;
@@ -644,15 +644,26 @@ final class RootProxyManager {
         return cache.isFile()&&cache.length()>0?Files.readAllBytes(cache.toPath()):null;
     }
 
-    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock)throws IOException{
+    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock,RootProxyPolicy policy)throws IOException{
         ProxyCoreConfig.Options o=new ProxyCoreConfig.Options();
         o.mode=profile.mode;
         if(profile.mode==ProxyRuntimeProfile.Mode.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
-        else{
+        else if(profile.mode==ProxyRuntimeProfile.Mode.TUN){
+            // sing-box's own TUN (hetu0) takes the traffic; no netfilter listener. App scope as packages, like Mihomo's tun.
+            // The editor check (policy null) needs no packages: sing-box check does not look at them.
+            if(policy!=null){
+                List<List<String>> packages=ProxyCoreConfig.tunPackages(profile.appScope,selectedTunPackages(),policy.directPackages);
+                o.tunIncludePackages=packages.get(0);
+                o.tunExcludePackages=packages.get(1);
+            }
+        }else{
+            // Redirect, and Enhance (TCP Redirect + UDP TPROXY).
             o.redirectPort=MihomoStartupConfig.REDIRECT_PORT;
-            if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
+            if(profile.mode==ProxyRuntimeProfile.Mode.ENHANCE||profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
         }
         o.dnsPort=profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.OFF?0:MihomoStartupConfig.DNS_PORT;
+        o.loopback6=loopback6Bindable();
+        o.sharedNetwork=policy!=null&&policy.sharedNetwork;
         o.controllerPort=controllerPort;
         o.egressPort=MihomoStartupConfig.egressProbePort(controllerPort);
         o.secret=controllerSecret();
@@ -672,6 +683,18 @@ final class RootProxyManager {
         }
         o.hostResolver=this::resolveServerHost;
         return o;
+    }
+
+    /**
+     * ::1 exists (IPv6 is not switched off on lo): the core's DNS port also listens there (ProxyCoreConfig.dnsInTags),
+     * else a bind of ::1 would stop the core at start. The App shares the network namespace hetu-root.sh starts it in.
+     */
+    private static boolean loopback6Bindable(){
+        try(DatagramSocket probe=new DatagramSocket(new InetSocketAddress(InetAddress.getByName("::1"),0))){
+            return probe.isBound();
+        }catch(IOException|SecurityException unavailable){
+            return false;
+        }
     }
 
     /**
@@ -2062,7 +2085,7 @@ final class RootProxyManager {
      * answers "does this run under the selected core".
      */
     private void validateNativeText(String text,ProxyRuntimeProfile profile)throws Exception{
-        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null);
+        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null,null);
         options.hostResolver=null;
         ProxyCoreConfig.Result built=ProxyCoreConfig.build(profile.core,text,options,this::fetchProvider);
         File stage=new File(context.getCacheDir(),"hetu-config-validator");

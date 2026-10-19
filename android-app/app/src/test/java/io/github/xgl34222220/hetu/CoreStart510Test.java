@@ -22,6 +22,8 @@ import static org.junit.Assert.*;
  * 拿不到的规则集在转换配置中连同依赖它的规则一起跳过（与 Mihomo 缺少 provider 时照常启动一致），原生配置保留远程。
  * 另：选了其它核心而保存的模式是 TUN / Enhance / eBPF 时，启动不再把核心改回 Mihomo，只把模式换成 TPROXY；内置模板跟随
  * Mihomo 当前选中的配置（而不只是内置配置）；Hysteria 先监听再连服务器；Xray / V2Fly 自己应答看门狗的存活查询。
+ * 5.5.5：Enhance 对所有核心开放，sing-box 可用自己的 TUN；DNS 端口改为监听回环地址（另加通配地址给热点设备），
+ * 应答从被 REDIRECT 到的地址发出，Android 解析器的已连接 UDP 套接字才收得到（之前其它核心的应用 DNS 全部超时）。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {35}, application = Application.class)
@@ -171,8 +173,14 @@ public class CoreStart510Test {
     }
 
     @Test public void aNonMihomoCoreKeepsItsCoreAndRunsInTproxyInsteadOfTurningIntoMihomo() throws Exception {
-        for (ProxyRuntimeProfile.Mode m : new ProxyRuntimeProfile.Mode[]{ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.Mode.EBPF})
-            assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.SING_BOX, m));
+        // 5.5.5: Enhance runs on every core, TUN on sing-box (its own TUN); eBPF stays Mihomo-only.
+        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Mode.EBPF));
+        assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.SING_BOX_REF1ND, ProxyRuntimeProfile.Mode.TUN));
+        for (ProxyRuntimeProfile.Mode m : new ProxyRuntimeProfile.Mode[]{ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.Mode.EBPF})
+            for (ProxyRuntimeProfile.Core c : new ProxyRuntimeProfile.Core[]{ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA})
+                assertEquals(c.label + " " + m.label, ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(c, m));
+        for (ProxyRuntimeProfile.Core c : ProxyRuntimeProfile.Core.values())
+            assertEquals(c.label, ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.runnableMode(c, ProxyRuntimeProfile.Mode.ENHANCE));
         assertEquals(ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.REDIRECT));
         assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TUN));
         assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.runnableMode(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.MIXED));
@@ -232,7 +240,7 @@ public class CoreStart510Test {
         Application app = ApplicationProvider.getApplicationContext();
         android.content.SharedPreferences p = app.getSharedPreferences("hetu", 0);
         p.edit().clear().commit();
-        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Mode.TUN));
+        assertEquals(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.TUN));
         assertEquals("tun", p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
         assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TPROXY));
         assertNull(p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
@@ -240,8 +248,152 @@ public class CoreStart510Test {
         ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.EBPF);
         assertEquals(ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.REDIRECT));
         assertNull(p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
-        // A mode every core runs is neither changed nor remembered.
+        // A mode the picked core runs is neither changed nor remembered.
         assertEquals(ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.HYSTERIA, ProxyRuntimeProfile.Mode.REDIRECT));
+        assertEquals(ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Mode.ENHANCE));
+        assertEquals(ProxyRuntimeProfile.Mode.TUN, ProxyRuntimeProfile.modeForPick(p, ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Mode.TUN));
         assertNull(p.getString(ProxyRuntimeProfile.MIHOMO_MODE_KEY, null));
+    }
+
+    private static final String SS = "proxies:\n  - {name: HK, type: ss, server: 192.0.2.1, port: 8388, cipher: aes-128-gcm, password: p}\nrules:\n  - MATCH,HK\n";
+
+    private static ProxyCoreConfig.Options modeOptions(ProxyRuntimeProfile.Mode mode) {
+        ProxyCoreConfig.Options o = new ProxyCoreConfig.Options();
+        o.mode = mode; o.dnsPort = 11053; o.controllerPort = 29090; o.egressPort = 29150; o.secret = "s";
+        if (mode == ProxyRuntimeProfile.Mode.TPROXY) o.tproxyPort = 19898;
+        if (mode == ProxyRuntimeProfile.Mode.REDIRECT || mode == ProxyRuntimeProfile.Mode.ENHANCE) o.redirectPort = 19897;
+        if (mode == ProxyRuntimeProfile.Mode.ENHANCE) o.tproxyPort = 19898;
+        return o;
+    }
+
+    private static Map<String, Object> inbound(List<Object> inbounds, String tag) {
+        for (Object i : inbounds) if (tag.equals(map(i).get("tag"))) return map(i);
+        return null;
+    }
+
+    @Test public void enhanceTakesTcpThroughRedirectAndUdpThroughTproxyOnEveryCore() throws Exception {
+        ProxyCoreConfig.Options o = modeOptions(ProxyRuntimeProfile.Mode.ENHANCE);
+        List<Object> sing = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config).get("inbounds"));
+        assertEquals("udp", inbound(sing, ProxyCoreConfig.TAG_TPROXY).get("network"));
+        assertEquals(19897, ((Number) inbound(sing, ProxyCoreConfig.TAG_REDIRECT).get("listen_port")).intValue());
+        assertNull("no TUN outside TUN mode", inbound(sing, ProxyCoreConfig.TAG_TUN));
+        List<Object> xray = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.XRAY, SS, o, u -> null).config).get("inbounds"));
+        assertEquals("udp", map(inbound(xray, ProxyCoreConfig.TAG_TPROXY).get("settings")).get("network"));
+        assertEquals("tcp", map(inbound(xray, ProxyCoreConfig.TAG_REDIRECT).get("settings")).get("network"));
+        String hy2 = "proxies:\n  - {name: HY, type: hysteria2, server: 192.0.2.9, port: 443, password: pw-long, sni: a.example.com}\nrules:\n  - MATCH,HY\n";
+        String hysteria = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).config;
+        assertTrue(hysteria, hysteria.contains("udpTProxy:\n  listen: :19898\n") && hysteria.contains("tcpRedirect:\n  listen: :19897\n"));
+        assertFalse("TCP is redirected, not TPROXY'd", hysteria.contains("tcpTProxy:"));
+        // TPROXY mode is unchanged: one listener for TCP and UDP.
+        List<Object> tproxy = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS,
+                modeOptions(ProxyRuntimeProfile.Mode.TPROXY), u -> null).config).get("inbounds"));
+        assertFalse(inbound(tproxy, ProxyCoreConfig.TAG_TPROXY).containsKey("network"));
+    }
+
+    @Test public void singBoxTunModeRunsItsOwnTunLikeMihomosTunBlock() throws Exception {
+        ProxyCoreConfig.Options o = modeOptions(ProxyRuntimeProfile.Mode.TUN);
+        o.tunExcludePackages = Arrays.asList("com.example.bank", "com.tencent.mm");
+        Map<String, Object> root = CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config);
+        List<Object> inbounds = list(root.get("inbounds"));
+        Map<String, Object> tun = inbound(inbounds, ProxyCoreConfig.TAG_TUN);
+        assertNotNull(tun);
+        assertEquals("tun", tun.get("type"));
+        assertEquals("hetu0", tun.get("interface_name"));
+        assertEquals(Boolean.TRUE, tun.get("auto_route"));
+        assertEquals(Boolean.TRUE, tun.get("strict_route"));
+        assertEquals(Collections.singletonList("0:9999"), tun.get("exclude_uid_range"));
+        assertTrue(((List<?>) tun.get("route_exclude_address")).containsAll(Arrays.asList("192.168.0.0/16", "10.0.0.0/8", "fc00::/7")));
+        assertEquals(Arrays.asList("com.example.bank", "com.tencent.mm"), tun.get("exclude_package"));
+        assertFalse(tun.containsKey("include_package"));
+        assertEquals(2, ((List<?>) tun.get("address")).size());
+        assertNull("no netfilter listener in TUN mode", inbound(inbounds, ProxyCoreConfig.TAG_TPROXY));
+        assertNull(inbound(inbounds, ProxyCoreConfig.TAG_REDIRECT));
+        assertNotNull("Hetu's DNS port stays", inbound(inbounds, ProxyCoreConfig.TAG_DNS_IN));
+        Map<String, Object> route = map(root.get("route"));
+        assertEquals(Boolean.TRUE, route.get("auto_detect_interface"));
+        List<Object> rules = list(route.get("rules"));
+        assertTrue(((List<?>) map(rules.get(0)).get("inbound")).contains(ProxyCoreConfig.TAG_TUN));
+        assertEquals("sniff", map(rules.get(0)).get("action"));
+        boolean dnsHijack = false;
+        for (Object r : rules) if ("dns".equals(map(r).get("protocol")) && "hijack-dns".equals(map(r).get("action"))) dnsHijack = true;
+        assertTrue("DNS inside the TUN is answered by sing-box", dnsHijack);
+
+        // A native sing-box file: Hetu's TUN replaces its inbounds, and auto_detect_interface is forced on.
+        o.ipv6 = false; o.tunExcludePackages = Collections.emptyList(); o.tunIncludePackages = Collections.singletonList("org.example.browser");
+        String own = "{\"inbounds\":[{\"type\":\"mixed\",\"listen_port\":7890}],\"outbounds\":[{\"type\":\"direct\",\"tag\":\"d\"}],\"route\":{\"auto_detect_interface\":false}}";
+        ProxyCoreConfig.Result r = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, own, o, u -> null);
+        Map<String, Object> nat = CoreJson.parseObject(r.config);
+        Map<String, Object> ntun = inbound(list(nat.get("inbounds")), ProxyCoreConfig.TAG_TUN);
+        assertEquals(Collections.singletonList("org.example.browser"), ntun.get("include_package"));
+        assertEquals(Collections.singletonList(ProxyCoreConfig.TUN_ADDRESS_V4), ntun.get("address"));
+        assertEquals(Boolean.TRUE, map(nat.get("route")).get("auto_detect_interface"));
+        assertTrue(r.warningText(), r.warningText().contains("auto_detect_interface"));
+    }
+
+    @Test public void tunAppScopeFollowsMihomosIncludeAndExcludeRule() throws Exception {
+        Set<String> picked = new TreeSet<>(Arrays.asList("com.b", "com.a"));
+        Set<String> direct = Collections.singleton("com.d");
+        assertEquals(Arrays.asList(Collections.emptyList(), Arrays.asList("com.a", "com.b", "com.d")),
+                ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.BLACKLIST, picked, direct));
+        assertEquals(Arrays.asList(Collections.emptyList(), Collections.singletonList("com.d")),
+                ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.CORE, picked, direct));
+        assertEquals(Arrays.asList(Arrays.asList("com.a", "com.b"), Collections.emptyList()),
+                ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.WHITELIST, new TreeSet<>(Arrays.asList("com.a", "com.b", "com.d")), direct));
+        try {
+            ProxyCoreConfig.tunPackages(ProxyRuntimeProfile.AppScope.WHITELIST, Collections.singleton("com.d"), direct);
+            fail("a whitelist emptied by DIRECT rules would route nothing");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("DIRECT"));
+        }
+        // The startup options take the packages only in TUN mode, from the same policy the start uses.
+        String root = new String(Files.readAllBytes(new File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").toPath()), StandardCharsets.UTF_8);
+        String options = root.substring(root.indexOf("private ProxyCoreConfig.Options nativeOptions("), root.indexOf("o.dnsPort=profile.dnsHijack"));
+        assertTrue(options, options.contains("ProxyCoreConfig.tunPackages(profile.appScope,selectedTunPackages(),policy.directPackages)"));
+        assertTrue(options, options.contains("profile.mode==ProxyRuntimeProfile.Mode.ENHANCE||profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY"));
+    }
+
+    @Test public void theDnsPortAnswersFromTheAddressHetuRedirectedTheQueryTo() throws Exception {
+        // hetu-root.sh REDIRECTs an app's DNS to 127.0.0.1 (::1); a wildcard listener answered from the phone's own
+        // address, which Android's connected resolver socket drops. Loopback listeners + a wildcard one for hotspot clients.
+        ProxyCoreConfig.Options o = modeOptions(ProxyRuntimeProfile.Mode.TPROXY);
+        List<Object> sing = list(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config).get("inbounds"));
+        assertEquals("127.0.0.1", inbound(sing, ProxyCoreConfig.TAG_DNS_IN).get("listen"));
+        assertEquals("::1", inbound(sing, ProxyCoreConfig.TAG_DNS_IN6).get("listen"));
+        assertEquals("::", inbound(sing, ProxyCoreConfig.TAG_DNS_LAN).get("listen"));
+        for (String tag : ProxyCoreConfig.dnsInTags(o)) {
+            assertEquals(tag, Boolean.TRUE, inbound(sing, tag).get("reuse_addr"));
+            assertEquals(tag, 11053, ((Number) inbound(sing, tag).get("listen_port")).intValue());
+        }
+        Map<String, Object> route = map(CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, SS, o, u -> null).config).get("route"));
+        boolean hijack = false;
+        for (Object r : list(route.get("rules")))
+            if ("hijack-dns".equals(map(r).get("action")) && ProxyCoreConfig.dnsInTags(o).equals(map(r).get("inbound"))) hijack = true;
+        assertTrue("every DNS listener is answered by sing-box's DNS", hijack);
+
+        o.loopback6 = false;
+        assertEquals(Arrays.asList(ProxyCoreConfig.TAG_DNS_IN, ProxyCoreConfig.TAG_DNS_LAN), ProxyCoreConfig.dnsInTags(o));
+        Map<String, Object> xray = CoreJson.parseObject(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.XRAY, SS, o, u -> null).config);
+        assertEquals("127.0.0.1", inbound(list(xray.get("inbounds")), ProxyCoreConfig.TAG_DNS_IN).get("listen"));
+        assertEquals("::", inbound(list(xray.get("inbounds")), ProxyCoreConfig.TAG_DNS_LAN).get("listen"));
+        assertNull("no ::1 listener where ::1 cannot be bound", inbound(list(xray.get("inbounds")), ProxyCoreConfig.TAG_DNS_IN6));
+        boolean dnsOut = false;
+        for (Object r : list(map(xray.get("routing")).get("rules")))
+            if (ProxyCoreConfig.TAG_DNS_OUT.equals(map(r).get("outboundTag")) && ProxyCoreConfig.dnsInTags(o).equals(map(r).get("inboundTag"))) dnsOut = true;
+        assertTrue(dnsOut);
+
+        // Hysteria's forwarders cannot share the port with a wildcard listener: loopback only.
+        o.loopback6 = true;
+        String hy2 = "proxies:\n  - {name: HY, type: hysteria2, server: 192.0.2.9, port: 443, password: pw-long, sni: a.example.com}\nrules:\n  - MATCH,HY\n";
+        String hysteria = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).config;
+        assertTrue(hysteria, hysteria.contains("udpForwarding:\n  - listen: 127.0.0.1:11053\n") && hysteria.contains("  - listen: '[::1]:11053'\n"));
+        assertFalse(hysteria, hysteria.contains("listen: :11053"));
+        assertFalse(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).warningText().contains("共享网络"));
+        o.sharedNetwork = true;
+        assertTrue("hotspot clients are told their DNS is not served", ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).warningText().contains("共享网络"));
+        o.ipv6 = false;
+        assertFalse(ProxyCoreConfig.build(ProxyRuntimeProfile.Core.HYSTERIA, hy2, o, u -> null).config.contains("[::1]"));
+
+        String root = new String(Files.readAllBytes(new File("src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java").toPath()), StandardCharsets.UTF_8);
+        assertTrue(root.contains("o.loopback6=loopback6Bindable();"));
     }
 }

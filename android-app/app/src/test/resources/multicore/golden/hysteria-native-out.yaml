@@ -22,9 +22,14 @@ udpTProxy:
 http:
   listen: 127.0.0.1:29150
 tcpForwarding:
-  - listen: :11053
+  - listen: 127.0.0.1:11053
+    remote: 1.1.1.1:53
+  - listen: '[::1]:11053'
     remote: 1.1.1.1:53
 udpForwarding:
-  - listen: :11053
+  - listen: 127.0.0.1:11053
+    remote: 1.1.1.1:53
+    timeout: 20s
+  - listen: '[::1]:11053'
     remote: 1.1.1.1:53
     timeout: 20s

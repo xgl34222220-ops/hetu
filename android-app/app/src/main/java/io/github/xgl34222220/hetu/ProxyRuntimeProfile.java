@@ -53,12 +53,19 @@ final class ProxyRuntimeProfile {
         boolean mihomo=core==Core.MIHOMO||core==Core.MIHOMO_SMART;
         if(!mihomo){
             // sing-box / Xray / V2Fly / Hysteria run behind the same Root netfilter capture:
-            // a TPROXY (TCP+UDP) or Redirect (TCP) inbound plus Hetu's DNS port. App scope, shared
-            // network, CIDR/interface bypass and QUIC control are netfilter features, core-independent.
+            // a TPROXY (TCP+UDP), Redirect (TCP) or Enhance (TCP Redirect + UDP TPROXY) inbound plus Hetu's DNS
+            // port. App scope, shared network, CIDR/interface bypass and QUIC control are netfilter features,
+            // core-independent. TUN is the core's own device (hetu0): sing-box has one (the same sing-tun Mihomo
+            // uses), Xray / V2Fly / Hysteria do not. eBPF redirects into Mihomo's TUN and stays Mihomo-only.
+            boolean singBox=core==Core.SING_BOX||core==Core.SING_BOX_REF1ND;
             switch(mode){
                 case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
                 case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
-                default:return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 在河图 Root 运行链中支持 TPROXY 与 Redirect；"+mode.label+" 仅 Mihomo 可用");
+                case ENHANCE:return new Capability(true,true,true,true,true,true,true,true,true,"");
+                case TUN:
+                    if(singBox)return new Capability(true,true,true,true,true,false,true,true,true,"");
+                    return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 没有自己的 TUN 设备，可用 TPROXY、Redirect 与 Enhance；TUN 仅 Mihomo / sing-box 可用");
+                default:return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 在河图 Root 运行链中支持 TPROXY、Redirect 与 Enhance；"+mode.label+" 仅 Mihomo 可用");
             }
         }
         switch(mode){
@@ -78,7 +85,7 @@ final class ProxyRuntimeProfile {
      */
     static Mode runnableMode(Core core,Mode mode){return capability(core,mode).available?mode:Mode.TPROXY;}
 
-    /** The Mihomo-only mode (TUN / Enhance / eBPF) a pick of another core replaced with TPROXY; restored on a pick of Mihomo. */
+    /** The Mihomo-only mode (eBPF, or TUN for a core without one) a pick of another core replaced with TPROXY; restored on a pick of Mihomo. */
     static final String MIHOMO_MODE_KEY="proxyMihomoModeBeforeCore";
 
     /**

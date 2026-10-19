@@ -580,7 +580,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 .map {
                     val capability = ProxyRuntimeProfile.capability(profile.core, it)
                     if (capability.available) HxChoice(it.id, it.label, ht(modeDescription(it)))
-                    else HxChoice(it.id, it.label, ht("仅 Mihomo 可用"), enabled = false)
+                    else HxChoice(it.id, it.label, ht(if (it == ProxyRuntimeProfile.Mode.TUN) "仅 Mihomo / sing-box 可用" else "仅 Mihomo 可用"), enabled = false)
                 },
             selected = profile.mode.id,
             onPick = { putString("proxyBaseMode", it); choice = null },
