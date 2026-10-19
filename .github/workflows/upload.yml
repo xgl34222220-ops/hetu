@@ -1,4 +1,4 @@
-name: hetu-5.0.0-release
+name: hetu-5.5.5-release
 on:
   push:
     branches: [hark/tmp-release-asset-5.0.0]
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Hetu-APK-arm64
-          run-id: 39109060656
+          run-id: 39190333936
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: xgl34222220-ops/hetu
           path: apk
@@ -22,25 +22,42 @@ jobs:
         run: |
           set -euo pipefail
           ls -la apk
-          echo "c97729870385c858e97433bfa8f53c89f7b79065a5a073484be5ce7ba4e4c292  apk/Hetu-5.0.0-arm64-v8a.apk" | sha256sum -c -
-          cp apk/Hetu-5.0.0-arm64-v8a.apk Hetu-5.0.0.apk
+          echo "aebb1a023faefe7f3c88df107ebeb76a674c471e7add543f1f7872d69a3b008a  apk/Hetu-5.5.5-arm64-v8a.apk" | sha256sum -c -
+          cp apk/Hetu-5.5.5-arm64-v8a.apk Hetu-5.5.5.apk
           cat > notes.md <<'NOTES'
-          ## 河图 5.0.0
+          ## 河图 5.5.5
 
-          修复「测速有网，但实际没网」和「用着用着就没网」；sing-box / Xray / V2Fly / Hysteria 的内置配置现在跟随 Mihomo 内置配置，可以直接使用。
+          修复 sing-box / Xray / V2Fly / Hysteria「根本启动不了」和域名解析不通；其它内核新增 Enhance 模式，sing-box 新增 TUN 模式；看门狗不再打断正在下载的连接，内核下载走代理，界面交互完善。
 
-          - **内置配置的主策略组被过滤成直连**：内置 Mihomo 配置里「节点选择 / 手动选择 / 故障转移 / AI 稳定」用来排除公告节点的过滤词包含「订阅」，而「订阅」槽位的节点名都带「 [订阅]」后缀，这四个组因此一个节点都没有，按直连处理。节点和地区组测速正常，最终兜底、Google 等默认流量却走直连，重启也不会变。已修正，升级后自动修复已有的内置配置（只改这一行，订阅链接和其他修改保留）。
-          - **看门狗只断开走失败节点的连接**：节点无响应时，先让自动选择的组重新测速，再只关闭经过该节点或策略组的连接；直连的游戏、国内应用和其他节点上的连接不受影响，也不再重载或重启核心。
-          - **其他内核的内置配置**：未修改的 sing-box / Xray / V2Fly / Hysteria 内置模板启动时转换 Mihomo 内置配置（同一订阅、策略组和规则，订阅只需填一次）。Mihomo 专用的 mrs 规则集换成各内核能读的同一份数据；🎯 本地直连 / ⛔ 拒绝连接 正确识别。
-          - **独立 DNS 过滤**：启动代理时总会先暂停独立 DNS 过滤，不再因上次异常结束而与代理同时运行。
-          - **配置解析**：修复部分订阅链接长度下 YAML 解析崩溃（SnakeYAML 分块边界遇到 emoji）。
+          **运行模式**
+          - **Enhance**（TCP 走 Redirect、UDP 走 TPROXY）现在所有内核都能用。
+          - **sing-box / sing-box reF1nd 新增 TUN**：与 Mihomo 相同的 hetu0 虚拟网卡、系统应用与私有网段不进 TUN、按「应用范围」设置排除或只代理所选应用。Xray / V2Fly / Hysteria 本身没有 TUN，eBPF 仍仅 Mihomo 可用；设置里不可用的模式会写明「仅 Mihomo 可用」或「仅 Mihomo / sing-box 可用」。
 
-          已知限制：sing-box 首次启动需直连 testingcf.jsdelivr.net 下载规则集，下载失败时 sing-box 无法启动（之后使用缓存）；Xray / V2Fly 不转换「去广告」规则集（可用河图自带广告过滤）；Hysteria 只使用一个 hysteria2 节点，分流规则不生效。
+          **其它内核**
+          - **域名解析不通**：河图把应用的 DNS 转到内核的 DNS 端口时，sing-box / Xray / V2Fly / Hysteria 的回包从手机自己的地址发出，Android 系统解析器（已连接的 UDP 套接字）收不到，经河图接管的域名解析全部超时（主机用真实内核复现；Mihomo 不受影响）。现在 DNS 端口监听回环地址，回包能送回；热点设备的 DNS 也照常解析（Hysteria 除外：开启共享网络时会提示）。
+          - **选了其它内核却跑成 Mihomo**：之前用 Mihomo 时选过其它内核不支持的模式，切到其它内核后启动会被改回 Mihomo。现在保留所选内核，只把模式换成 TPROXY 并提示；切回 Mihomo 时恢复原来的模式。
+          - **跟随 Mihomo 当前配置**：未修改的其它内核内置模板跟随 Mihomo 当前选中的配置（不再只认内置配置，用自己导入的配置也能直接用）。
+          - **sing-box 规则集**：启动前由河图下载并缓存（jsDelivr / GitHub 镜像轮换），不再因为某个规则集下载失败而整个起不来；实在拿不到的规则集本次跳过。
+          - **Hysteria**：先监听再连服务器，服务器一时连不上不再直接退出；在已运行的代理上重启时服务器地址不再被解析成假 IP。
+          - **Xray / V2Fly**：节点挂掉或上游 DNS 慢时，不再被看门狗当成内核卡死而停掉代理。
+          - **内核下载**：代理运行时通过代理下载，失败再直连，最后试镜像（均按 SHA-256 校验）；所选内核未安装时启动会直接说明去哪里下载。
+
+          **下载速度**
+          - 看门狗在大流量下不再误判节点失效：连接还在收数据就一个都不断开，只重测出问题的分组，不再清掉你在自动选择组里手动固定的节点。
+          - 说明：5.0.0 起外网与未分类流量按规则走节点（4.4.4 实际误走直连），速度由节点决定。「最终兜底」默认用「故障转移」（订阅里排第一个可用的节点），想要自动挑延迟最低的可以在面板里改成「节点选择」。
+
+          **界面交互**（布局、间距、圆角不变）
+          - 设置里未安装的内核可以点，直接打开「工具 → 核心管理」；运行模式列表说明哪个模式哪些内核可用。
+          - 核心管理：删除、恢复内置前先确认；下载完成提示「已安装 / 已更新」及何时生效；没有可下载构建或检查失败时在卡片上说明原因；错误统一为中文。
+          - 在「工具 → 配置管理」切换配置后会应用到运行中的代理（热重载，或提示重启生效）。
+          - 首页与通知显示实际在运行的内核；文件选择器不可用时给出提示而不是闪退；修正几处指向不存在页面的提示。
+
+          覆盖安装后请点一次代理「重启」，新的看门狗与运行脚本才会生效。
 
           尚未完成真机验证。
 
-          SHA-256: `c97729870385c858e97433bfa8f53c89f7b79065a5a073484be5ce7ba4e4c292`
+          SHA-256: `aebb1a023faefe7f3c88df107ebeb76a674c471e7add543f1f7872d69a3b008a`
 
           NOTES
-          gh release create v5.0.0 Hetu-5.0.0.apk --repo xgl34222220-ops/hetu --target defa2bfe0c2819ca1fda7e090b5ddac5d50efada --title '河图 5.0.0' --notes-file notes.md
-          gh release view v5.0.0 --repo xgl34222220-ops/hetu --json tagName,targetCommitish,assets --jq '{tag: .tagName, target: .targetCommitish, assets: [.assets[] | {name, size, digest}]}'
+          gh release create v5.5.5 Hetu-5.5.5.apk --repo xgl34222220-ops/hetu --target 7d6a56d8e55278df7b20de746778e4b8a5a0b065 --title '河图 5.5.5' --notes-file notes.md
+          gh release view v5.5.5 --repo xgl34222220-ops/hetu --json tagName,targetCommitish,assets --jq '{tag: .tagName, target: .targetCommitish, assets: [.assets[] | {name, size, digest}]}'
