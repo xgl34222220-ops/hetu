@@ -314,7 +314,10 @@ internal class ProxyComposeController(context: Context) {
         // A completed status observation supersedes the cached fast hint, including
         // a confirmed stopped core. Missing/failed observations keep only the hint.
         val running = status.optBoolean("running", fastRunning)
-        val healthObserved = !status.optBoolean("healthProbeFailed", false) &&
+        // 7.0.0: while another Root transaction holds the lock, health is unknown, not a failed check.
+        val transactionBusy = status.optString("networkIntegrity") == "unknown" &&
+            status.optString("networkFault") == "transaction-in-progress"
+        val healthObserved = !transactionBusy && !status.optBoolean("healthProbeFailed", false) &&
             if (shouldProbeHealth) status.opt("dataPlaneHealthy") is Boolean
             else prefs.getBoolean("proxyRootHealthObserved", false)
         // All observational writes share the read's original control/session/
@@ -454,6 +457,7 @@ internal class ProxyComposeController(context: Context) {
                 status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
                 status.optBoolean("baselineRepairAvailable", false) ->
                     "旧版运行记录需要校正，可在工具→诊断工具中修复运行记录；当前规则已核对"
+                transactionBusy -> ""
                 !status.optBoolean("dataPlaneHealthy", false) ->
                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                 else -> ""

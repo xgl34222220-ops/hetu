@@ -431,10 +431,11 @@ rollback_start(){
   START_ACTIVE=0
 }
 
+# [$1] attempts of 0.05 s (default 100 = 5 s).
 acquire_lock(){
   [ "$LOCK_HELD" != 1 ] || return 0
   mkdir -p "$RUN" || return 1
-  N=0
+  N=0; AL_MAX="${1:-100}"
   while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
     OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
     case "$OWNER" in ''|*[!0-9]*) ;; *)
@@ -444,9 +445,24 @@ acquire_lock(){
         rmdir "$RUN/.txn.reap" 2>/dev/null || true
         continue
       fi;; esac
-    N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
+    # 7.0.0: while waiting, say so (txn_waiter): the watchdog's Google rule pass gives the lock up for it.
+    [ "$N" != 0 ] || : > "$RUN/.txn.want.$SELF_PID" 2>/dev/null || true
+    N=$((N+1)); [ "$N" -lt "$AL_MAX" ] || { rm -f "$RUN/.txn.want.$SELF_PID"; return 1; }; sleep 0.05
   done
+  rm -f "$RUN/.txn.want.$SELF_PID"
   printf '%s\n' "$SELF_PID" > "$LOCK_DIR/pid"; LOCK_HELD=1
+}
+# 0 while another live process waits in acquire_lock; markers of gone waiters are removed.
+txn_waiter(){
+  for TW_F in "$RUN"/.txn.want.*; do
+    [ -e "$TW_F" ] || continue
+    TW_P=${TW_F##*.}
+    case "$TW_P" in ''|*[!0-9]*) continue;; esac
+    [ "$TW_P" != "$SELF_PID" ] || continue
+    if kill -0 "$TW_P" 2>/dev/null; then return 0; fi
+    rm -f "$TW_F"
+  done
+  return 1
 }
 # One attempt only (status polling must never wait): reap a lock whose owner is gone.
 try_lock_once(){
@@ -792,7 +808,8 @@ stop_transaction(){
   # Revoke before waiting for the lock, including a start whose watchdog has not
   # yet appeared. A stopped receipt is not a successful-cleanup receipt.
   cancel_boot || return 1
-  acquire_lock || return 1
+  # 7.0.0: 15 s, a background holder yields (txn_waiter); an older script's watchdog pass may not.
+  acquire_lock 300 || return 1
   printf 'stopped-%s\n' "$$" > "$RUN/generation" || return 1
   ST_FAKE4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)
   ST_FAKE6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -4289,6 +4306,10 @@ google_firewall_ebpf(){
 }
 google_firewall_cleanup(){
   # Caller owns the existing Root transaction lock. Never flush a system chain.
+  # 7.0.0: "background" (the watchdog's minute pass, google_firewall_maintain): the caller released the
+  # lock. The scan (pm, iptables -S, one awk per rule) runs without it; only the deletions take it again
+  # and stop as soon as a start or stop waits for it (txn_waiter). The rest waits for the next pass.
+  GF_MODE="${1:-}"
   GF_UIDS=$(google_firewall_uids)
   GF_PRESENT=""
   if [ -z "$GF_UIDS" ]; then
@@ -4303,7 +4324,8 @@ google_firewall_cleanup(){
   # 6.6.6: one comma list for awk -v. One True Awk (Android's awk) rejects a newline inside a -v value
   # ("newline in string"), which left every vendor rule in place with two or more Google UIDs.
   GF_UID_LIST=$(printf '%s\n' "$GF_UIDS" | grep -E '^[0-9]+$' | tr '\n' ','); GF_UID_LIST="${GF_UID_LIST%,}"
-  GF_FILE="$RUN/.google-firewall.$$"
+  GF_FILE="$RUN/.google-firewall.$$"; GF_DEL="$RUN/.google-firewall-del.$$"
+  : > "$GF_DEL"
   for GF_TOOL in xt4q xt6q; do
     for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
       if ! $GF_TOOL -t filter -S "$GF_CHAIN" > "$GF_FILE" 2>/dev/null; then continue; fi
@@ -4324,20 +4346,37 @@ google_firewall_cleanup(){
             if(!inverted && uid ~ /^[0-9]+$/ && allowed[uid] && (target=="REJECT" || target=="DROP")) found=1
           }
           END{exit !found}'; then continue; fi
-        # Delete the exact specification; line numbers can change under netd.
-        case $- in *f*) GF_GLOB_OFF=1;; *) GF_GLOB_OFF=0; set -f;; esac
-        set -- $GF_RULE
-        shift 2
-        if $GF_TOOL -t filter -D "$GF_CHAIN" "$@" 2>/dev/null; then
-          GF_REMOVED=$((GF_REMOVED+1))
-          printf '%s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$GF_TOOL" "$GF_RULE" >> "$RUN/google-firewall.log"
-        else GF_FAILED=$((GF_FAILED+1)); fi
-        [ "$GF_GLOB_OFF" = 1 ] || set +f
+        printf '%s\t%s\t%s\n' "$GF_TOOL" "$GF_CHAIN" "$GF_RULE" >> "$GF_DEL"
       done < "$GF_FILE"
     done
   done
   rm -f "$GF_FILE"
-  printf 'checked=%s removed=%s failed=%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" > "$RUN/google-firewall-status"
+  GF_DEFERRED=0; GF_BG_LOCK=0
+  if [ "$GF_MODE" = background ] && [ -s "$GF_DEL" ]; then
+    if [ "$LOCK_HELD" != 1 ] && acquire_lock; then GF_BG_LOCK=1; fi
+    # Same core and switch as when the pass began, else nothing is deleted.
+    if [ "$LOCK_HELD" != 1 ] || [ "${GF_PID:-}" != "$(cat "$PIDFILE" 2>/dev/null)" ] || ! pidcore "$GF_PID" ||
+      ! kill -0 "$GF_PID" 2>/dev/null || [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" != 1 ]; then
+      GF_DEFERRED=$(grep -c . "$GF_DEL"); : > "$GF_DEL"
+    fi
+  fi
+  GF_TAB=$(printf '\t')
+  while IFS="$GF_TAB" read -r GF_TOOL GF_CHAIN GF_RULE; do
+    if [ "$GF_MODE" = background ] && txn_waiter; then GF_DEFERRED=$((GF_DEFERRED+1)); continue; fi
+    # Delete the exact specification; line numbers can change under netd.
+    case $- in *f*) GF_GLOB_OFF=1;; *) GF_GLOB_OFF=0; set -f;; esac
+    set -- $GF_RULE
+    shift 2
+    if $GF_TOOL -t filter -D "$GF_CHAIN" "$@" 2>/dev/null; then
+      GF_REMOVED=$((GF_REMOVED+1))
+      printf '%s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$GF_TOOL" "$GF_RULE" >> "$RUN/google-firewall.log"
+    else GF_FAILED=$((GF_FAILED+1)); fi
+    [ "$GF_GLOB_OFF" = 1 ] || set +f
+  done < "$GF_DEL"
+  rm -f "$GF_DEL"
+  [ "$GF_BG_LOCK" != 1 ] || release_lock
+  printf 'checked=%s removed=%s failed=%s%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" \
+    "$([ "$GF_DEFERRED" = 0 ] || printf ' deferred=%s' "$GF_DEFERRED")" > "$RUN/google-firewall-status"
   # Which vendor chains this device has at all: without any of them the switch does nothing.
   printf 'uids=%s chains=%s at=%s\n' "$(printf '%s\n' "$GF_UIDS" | grep -c .)" "$GF_PRESENT" "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$RUN/google-firewall-detail" 2>/dev/null || true
   if [ -f "$RUN/google-firewall.log" ]; then
@@ -4366,11 +4405,15 @@ google_firewall_maintain(){ (
     google_firewall_ebpf unblock "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"
     exit 0
   fi
+  GF_HAD_LOCK="$LOCK_HELD"
   acquire_lock || exit 0
   [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
   [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = "$GF_CLEAN" ] || exit 0
   printf '%s\n' "$GF_NOW" > "$RUN/google-firewall-at"
-  if [ "$GF_CLEAN" = 1 ]; then google_firewall_cleanup
+  if [ "$GF_CLEAN" = 1 ]; then
+    # 7.0.0: a start/stop must not wait behind pm and a few hundred awk runs (it gives up after 5 s).
+    [ "$GF_HAD_LOCK" = 1 ] || release_lock
+    google_firewall_cleanup background
   else google_firewall_ebpf check "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"; fi
 ); }
 # Switch off: one read-only look at the eBPF maps at start, with the App's app IDs (no pm call).
@@ -4466,7 +4509,8 @@ start(){
   # Before anything is spawned: the core, watchdog and monitor inherit the root cgroup, so freezing
   # or killing the App (its uid_/pid_ cgroup) never freezes or kills them.
   cg_escape "$$"; START_CG_ESCAPED="$CG_ESCAPED"
-  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+  # 7.0.0: 15 s, as in stop_transaction.
+  acquire_lock 300 || fail "另一个代理网络事务正在执行，请稍后重试"
   if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
     BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
     [ -n "$BOOT_NOW" ] && [ "$HETU_BOOT_RESTORE_ID" = "$BOOT_NOW" ] && [ -f "$BASE/boot/enabled" ] &&

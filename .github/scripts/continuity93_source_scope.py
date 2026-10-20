@@ -32,7 +32,9 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-20: 6.6.6 (versionCode 2105; user: 做6.6.6 自动组不就是自动切走的吗？而且我测试都有延迟啊) = 6.0.0 + stalled-node
 # watchdog (a node that answers delay tests but returns nothing: auto groups pinned elsewhere, timed return),
 # connection chains with "]" in node names matched again, Google vendor-chain cleanup with One True Awk.
-VERSION_CODE, VERSION_NAME = 2105, '6.6.6'
+# 2026-10-20: 7.0.0 (versionCode 2106; user: 做吧, to adding Chrome handshakes to subscription nodes; then 7.0.0) = 6.6.6 +
+# the removed global-client-fingerprint filled into remote provider nodes through a provider override-expr item.
+VERSION_CODE, VERSION_NAME = 2106, '7.0.0'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -177,6 +179,10 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-18 5.0.0 no-network fix (user: 测速有网但实际没网，停止启动都一样): a proxy start pauses the standalone
     # DNS VPN even when the chain flag survived a session that never reached a clean stop.
     PACKAGE + 'ProxyAdblockCoordinator.java',
+    # 2026-10-20 7.0.0 subscription fingerprint (user: 做吧, to adding Chrome handshakes to subscription nodes):
+    # Mihomo 1.19.31 removed global-client-fingerprint; the startup copy gives remote providers an
+    # override-expr item that fills it into their TLS nodes without one.
+    PACKAGE + 'RuntimeCompatibility14.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
@@ -427,8 +433,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2105', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "6.6.6"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2106', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "7.0.0"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'

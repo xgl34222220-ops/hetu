@@ -148,6 +148,7 @@ final class MihomoStartupConfig {
         int sourceRp=detectScalarPort(source,"redir-port");
         String yaml=normalize(source);
         yaml=RuntimeCompatibility14.migrateFingerprint(yaml);
+        yaml=RuntimeCompatibility14.migrateProviderFingerprint(yaml);
         yaml=sanitizeStrictDomainCompatibility(yaml);
         yaml=normalizeDeprecatedEncryptedDns(yaml);
         // Runtime mode is authoritative. The selected source config remains byte-for-byte untouched.
