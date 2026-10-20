@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..83ecc0b 100644
+index 8a43698..6dcffba 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -9,7 +9,7 @@ index 8a43698..83ecc0b 100644
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
 +        versionCode = 2106
-+        versionName = "6.6.7"
++        versionName = "7.0.0"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -63585,7 +63585,7 @@ index 9cd82da..075dc8e 100644
      private void copyScriptAsset(File out)throws IOException{
          byte[] bytes;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java
-index f754312..77d282c 100644
+index f754312..e32a198 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java
 @@ -4,6 +4,7 @@ import java.io.*;
@@ -63604,7 +63604,7 @@ index f754312..77d282c 100644
 +    private static final List<String> TLS_TYPES = Arrays.asList("vmess", "vless", "trojan", "anytls");
 +
 +    /**
-+     * 6.6.7: migrateFingerprint can only write the removed global value onto nodes in this file. Each remote
++     * 7.0.0: migrateFingerprint can only write the removed global value onto nodes in this file. Each remote
 +     * (http/file) provider gets an override-expr item instead, which the core applies to every node it loads, on
 +     * every refresh: TLS_TYPES nodes whose client-fingerprint is missing or empty get the global value, as the
 +     * removed option did, and explicit values stay. A provider whose override names client-fingerprint itself, or
@@ -96748,11 +96748,11 @@ index 0000000..b922ac5
 +        }
 +    }
 +}
-diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint667Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint667Test.java
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint700Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint700Test.java
 new file mode 100644
-index 0000000..4b31c51
+index 0000000..1ede7c9
 --- /dev/null
-+++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint667Test.java
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint700Test.java
 @@ -0,0 +1,116 @@
 +package io.github.xgl34222220.hetu;
 +
@@ -96763,12 +96763,12 @@ index 0000000..4b31c51
 +import org.yaml.snakeyaml.Yaml;
 +
 +/**
-+ * 6.6.7: Mihomo 1.19.31 removed global-client-fingerprint, so subscription (remote provider) nodes without their
++ * 7.0.0: Mihomo 1.19.31 removed global-client-fingerprint, so subscription (remote provider) nodes without their
 + * own client-fingerprint connected with Go's default ClientHello. The startup copy now gives each http/file
 + * provider an override-expr item that fills in the global value; explicit node values stay. The item itself was
 + * checked against the bundled Mihomo (nodes without a value send Chrome's ClientHello, safari stays safari).
 + */
-+public class ProviderFingerprint667Test {
++public class ProviderFingerprint700Test {
 +    private static final String ITEM = "(select(((.client-fingerprint // \"\") == \"\") and (.type == \"vmess\" or .type == \"vless\""
 +            + " or .type == \"trojan\" or .type == \"anytls\")) | .client-fingerprint) = \"chrome\"";
 +    private static final String GLOBAL = "global-client-fingerprint: chrome\n";

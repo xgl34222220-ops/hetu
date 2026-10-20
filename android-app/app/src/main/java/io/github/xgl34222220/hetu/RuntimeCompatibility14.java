@@ -50,7 +50,7 @@ final class RuntimeCompatibility14 {
     private static final List<String> TLS_TYPES = Arrays.asList("vmess", "vless", "trojan", "anytls");
 
     /**
-     * 6.6.7: migrateFingerprint can only write the removed global value onto nodes in this file. Each remote
+     * 7.0.0: migrateFingerprint can only write the removed global value onto nodes in this file. Each remote
      * (http/file) provider gets an override-expr item instead, which the core applies to every node it loads, on
      * every refresh: TLS_TYPES nodes whose client-fingerprint is missing or empty get the global value, as the
      * removed option did, and explicit values stay. A provider whose override names client-fingerprint itself, or

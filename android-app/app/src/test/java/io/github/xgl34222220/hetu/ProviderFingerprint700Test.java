@@ -7,12 +7,12 @@ import java.util.*;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * 6.6.7: Mihomo 1.19.31 removed global-client-fingerprint, so subscription (remote provider) nodes without their
+ * 7.0.0: Mihomo 1.19.31 removed global-client-fingerprint, so subscription (remote provider) nodes without their
  * own client-fingerprint connected with Go's default ClientHello. The startup copy now gives each http/file
  * provider an override-expr item that fills in the global value; explicit node values stay. The item itself was
  * checked against the bundled Mihomo (nodes without a value send Chrome's ClientHello, safari stays safari).
  */
-public class ProviderFingerprint667Test {
+public class ProviderFingerprint700Test {
     private static final String ITEM = "(select(((.client-fingerprint // \"\") == \"\") and (.type == \"vmess\" or .type == \"vless\""
             + " or .type == \"trojan\" or .type == \"anytls\")) | .client-fingerprint) = \"chrome\"";
     private static final String GLOBAL = "global-client-fingerprint: chrome\n";

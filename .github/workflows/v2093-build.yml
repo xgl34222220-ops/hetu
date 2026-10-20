@@ -471,7 +471,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2106'' versionName=''6.6.7''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2106'' versionName=''7.0.0''" out/apk-transfer/apk-metadata.txt
 
         if grep -q "application-debuggable" out/apk-transfer/apk-metadata.txt; then echo "Shipped APK is debuggable"; exit 1; fi
 

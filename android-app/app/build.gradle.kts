@@ -18,7 +18,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 2106
-        versionName = "6.6.7"
+        versionName = "7.0.0"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
