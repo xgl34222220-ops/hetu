@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..694d342 100644
+index 8a43698..83ecc0b 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -8,8 +8,8 @@ index 8a43698..694d342 100644
          targetSdk = 35
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
-+        versionCode = 2105
-+        versionName = "6.6.6"
++        versionCode = 2106
++        versionName = "6.6.7"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -54097,7 +54097,7 @@ index f104cef..2380e94 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-index 71d5484..5fa85da 100644
+index 71d5484..4b83ad9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 @@ -69,6 +69,73 @@ final class MihomoStartupConfig {
@@ -54174,7 +54174,15 @@ index 71d5484..5fa85da 100644
          if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
          if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
          if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
-@@ -116,6 +183,12 @@ final class MihomoStartupConfig {
+@@ -81,6 +148,7 @@ final class MihomoStartupConfig {
+         int sourceRp=detectScalarPort(source,"redir-port");
+         String yaml=normalize(source);
+         yaml=RuntimeCompatibility14.migrateFingerprint(yaml);
++        yaml=RuntimeCompatibility14.migrateProviderFingerprint(yaml);
+         yaml=sanitizeStrictDomainCompatibility(yaml);
+         yaml=normalizeDeprecatedEncryptedDns(yaml);
+         // Runtime mode is authoritative. The selected source config remains byte-for-byte untouched.
+@@ -116,6 +184,12 @@ final class MihomoStartupConfig {
          // filtering chain is enabled. The user's source YAML remains untouched.
          if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
 
@@ -54187,7 +54195,7 @@ index 71d5484..5fa85da 100644
          // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
          // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
          // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
-@@ -136,10 +209,39 @@ final class MihomoStartupConfig {
+@@ -136,10 +210,39 @@ final class MihomoStartupConfig {
              yaml=ensureAdblock(yaml);
          if(profile.cnIpDirect)
              yaml=ensureCnIpDirect(yaml);
@@ -54227,7 +54235,7 @@ index 71d5484..5fa85da 100644
          switch(profile.mode){
              case TPROXY:
                  tp=TPROXY_PORT;
-@@ -372,12 +474,16 @@ final class MihomoStartupConfig {
+@@ -372,12 +475,16 @@ final class MihomoStartupConfig {
      /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
      private static String ensureAdblock(String source)throws IOException{
          String yaml=normalize(source);
@@ -54246,7 +54254,7 @@ index 71d5484..5fa85da 100644
          String[] lines=normalize(source).split("\n",-1);
          int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
          for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
-@@ -391,7 +497,13 @@ final class MihomoStartupConfig {
+@@ -391,7 +498,13 @@ final class MihomoStartupConfig {
                  "    type: file\n"+
                  "    behavior: domain\n"+
                  "    format: text\n"+
@@ -54261,7 +54269,7 @@ index 71d5484..5fa85da 100644
          if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
          String rest=found.group(1).trim();
          if(rest.startsWith("#"))rest="";
-@@ -400,7 +512,8 @@ final class MihomoStartupConfig {
+@@ -400,7 +513,8 @@ final class MihomoStartupConfig {
          for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
          for(int i=index+1;i<end;i++){
              String t=lines[i].trim();
@@ -54271,7 +54279,7 @@ index 71d5484..5fa85da 100644
                  throw new IOException("源配置占用了河图保留的 DNS 过滤 provider 名称");
          }
          StringBuilder out=new StringBuilder();
-@@ -610,6 +723,45 @@ final class MihomoStartupConfig {
+@@ -610,6 +724,45 @@ final class MihomoStartupConfig {
                  "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
      }
 
@@ -63576,6 +63584,146 @@ index 9cd82da..075dc8e 100644
      }
      private void copyScriptAsset(File out)throws IOException{
          byte[] bytes;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java
+index f754312..77d282c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java
+@@ -4,6 +4,7 @@ import java.io.*;
+ import java.security.MessageDigest;
+ import java.util.*;
+ import org.yaml.snakeyaml.DumperOptions;
++import org.yaml.snakeyaml.error.Mark;
+ import org.yaml.snakeyaml.nodes.*;
+
+ /** Narrow migrations in the private startup copy; source YAML is never saved or reserialized. */
+@@ -45,13 +46,117 @@ final class RuntimeCompatibility14 {
+         for (Map.Entry<Integer,String> edit : edits.entrySet()) result.insert(edit.getKey(), edit.getValue());
+         return result.toString();
+     }
++    /** Proxy types the removed global-client-fingerprint applied to. */
++    private static final List<String> TLS_TYPES = Arrays.asList("vmess", "vless", "trojan", "anytls");
++
++    /**
++     * 6.6.7: migrateFingerprint can only write the removed global value onto nodes in this file. Each remote
++     * (http/file) provider gets an override-expr item instead, which the core applies to every node it loads, on
++     * every refresh: TLS_TYPES nodes whose client-fingerprint is missing or empty get the global value, as the
++     * removed option did, and explicit values stay. A provider whose override names client-fingerprint itself, or
++     * that cannot be extended in place, is left as written.
++     */
++    static String migrateProviderFingerprint(String source) throws IOException {
++        if (!source.contains("global-client-fingerprint")) return source;
++        Node root = tree(source);
++        String fingerprint = scalar(field(root, "global-client-fingerprint")).trim();
++        if (fingerprint.isEmpty()) return source;
++        if (!fingerprint.matches("[A-Za-z0-9_-]{1,32}"))
++            throw new IOException("旧全局 TLS 指纹格式无效，请在具体节点设置 client-fingerprint");
++        Node providers = field(root, "proxy-providers");
++        if (!(providers instanceof MappingNode)) return source;
++        String item = providerFingerprintExpr(fingerprint);
++        TreeMap<Integer,String> edits = new TreeMap<>(Collections.reverseOrder());
++        Set<Node> visited = Collections.newSetFromMap(new IdentityHashMap<>());
++        for (NodeTuple provider : ((MappingNode)providers).getValue())
++            migrateProvider(source, provider.getValueNode(), item, edits, visited);
++        StringBuilder result = new StringBuilder(source);
++        for (Map.Entry<Integer,String> edit : edits.entrySet()) result.insert(edit.getKey(), edit.getValue());
++        return result.toString();
++    }
++    /** The override-expr item, YAML single-quoted, that gives TLS_TYPES nodes without one [fingerprint]. */
++    static String providerFingerprintExpr(String fingerprint) {
++        StringBuilder types = new StringBuilder();
++        for (String type : TLS_TYPES) types.append(types.length() == 0 ? "" : " or ").append(".type == \"").append(type).append('"');
++        return "'(select(((.client-fingerprint // \"\") == \"\") and (" + types + ")) | .client-fingerprint) = \""
++                + fingerprint + "\"'";
++    }
++    private static void migrateProvider(String source, Node provider, String item,
++            Map<Integer,String> edits, Set<Node> visited) {
++        if (!(provider instanceof MappingNode)) return;
++        String type = scalar(inherited(provider, "type")).toLowerCase(Locale.ROOT);
++        if (!type.equals("http") && !type.equals("file")) return;
++        Node override = inherited(provider, "override");
++        if (override == null) {
++            addEntry(source, (MappingNode)provider, "override: {override-expr: [" + item + "]}", edits, visited);
++            return;
++        }
++        if (!(override instanceof MappingNode) || inherited(override, "client-fingerprint") != null) return;
++        Node list = inherited(override, "override-expr");
++        if (list == null) addEntry(source, (MappingNode)override, "override-expr: [" + item + "]", edits, visited);
++        else if (list instanceof SequenceNode && !mentions((SequenceNode)list, "client-fingerprint"))
++            addItem(source, (SequenceNode)list, item, edits, visited);
++    }
++    private static boolean mentions(SequenceNode list, String text) {
++        for (Node item : list.getValue()) if (scalar(item).contains(text)) return true;
++        return false;
++    }
++    private static int offset(String source, Mark mark) { return source.offsetByCodePoints(0, mark.getIndex()); }
++    private static String spaces(int count) { return String.join("", Collections.nCopies(count, " ")); }
++    /** ", " before a new entry at [close] (a flow collection's closing bracket), " " after a trailing comma, "" when empty. */
++    private static String separator(String source, Node last, int close) {
++        if (last == null) return "";
++        int lastEnd = offset(source, last.getEndMark());
++        // Only the suffix after the final value is inspected (see migrateList).
++        String tail = lastEnd <= close ? source.substring(lastEnd, close).replaceAll("(?m)#.*$", "").trim() : "";
++        return tail.equals(",") ? " " : ", ";
++    }
++    /** [entry] into a flow mapping before its closing brace, or into a block mapping as a line before its first key. */
++    private static void addEntry(String source, MappingNode mapping, String entry,
++            Map<Integer,String> edits, Set<Node> visited) {
++        if (!visited.add(mapping)) return;
++        List<NodeTuple> tuples = mapping.getValue();
++        if (mapping.getFlowStyle() == DumperOptions.FlowStyle.FLOW) {
++            int close = offset(source, mapping.getEndMark()) - 1;
++            if (close < 0 || source.charAt(close) != '}') return;
++            Node last = tuples.isEmpty() ? null : tuples.get(tuples.size() - 1).getValueNode();
++            edits.merge(close, separator(source, last, close) + entry, String::concat);
++        } else if (!tuples.isEmpty()) {
++            Mark key = tuples.get(0).getKeyNode().getStartMark();
++            edits.merge(offset(source, key), entry + "\n" + spaces(key.getColumn()), String::concat);
++        }
++    }
++    /** [item] at the end of a flow sequence, or as a "- " line after the last one-line item of a block sequence. */
++    private static void addItem(String source, SequenceNode list, String item,
++            Map<Integer,String> edits, Set<Node> visited) {
++        if (!visited.add(list)) return;
++        List<Node> items = list.getValue();
++        if (list.getFlowStyle() == DumperOptions.FlowStyle.FLOW) {
++            int close = offset(source, list.getEndMark()) - 1;
++            if (close < 0 || source.charAt(close) != ']') return;
++            edits.merge(close, separator(source, items.isEmpty() ? null : items.get(items.size() - 1), close) + item,
++                    String::concat);
++            return;
++        }
++        if (items.isEmpty()) return;
++        Node last = items.get(items.size() - 1);
++        int dash = offset(source, list.getStartMark());
++        // A multi-line last item would leave no line of its own to append after.
++        if (!(last instanceof ScalarNode) || last.getStartMark().getLine() != last.getEndMark().getLine()
++                || dash >= source.length() || source.charAt(dash) != '-') return;
++        String line = spaces(list.getStartMark().getColumn()) + "- " + item + "\n";
++        int newline = source.indexOf('\n', offset(source, last.getEndMark()));
++        if (newline < 0) edits.merge(source.length(), "\n" + line, String::concat);
++        else edits.merge(newline + 1, line, String::concat);
++    }
++
+     private static void migrateList(String source, Node sequence, String fingerprint,
+             Map<Integer,String> edits, Set<Node> visited) throws IOException {
+         if (!(sequence instanceof SequenceNode)) return;
+         for (Node node : ((SequenceNode)sequence).getValue()) {
+             if (!(node instanceof MappingNode) || !visited.add(node)) continue;
+             String type = scalar(inherited(node, "type")).toLowerCase(Locale.ROOT);
+-            if (!Arrays.asList("vmess", "vless", "trojan", "anytls").contains(type)
++            if (!TLS_TYPES.contains(type)
+                     || inherited(node, "client-fingerprint") != null) continue;
+             MappingNode mapping = (MappingNode)node;
+             String entry = "client-fingerprint: '" + fingerprint + "'";
+@@ -121,7 +226,7 @@ final class RuntimeCompatibility14 {
+             }
+             Node providers = field(root,"proxy-providers");
+             if (field(root,"global-client-fingerprint") != null && providers instanceof MappingNode)
+-                result.append("注意：远程提供商须自行提供节点级 TLS 指纹，不用全局 override 覆盖明确值。\n");
++                result.append("注意：订阅（远程提供商）里没有自己 client-fingerprint 的 vmess/vless/trojan/anytls 节点，由启动副本的 override-expr 补上这个全局指纹；节点已有的值不变。\n");
+             if ("true".equalsIgnoreCase(scalar(field(root,"disable-keep-alive"))))
+                 result.append("注意：源配置明确禁用了 TCP 保活，河图未擅自改写；长连接问题需结合计时器排查。\n");
+             return result.toString();
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java
 index 0a876fb..86a8182 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java
@@ -96598,6 +96746,128 @@ index 0000000..b922ac5
 +            // Structural gate tests above are the hard performance contract; these
 +            // actual times are reported without a flaky host-speed percentage gate.
 +        }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint667Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint667Test.java
+new file mode 100644
+index 0000000..4b31c51
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProviderFingerprint667Test.java
+@@ -0,0 +1,116 @@
++package io.github.xgl34222220.hetu;
++
++import org.junit.Test;
++import static org.junit.Assert.*;
++import java.io.*;
++import java.util.*;
++import org.yaml.snakeyaml.Yaml;
++
++/**
++ * 6.6.7: Mihomo 1.19.31 removed global-client-fingerprint, so subscription (remote provider) nodes without their
++ * own client-fingerprint connected with Go's default ClientHello. The startup copy now gives each http/file
++ * provider an override-expr item that fills in the global value; explicit node values stay. The item itself was
++ * checked against the bundled Mihomo (nodes without a value send Chrome's ClientHello, safari stays safari).
++ */
++public class ProviderFingerprint667Test {
++    private static final String ITEM = "(select(((.client-fingerprint // \"\") == \"\") and (.type == \"vmess\" or .type == \"vless\""
++            + " or .type == \"trojan\" or .type == \"anytls\")) | .client-fingerprint) = \"chrome\"";
++    private static final String GLOBAL = "global-client-fingerprint: chrome\n";
++    private static final String TAIL = "proxy-groups:\n  - {name: G, type: select, use: [sub]}\nrules:\n  - MATCH,G\n";
++
++    private static String generate(String source) throws IOException {
++        ProxyRuntimeProfile profile = new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TPROXY,
++                ProxyRuntimeProfile.Ipv6.DISABLE, ProxyRuntimeProfile.AppScope.BLACKLIST, ProxyRuntimeProfile.DnsHijack.TPROXY,
++                true, true, true, false, false, true);
++        return MihomoStartupConfig.generate(source, profile, "synthetic-controller", 29147).yaml;
++    }
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> providers(String yaml) {
++        return (Map<String, Object>) ((Map<String, Object>) new Yaml().load(yaml)).get("proxy-providers");
++    }
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> override(String yaml, String provider) {
++        return (Map<String, Object>) ((Map<String, Object>) providers(yaml).get(provider)).get("override");
++    }
++    @SuppressWarnings("unchecked")
++    private static List<String> items(String yaml, String provider) {
++        Map<String, Object> override = override(yaml, provider);
++        return override == null ? Collections.emptyList() : (List<String>) override.get("override-expr");
++    }
++    private static String migrate(String source) throws IOException {
++        return RuntimeCompatibility14.migrateProviderFingerprint(source);
++    }
++
++    @Test public void itemIsTheOneCheckedAgainstTheBundledCore() {
++        assertEquals("'" + ITEM + "'", RuntimeCompatibility14.providerFingerprintExpr("chrome"));
++    }
++
++    @Test public void startupCopyGivesBlockFlowAndMergedRemoteProvidersTheItem() throws Exception {
++        String source = GLOBAL + "provider: &provider {type: http, interval: 3600}\nproxy-providers:\n"
++                + "  sub:\n    type: http\n    url: 'https://example.test/a'\n    path: ./a.yaml\n"
++                + "  flow: {type: http, url: 'https://example.test/b', path: ./b.yaml, }\n"
++                + "  merged: {<<: *provider, url: 'https://example.test/c', path: ./c.yaml}\n"
++                + "  local:\n    type: file\n    path: ./d.yaml\n" + TAIL;
++        String output = generate(source);
++        for (String name : Arrays.asList("sub", "flow", "merged", "local")) assertEquals(name, Collections.singletonList(ITEM), items(output, name));
++        @SuppressWarnings("unchecked") Map<String, Object> merged = (Map<String, Object>) providers(output).get("merged");
++        assertEquals("http", merged.get("type"));
++        assertEquals(3600, merged.get("interval"));
++        assertEquals("https://example.test/c", merged.get("url"));
++        assertFalse(output.contains("global-client-fingerprint"));
++    }
++
++    @Test public void existingOverridesAndExpressionsAreExtendedNotReplaced() throws Exception {
++        String block = GLOBAL + "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n    path: ./a.yaml\n"
++                + "    override:\n      additional-prefix: \"[A] \"\n      override-expr:\n        - '.udp = true'   # keep\n"
++                + "    health-check: {enable: false}\n" + TAIL;
++        String output = migrate(block);
++        assertEquals(Arrays.asList(".udp = true", ITEM), items(output, "sub"));
++        assertEquals("[A] ", override(output, "sub").get("additional-prefix"));
++        assertTrue(output.contains("'.udp = true'   # keep\n"));
++        String flow = GLOBAL + "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n"
++                + "    override: {udp: true}\n" + TAIL;
++        assertEquals(Collections.singletonList(ITEM), items(migrate(flow), "sub"));
++        assertEquals(true, override(migrate(flow), "sub").get("udp"));
++        String list = GLOBAL + "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n"
++                + "    override: {override-expr: ['.udp = true']}\n" + TAIL;
++        assertEquals(Arrays.asList(".udp = true", ITEM), items(migrate(list), "sub"));
++    }
++
++    @Test public void providerThatChoosesItsOwnFingerprintIsLeftAsWritten() throws Exception {
++        String own = GLOBAL + "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n"
++                + "    override: {client-fingerprint: safari}\n" + TAIL;
++        assertEquals(own, migrate(own));
++        String expr = GLOBAL + "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n"
++                + "    override:\n      override-expr: ['.client-fingerprint = \"firefox\"']\n" + TAIL;
++        assertEquals(expr, migrate(expr));
++        String empty = GLOBAL + "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n    override:\n" + TAIL;
++        assertEquals(empty, migrate(empty));
++    }
++
++    @Test public void inlineProvidersAndConfigsWithoutTheGlobalOptionKeepTheirProviders() throws Exception {
++        String inline = GLOBAL + "proxy-providers:\n  sub:\n    type: inline\n    payload:\n"
++                + "      - {name: A, type: trojan, server: a.test, port: 443, password: x}\n" + TAIL;
++        assertEquals(inline, migrate(inline));
++        String noGlobal = "proxy-providers:\n  sub:\n    type: http\n    url: 'https://example.test/a'\n" + TAIL;
++        assertEquals(noGlobal, migrate(noGlobal));
++        assertEquals(Collections.emptyList(), items(generate(noGlobal), "sub"));
++    }
++
++    @Test public void sharedAnchorsCarryTheItemOnceAndUnicodeOrCrlfSourcesStayValid() throws Exception {
++        String shared = GLOBAL + "base: &base\n  type: http\n  interval: 3600\n  override:\n    additional-prefix: \"[A] \"\n"
++                + "proxy-providers:\n  a:\n    <<: *base\n    url: 'https://example.test/a'\n  b:\n    <<: *base\n    url: 'https://example.test/b'\n"
++                + "  c: *base\n" + TAIL;
++        String output = migrate(shared);
++        for (String name : Arrays.asList("a", "b", "c")) assertEquals(name, Collections.singletonList(ITEM), items(output, name));
++        String unicode = (GLOBAL + "proxy-providers:\n  '🇸🇬 机场':\n    # 订阅 🚀\n    type: http\n    url: 'https://example.test/a'\n" + TAIL)
++                .replace("\n", "\r\n");
++        assertEquals(Collections.singletonList(ITEM), items(migrate(unicode), "🇸🇬 机场"));
++    }
++
++    @Test public void invalidGlobalValueFailsWithoutEchoingIt() {
++        String raw = "global-client-fingerprint: 'chrome; secret'\nproxy-providers:\n  sub: {type: http, url: 'https://example.test/a'}\n";
++        try { migrate(raw); fail("invalid fingerprint accepted"); }
++        catch (IOException expected) { assertFalse(String.valueOf(expected.getMessage()).contains("secret")); }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyCoreConfigGoldenTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyCoreConfigGoldenTest.kt

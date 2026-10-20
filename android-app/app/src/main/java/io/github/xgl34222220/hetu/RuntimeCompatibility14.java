@@ -4,6 +4,7 @@ import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.error.Mark;
 import org.yaml.snakeyaml.nodes.*;
 
 /** Narrow migrations in the private startup copy; source YAML is never saved or reserialized. */
@@ -45,13 +46,117 @@ final class RuntimeCompatibility14 {
         for (Map.Entry<Integer,String> edit : edits.entrySet()) result.insert(edit.getKey(), edit.getValue());
         return result.toString();
     }
+    /** Proxy types the removed global-client-fingerprint applied to. */
+    private static final List<String> TLS_TYPES = Arrays.asList("vmess", "vless", "trojan", "anytls");
+
+    /**
+     * 6.6.7: migrateFingerprint can only write the removed global value onto nodes in this file. Each remote
+     * (http/file) provider gets an override-expr item instead, which the core applies to every node it loads, on
+     * every refresh: TLS_TYPES nodes whose client-fingerprint is missing or empty get the global value, as the
+     * removed option did, and explicit values stay. A provider whose override names client-fingerprint itself, or
+     * that cannot be extended in place, is left as written.
+     */
+    static String migrateProviderFingerprint(String source) throws IOException {
+        if (!source.contains("global-client-fingerprint")) return source;
+        Node root = tree(source);
+        String fingerprint = scalar(field(root, "global-client-fingerprint")).trim();
+        if (fingerprint.isEmpty()) return source;
+        if (!fingerprint.matches("[A-Za-z0-9_-]{1,32}"))
+            throw new IOException("旧全局 TLS 指纹格式无效，请在具体节点设置 client-fingerprint");
+        Node providers = field(root, "proxy-providers");
+        if (!(providers instanceof MappingNode)) return source;
+        String item = providerFingerprintExpr(fingerprint);
+        TreeMap<Integer,String> edits = new TreeMap<>(Collections.reverseOrder());
+        Set<Node> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (NodeTuple provider : ((MappingNode)providers).getValue())
+            migrateProvider(source, provider.getValueNode(), item, edits, visited);
+        StringBuilder result = new StringBuilder(source);
+        for (Map.Entry<Integer,String> edit : edits.entrySet()) result.insert(edit.getKey(), edit.getValue());
+        return result.toString();
+    }
+    /** The override-expr item, YAML single-quoted, that gives TLS_TYPES nodes without one [fingerprint]. */
+    static String providerFingerprintExpr(String fingerprint) {
+        StringBuilder types = new StringBuilder();
+        for (String type : TLS_TYPES) types.append(types.length() == 0 ? "" : " or ").append(".type == \"").append(type).append('"');
+        return "'(select(((.client-fingerprint // \"\") == \"\") and (" + types + ")) | .client-fingerprint) = \""
+                + fingerprint + "\"'";
+    }
+    private static void migrateProvider(String source, Node provider, String item,
+            Map<Integer,String> edits, Set<Node> visited) {
+        if (!(provider instanceof MappingNode)) return;
+        String type = scalar(inherited(provider, "type")).toLowerCase(Locale.ROOT);
+        if (!type.equals("http") && !type.equals("file")) return;
+        Node override = inherited(provider, "override");
+        if (override == null) {
+            addEntry(source, (MappingNode)provider, "override: {override-expr: [" + item + "]}", edits, visited);
+            return;
+        }
+        if (!(override instanceof MappingNode) || inherited(override, "client-fingerprint") != null) return;
+        Node list = inherited(override, "override-expr");
+        if (list == null) addEntry(source, (MappingNode)override, "override-expr: [" + item + "]", edits, visited);
+        else if (list instanceof SequenceNode && !mentions((SequenceNode)list, "client-fingerprint"))
+            addItem(source, (SequenceNode)list, item, edits, visited);
+    }
+    private static boolean mentions(SequenceNode list, String text) {
+        for (Node item : list.getValue()) if (scalar(item).contains(text)) return true;
+        return false;
+    }
+    private static int offset(String source, Mark mark) { return source.offsetByCodePoints(0, mark.getIndex()); }
+    private static String spaces(int count) { return String.join("", Collections.nCopies(count, " ")); }
+    /** ", " before a new entry at [close] (a flow collection's closing bracket), " " after a trailing comma, "" when empty. */
+    private static String separator(String source, Node last, int close) {
+        if (last == null) return "";
+        int lastEnd = offset(source, last.getEndMark());
+        // Only the suffix after the final value is inspected (see migrateList).
+        String tail = lastEnd <= close ? source.substring(lastEnd, close).replaceAll("(?m)#.*$", "").trim() : "";
+        return tail.equals(",") ? " " : ", ";
+    }
+    /** [entry] into a flow mapping before its closing brace, or into a block mapping as a line before its first key. */
+    private static void addEntry(String source, MappingNode mapping, String entry,
+            Map<Integer,String> edits, Set<Node> visited) {
+        if (!visited.add(mapping)) return;
+        List<NodeTuple> tuples = mapping.getValue();
+        if (mapping.getFlowStyle() == DumperOptions.FlowStyle.FLOW) {
+            int close = offset(source, mapping.getEndMark()) - 1;
+            if (close < 0 || source.charAt(close) != '}') return;
+            Node last = tuples.isEmpty() ? null : tuples.get(tuples.size() - 1).getValueNode();
+            edits.merge(close, separator(source, last, close) + entry, String::concat);
+        } else if (!tuples.isEmpty()) {
+            Mark key = tuples.get(0).getKeyNode().getStartMark();
+            edits.merge(offset(source, key), entry + "\n" + spaces(key.getColumn()), String::concat);
+        }
+    }
+    /** [item] at the end of a flow sequence, or as a "- " line after the last one-line item of a block sequence. */
+    private static void addItem(String source, SequenceNode list, String item,
+            Map<Integer,String> edits, Set<Node> visited) {
+        if (!visited.add(list)) return;
+        List<Node> items = list.getValue();
+        if (list.getFlowStyle() == DumperOptions.FlowStyle.FLOW) {
+            int close = offset(source, list.getEndMark()) - 1;
+            if (close < 0 || source.charAt(close) != ']') return;
+            edits.merge(close, separator(source, items.isEmpty() ? null : items.get(items.size() - 1), close) + item,
+                    String::concat);
+            return;
+        }
+        if (items.isEmpty()) return;
+        Node last = items.get(items.size() - 1);
+        int dash = offset(source, list.getStartMark());
+        // A multi-line last item would leave no line of its own to append after.
+        if (!(last instanceof ScalarNode) || last.getStartMark().getLine() != last.getEndMark().getLine()
+                || dash >= source.length() || source.charAt(dash) != '-') return;
+        String line = spaces(list.getStartMark().getColumn()) + "- " + item + "\n";
+        int newline = source.indexOf('\n', offset(source, last.getEndMark()));
+        if (newline < 0) edits.merge(source.length(), "\n" + line, String::concat);
+        else edits.merge(newline + 1, line, String::concat);
+    }
+
     private static void migrateList(String source, Node sequence, String fingerprint,
             Map<Integer,String> edits, Set<Node> visited) throws IOException {
         if (!(sequence instanceof SequenceNode)) return;
         for (Node node : ((SequenceNode)sequence).getValue()) {
             if (!(node instanceof MappingNode) || !visited.add(node)) continue;
             String type = scalar(inherited(node, "type")).toLowerCase(Locale.ROOT);
-            if (!Arrays.asList("vmess", "vless", "trojan", "anytls").contains(type)
+            if (!TLS_TYPES.contains(type)
                     || inherited(node, "client-fingerprint") != null) continue;
             MappingNode mapping = (MappingNode)node;
             String entry = "client-fingerprint: '" + fingerprint + "'";
@@ -121,7 +226,7 @@ final class RuntimeCompatibility14 {
             }
             Node providers = field(root,"proxy-providers");
             if (field(root,"global-client-fingerprint") != null && providers instanceof MappingNode)
-                result.append("注意：远程提供商须自行提供节点级 TLS 指纹，不用全局 override 覆盖明确值。\n");
+                result.append("注意：订阅（远程提供商）里没有自己 client-fingerprint 的 vmess/vless/trojan/anytls 节点，由启动副本的 override-expr 补上这个全局指纹；节点已有的值不变。\n");
             if ("true".equalsIgnoreCase(scalar(field(root,"disable-keep-alive"))))
                 result.append("注意：源配置明确禁用了 TCP 保活，河图未擅自改写；长连接问题需结合计时器排查。\n");
             return result.toString();
