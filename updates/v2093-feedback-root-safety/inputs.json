@@ -3,8 +3,8 @@
   "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
   "baseAndroidAppTree": "0d997c00e433ed07a3db2dec12120e11ea042d94",
   "originalTestHead": "9769663edcda3a1c33f2eb2594a6b4fd9b4e2a6f",
-  "versionCode": 2104,
-  "versionName": "6.0.0",
+  "versionCode": 2105,
+  "versionName": "6.6.6",
   "previousInputsSha256": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
   "previousPatchSha256": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e",
   "historicalFilesSha256": {
@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "4c3cc301fcc98e71441ba2a27d2d10bbf01aaa854bfa94d844621e303fd66104",
+  "patchSha256": "7619063ccc0e5183c78c27b7d3cefe1504968b22875695d2dc71f81f6fb12477",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -474,13 +474,13 @@
     "android-app/app/src/test/resources/multicore/xray-native.json"
   ],
   "changedOrAddedFiles": {
-    "android-app/app/build.gradle.kts": "1f69987d08f3136a1b36b1b3b0d7e529a619fc09255b877a5d3dfc5812d6f5c2",
+    "android-app/app/build.gradle.kts": "daee841f29ce149d7a94a8ff99988871a2a879969cff9703c92a99a3c8e15ba5",
     "android-app/app/proguard-rules.pro": "9b458c761f6b8f9b2d2b60fa2ec1bdd691fe53ec1899f77cdc84aba962b16f75",
     "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
     "android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf": "dc671038dc008f468ff69a68c83fffc925207c8565f319ca9ce23891d166fa08",
     "android-app/app/src/main/assets/hetu-bpf/hetu_match.o": "096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de",
     "android-app/app/src/main/assets/hetu-bpf/x86_64/hetu-bpf": "ed3f241d2d8ad9b4867325083090d6b580c15d36b3873e44a61a389e887ae779",
-    "android-app/app/src/main/assets/hetu-root.sh": "0c83780f457ceae6b22f537a9cb0b3b00bf4bea2a5075cde5ba7c45eade5b2ff",
+    "android-app/app/src/main/assets/hetu-root.sh": "67916c1d7ec4d6f56c4555bab5513eafb4a5d2164194898eae60bd053e425909",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "a7357e8b7dc27bfde749eedfdfa13aa8547c0287a3b1f1dd3830e6c0a4683c22",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "0212634c3ca8d17c3b00a1a74457b1a088c6001473c2ad6e06d22c3b256540db",
@@ -1044,12 +1044,12 @@
     "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
   },
   "runtimePayloadCount": 23,
-  "rootScriptSha256": "0c83780f457ceae6b22f537a9cb0b3b00bf4bea2a5075cde5ba7c45eade5b2ff",
+  "rootScriptSha256": "67916c1d7ec4d6f56c4555bab5513eafb4a5d2164194898eae60bd053e425909",
   "autostartScriptSha256": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
   "authorizedRootPayloadDeltas": {
     "android-app/app/src/main/assets/hetu-root.sh": {
       "before": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
-      "after": "0c83780f457ceae6b22f537a9cb0b3b00bf4bea2a5075cde5ba7c45eade5b2ff"
+      "after": "67916c1d7ec4d6f56c4555bab5513eafb4a5d2164194898eae60bd053e425909"
     },
     "android-app/app/src/main/assets/hetu-autostart.sh": {
       "before": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
@@ -1105,23 +1105,23 @@
   },
   "evidenceSourcesSha256": {
     ".github/scripts/continuity93_ci_config.py": "683509722dda5b159f26c2eb8859d40e7326f8cd5268bcee0546f15933d74044",
-    ".github/scripts/continuity93_source_scope.py": "2ea04f07d98a9eacef38ab4e62e8fb1a9c48a6e8ba6daa4cbf9d561fd52f19a6",
+    ".github/scripts/continuity93_source_scope.py": "6f8eb581a4f6f2cfc17a448589b649872663120438de6a87aecd2ff5e051bc1d",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/profile_release_continuity93.py": "96b94e3fd145432812a08ef08699ab7a3a851dc564ff34800d3d083e4eca0e17",
     ".github/scripts/retrace_profile_continuity93.py": "340b01f15e6169ccda2114d66b03190723e977bb15c67a78807e3f6219725f25",
     ".github/scripts/run_continuity93_baseline_hosts.py": "ce03bed2220d77cbacb453051b3a735a972bd5d28607fc31dfbb549e73d9b8cc",
     ".github/scripts/run_continuity93_network_soak.py": "69cc5fd6df391835e98c7249ce8b2676835f9efec5ed37518ded924a1d8ee1cf",
-    ".github/scripts/smoke_release_continuity93.py": "7e9d5be5a33eee450bd7c54ef9590128228f09846b28b5622c61884795e229c3",
+    ".github/scripts/smoke_release_continuity93.py": "2670b37fe43722cb26ba6ccb2873acf780d3d72d4d6363a6f7ed5fe6fdc8d72c",
     ".github/scripts/test_continuity93_ebpf_gate.py": "bd0a794726b9ef2647e60e485600993250ee9dbd1034caf58d71bdae1c16164c",
-    ".github/scripts/test_continuity93_evidence.py": "5eb2fd553297c21e6e3b3a9422389b66dda5e3427290708dc03d1203ba5aa01b",
+    ".github/scripts/test_continuity93_evidence.py": "e059bbb742a0a4c5cd32f55f77083038992e60169563c15a589365140ec3c754",
     ".github/scripts/test_continuity93_network_soak.py": "e0cbcb6d7b898627849f6c41c6e0e1903be537e1189c604372c11fffd6dba5d8",
     ".github/scripts/transport_continuity93_failures.py": "5afddef49021db6ed7bc8e8f27a57a078b749e7d9f5dfd13185a3599835fa9a9",
     ".github/scripts/transport_ui93_pngs.py": "da87843f04dfc90c245fdde3a0a69f988daff47ccf5e2ab33ffde2a2f8849a39",
     ".github/scripts/verify_continuity93_test_results.py": "da3afaba2d8f420f2292697375f8fbeb2b7308f24c53b947723341351437024c",
-    ".github/scripts/verify_release_continuity93.py": "7af13824e0c412ce58553c7757e9ead7c7cefa326a43c6b22bd951456e5feaa2",
+    ".github/scripts/verify_release_continuity93.py": "4a07eb43cbfab0d4903a4f5d8da54f4c1c01e787b421e33332c1e1f195740703",
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
-    ".github/workflows/v2093-build.yml": "49c21c12041d33bf5cbde4d49e062b5b6365263c0d7f2cfc441bf3c98d9479d2",
+    ".github/workflows/v2093-build.yml": "86bf2343363287e55ad166b9afc0c9d6603f0c69f622e712fa5ec802d7849d49",
     "tools/qa/netfilter_model93.py": "29803e1f48411f7c2ea26f5c133a2ab223e7788e5c5eb2c4be49599b92bb6684",
     "tools/qa/test_adblock93.py": "3b44d2d6d62bb5035827180ccc7dc8af5a212e5b841dcdee39305dc2347270b5",
     "tools/qa/test_app_recovery93.py": "bd196f195d409736bbd05c0a466a75e239991a0db1681dceea1bec3dbcbaa2db",
@@ -1136,7 +1136,7 @@
     "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
     "tools/qa/test_fast_start93.py": "8a3014b5841151e49ddc8f03bd31d06e5b2c449b19c44ac0ff599c61195af796",
     "tools/qa/test_i18n93.py": "59725902a88214812c7d22481f815879f55568d1401ea49b5bd421bfcfcf7d52",
-    "tools/qa/test_netloss93.py": "acfa4ca9163ddc93332850590b2e2c98de8a563c05d681484d9bdbe3b5d9abeb",
+    "tools/qa/test_netloss93.py": "54ee78260043e7ff05710deee4a8ce856cd93d6a16abf8aa0c4c9abe7fb386ce",
     "tools/qa/test_netmatch93.py": "c27218a7c93976697ec6089ef1dc7734d120a50134fa6d4ef67e5521a610d585",
     "tools/qa/test_netshare93.py": "1d353bd0ee8f2230e07350573efd5600a880bffd7729ed45c43e20e90380ccb9",
     "tools/qa/test_network_recovery_stress.py": "0a2abc21457cc4936bdbbc5cec53ea71d12c8a2aaa356661890b94a51f2ff179",

@@ -76,14 +76,20 @@ SELFHEAL_VARS = ('CG_ESCAPE_GATE', 'CG_ESCAPE_V1', 'CG_ESCAPED', 'SETSID', 'SETS
                  'WD_EGRESS_LIMIT', 'WD_EGRESS_BACKOFF', 'WD_EGRESS_BACKOFF_MAX', 'WD_RESTART_MAX',
                  'WD_RESTART_WINDOW', 'WD_LOG_MAX', 'WD_PROXY_URL', 'WD_DIRECT_URLS', 'WD_HEAL_REASON',
                  'CORE_GROUP_ID', 'WIFI_HEAL_URLS', 'WIFI_HEAL_DNS', 'WIFI_HEAL_OFF', 'WIFI_HEAL_GAP', 'WIFI_HEAL_HOUR_MAX',
-                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT', 'WD_CLOSE_MAX', 'WD_BUSY_GAP')
+                 'WIFI_HEAL_SETTLE', 'WIFI_HEAL_WAIT', 'WIFI_HEAL_OFFLINE_LIMIT', 'WD_CLOSE_MAX', 'WD_BUSY_GAP',
+                 # 6.6.6 stalled-node watchdog
+                 'WD_STALL_EVERY', 'WD_STALL_AGE', 'WD_STALL_LIVE_AGE', 'WD_STALL_MIN', 'WD_STALL_HOSTS', 'WD_STALL_PIN_TTL',
+                 'WD_STALL_PIN_MAX', 'WD_STALL_ACT_GAP', 'WD_STALL_NOTIFY_GAP', 'WD_STALL_RECENT', 'WD_STALL_GROUP_MAX',
+                 'WD_STALL_TLS_URL', 'WD_STALL_REPEAT', 'WD_STALL_REPEAT_WINDOW')
 HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape', 'wd_log', 'wd_log_body', 'wd_now',
            'wd_notify', 'wd_http', 'wd_dns_probe', 'wd_core_frozen', 'wd_selfheal_init', 'wd_net_sig', 'wd_net_watch',
            'wd_liveness', 'wd_restart_allowed', 'wd_restart_core', 'wd_heal_notice', 'wd_recover', 'wd_egress_target',
            'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick', 'fake_range', 'wd_session_fake_range',
            'wd_root_fake_captured', 'wd_offline_seen', 'wifi_heal_async', 'wd_uptime', 'wd_budget_start',
            'wd_budget_left', 'wd_groups', 'wd_conn_match', 'wd_close_through', 'wd_conn_busy', 'wd_heal_chain', 'wd_node_heal',
-           'wd_proxy_heal', 'wd_dataplane_heal', 'wd_cache_lost', 'wd_fakeip_heal', 'foreign_tun_links')
+           'wd_proxy_heal', 'wd_dataplane_heal', 'wd_cache_lost', 'wd_fakeip_heal', 'foreign_tun_links',
+           'wd_stall_scan', 'wd_json_name', 'wd_stall_end', 'wd_stall_recent', 'wd_stall_pick', 'wd_stall_pin',
+           'wd_stall_unpin', 'wd_stall_heal', 'wd_stall_tick', 'wd_stall_close_stuck')
 
 
 class Controller:
