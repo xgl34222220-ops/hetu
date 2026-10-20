@@ -36617,7 +36617,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..7e03419 100755
+index ae832da..4e9e543 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36894,7 +36894,7 @@ index ae832da..7e03419 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +315,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,20 +315,191 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -36934,8 +36934,9 @@ index ae832da..7e03419 100755
 +  # A wait interrupted by a (now ignored) signal is retried until the child really exits.
 +  while kill -0 "$SH_CHILD" 2>/dev/null; do wait "$SH_CHILD"; SH_RC=$?; done
 +  return "$SH_RC"
-+}
-+
+ }
+-trap 'release_lock' EXIT
+
 +transaction_current(){
 +  [ "$START_ACTIVE" = 1 ] || return 0
 +  if [ "$START_ROLLBACK" = 1 ]; then
@@ -37013,16 +37014,18 @@ index ae832da..7e03419 100755
 +    printf '%s\n' 'rollback-incomplete' > "$RUN/rollback-state"
 +  fi
 +  START_ACTIVE=0
- }
--trap 'release_lock' EXIT
-
++}
++
++# [$1] attempts of 0.05 s (default 100 = 5 s).
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +437,53 @@ acquire_lock(){
-   N=0
+   mkdir -p "$RUN" || return 1
+-  N=0
++  N=0; AL_MAX="${1:-100}"
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
 -    case "$OWNER" in ''|*[!0-9]*) ;; *) if ! kill -0 "$OWNER" >/dev/null 2>&1; then rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true; continue; fi;; esac
+-    N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
 +    case "$OWNER" in ''|*[!0-9]*) ;; *)
 +      if ! kill -0 "$OWNER" >/dev/null 2>&1 && mkdir "$RUN/.txn.reap" 2>/dev/null; then
 +        OWNER_NOW=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -37030,10 +37033,25 @@ index ae832da..7e03419 100755
 +        rmdir "$RUN/.txn.reap" 2>/dev/null || true
 +        continue
 +      fi;; esac
-     N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
++    # 7.0.0: while waiting, say so (txn_waiter): the watchdog's Google rule pass gives the lock up for it.
++    [ "$N" != 0 ] || : > "$RUN/.txn.want.$SELF_PID" 2>/dev/null || true
++    N=$((N+1)); [ "$N" -lt "$AL_MAX" ] || { rm -f "$RUN/.txn.want.$SELF_PID"; return 1; }; sleep 0.05
++  done
++  rm -f "$RUN/.txn.want.$SELF_PID"
++  printf '%s\n' "$SELF_PID" > "$LOCK_DIR/pid"; LOCK_HELD=1
++}
++# 0 while another live process waits in acquire_lock; markers of gone waiters are removed.
++txn_waiter(){
++  for TW_F in "$RUN"/.txn.want.*; do
++    [ -e "$TW_F" ] || continue
++    TW_P=${TW_F##*.}
++    case "$TW_P" in ''|*[!0-9]*) continue;; esac
++    [ "$TW_P" != "$SELF_PID" ] || continue
++    if kill -0 "$TW_P" 2>/dev/null; then return 0; fi
++    rm -f "$TW_F"
    done
 -  printf '%s\n' "$$" > "$LOCK_DIR/pid"; LOCK_HELD=1
-+  printf '%s\n' "$SELF_PID" > "$LOCK_DIR/pid"; LOCK_HELD=1
++  return 1
 +}
 +# One attempt only (status polling must never wait): reap a lock whose owner is gone.
 +try_lock_once(){
@@ -37074,7 +37092,7 @@ index ae832da..7e03419 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +569,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +585,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -37098,7 +37116,7 @@ index ae832da..7e03419 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +618,9 @@ cleanup4(){
+@@ -233,7 +634,9 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -37109,7 +37127,7 @@ index ae832da..7e03419 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +635,453 @@ cleanup6(){
+@@ -248,13 +651,454 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -37272,7 +37290,8 @@ index ae832da..7e03419 100755
 +  # Revoke before waiting for the lock, including a start whose watchdog has not
 +  # yet appeared. A stopped receipt is not a successful-cleanup receipt.
 +  cancel_boot || return 1
-+  acquire_lock || return 1
++  # 7.0.0: 15 s, a background holder yields (txn_waiter); an older script's watchdog pass may not.
++  acquire_lock 300 || return 1
 +  printf 'stopped-%s\n' "$$" > "$RUN/generation" || return 1
 +  ST_FAKE4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)
 +  ST_FAKE6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -37565,7 +37584,7 @@ index ae832da..7e03419 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +1113,21 @@ findcorepid(){
+@@ -286,8 +1130,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -37588,7 +37607,7 @@ index ae832da..7e03419 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +1136,8 @@ stopcore(){
+@@ -296,6 +1153,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -37597,7 +37616,7 @@ index ae832da..7e03419 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,8 +1162,65 @@ stopcore(){
+@@ -320,8 +1179,65 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -37663,7 +37682,7 @@ index ae832da..7e03419 100755
 
  # procfs reports a zero stat size even when this file contains IPv6 addresses.
  # Install the selected IPv6 policy whenever the kernel supports IPv6, including
-@@ -362,6 +1261,138 @@ v6disabled(){
+@@ -362,6 +1278,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -37802,7 +37821,7 @@ index ae832da..7e03419 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1487,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1504,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -37900,7 +37919,7 @@ index ae832da..7e03419 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1595,8 @@ core_return(){
+@@ -473,8 +1612,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -37911,7 +37930,7 @@ index ae832da..7e03419 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1620,14 @@ append_scoped(){
+@@ -498,12 +1637,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -37928,7 +37947,7 @@ index ae832da..7e03419 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1635,21 @@ scoped_redirect(){
+@@ -511,17 +1652,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -37953,7 +37972,7 @@ index ae832da..7e03419 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,15 +1661,532 @@ bypass4(){
+@@ -533,15 +1678,532 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -38486,7 +38505,7 @@ index ae832da..7e03419 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -710,8 +2355,12 @@ local_destination_return(){
+@@ -710,8 +2372,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -38500,7 +38519,7 @@ index ae832da..7e03419 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +2380,23 @@ install_mangle4(){
+@@ -731,22 +2397,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -38533,7 +38552,7 @@ index ae832da..7e03419 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +2411,45 @@ install_mangle6(){
+@@ -761,40 +2428,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -38593,7 +38612,7 @@ index ae832da..7e03419 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +2477,12 @@ remove_dot_guard(){
+@@ -822,12 +2494,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -38608,7 +38627,7 @@ index ae832da..7e03419 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +2496,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2513,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -38630,7 +38649,7 @@ index ae832da..7e03419 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +2521,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2538,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -38674,7 +38693,7 @@ index ae832da..7e03419 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,22 +2580,134 @@ v6_disable_guard_ready(){
+@@ -921,18 +2597,130 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -38747,10 +38766,6 @@ index ae832da..7e03419 100755
 -validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
 -hexport(){ printf '%04X' "$1" 2>/dev/null; }
 -# One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
--LISTEN_SNAPSHOT_VALID=0
--LISTEN_PORTS=''
--listen_snapshot(){
--  LISTEN_SNAPSHOT_VALID=0; LISTEN_PORTS=''
 +core_kind(){
 +  CK="$CORE_KIND_OVERRIDE"; [ -n "$CK" ] || CK=$(head -n 1 "$CORE_KIND_FILE" 2>/dev/null || true)
 +  case "$CK" in sing-box|xray|v2ray|hysteria) printf '%s' "$CK";; *) printf mihomo;; esac
@@ -38813,14 +38828,10 @@ index ae832da..7e03419 100755
 +}
 +hexport(){ printf '%04X' "$1" 2>/dev/null; }
 +# One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
-+LISTEN_SNAPSHOT_VALID=0
-+LISTEN_PORTS=''
-+listen_snapshot(){
-+  LISTEN_SNAPSHOT_VALID=0; LISTEN_PORTS=''
-   if has ss; then
-     LS_RAW=$(ss -lnut 2>/dev/null); LS_RC=$?
-     if [ "$LS_RC" = 0 ]; then
-@@ -961,10 +2732,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+ LISTEN_SNAPSHOT_VALID=0
+ LISTEN_PORTS=''
+ listen_snapshot(){
+@@ -961,10 +2749,86 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -38908,7 +38919,7 @@ index ae832da..7e03419 100755
  check_start_ports(){
    listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
    M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
-@@ -1019,20 +2866,1201 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2883,1201 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -40118,7 +40129,7 @@ index ae832da..7e03419 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +4073,45 @@ probe_core_owner(){
+@@ -1045,9 +4090,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -40165,7 +40176,7 @@ index ae832da..7e03419 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +4122,29 @@ core_identity_prepare(){
+@@ -1058,14 +4139,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -40199,7 +40210,7 @@ index ae832da..7e03419 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +4158,9 @@ core_launch(){
+@@ -1079,8 +4175,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -40211,7 +40222,7 @@ index ae832da..7e03419 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,26 +4227,82 @@ core_tune(){
+@@ -1147,27 +4244,88 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -40278,6 +40289,10 @@ index ae832da..7e03419 100755
 +}
  google_firewall_cleanup(){
    # Caller owns the existing Root transaction lock. Never flush a system chain.
++  # 7.0.0: "background" (the watchdog's minute pass, google_firewall_maintain): the caller released the
++  # lock. The scan (pm, iptables -S, one awk per rule) runs without it; only the deletions take it again
++  # and stop as soon as a start or stop waits for it (txn_waiter). The rest waits for the next pass.
++  GF_MODE="${1:-}"
    GF_UIDS=$(google_firewall_uids)
    GF_PRESENT=""
    if [ -z "$GF_UIDS" ]; then
@@ -40289,13 +40304,16 @@ index ae832da..7e03419 100755
 +  [ "$(cat "$RUN/google-firewall-uids" 2>/dev/null)" = "$GF_UIDS" ] || printf '%s\n' "$GF_UIDS" > "$RUN/google-firewall-uids" 2>/dev/null || true
 +  google_firewall_ebpf unblock "$GF_UIDS"
    GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
+-  GF_FILE="$RUN/.google-firewall.$$"
 +  # 6.6.6: one comma list for awk -v. One True Awk (Android's awk) rejects a newline inside a -v value
 +  # ("newline in string"), which left every vendor rule in place with two or more Google UIDs.
 +  GF_UID_LIST=$(printf '%s\n' "$GF_UIDS" | grep -E '^[0-9]+$' | tr '\n' ','); GF_UID_LIST="${GF_UID_LIST%,}"
-   GF_FILE="$RUN/.google-firewall.$$"
++  GF_FILE="$RUN/.google-firewall.$$"; GF_DEL="$RUN/.google-firewall-del.$$"
++  : > "$GF_DEL"
    for GF_TOOL in xt4q xt6q; do
      for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
-@@ -1176,8 +4312,8 @@ google_firewall_cleanup(){
+       if ! $GF_TOOL -t filter -S "$GF_CHAIN" > "$GF_FILE" 2>/dev/null; then continue; fi
+@@ -1176,8 +4334,8 @@ google_firewall_cleanup(){
        while IFS= read -r GF_RULE; do
          # Quotes/comments and inverted/range UID matches are deliberately left intact.
          case "$GF_RULE" in *\"*|*\'*) continue;; esac
@@ -40306,7 +40324,54 @@ index ae832da..7e03419 100755
            $1=="-A" && $2==c {
              uid="";target="";inverted=0
              for(i=3;i<=NF;i++) {
-@@ -1208,33 +4344,128 @@ google_firewall_cleanup(){
+@@ -1188,62 +4346,187 @@ google_firewall_cleanup(){
+             if(!inverted && uid ~ /^[0-9]+$/ && allowed[uid] && (target=="REJECT" || target=="DROP")) found=1
+           }
+           END{exit !found}'; then continue; fi
+-        # Delete the exact specification; line numbers can change under netd.
+-        case $- in *f*) GF_GLOB_OFF=1;; *) GF_GLOB_OFF=0; set -f;; esac
+-        set -- $GF_RULE
+-        shift 2
+-        if $GF_TOOL -t filter -D "$GF_CHAIN" "$@" 2>/dev/null; then
+-          GF_REMOVED=$((GF_REMOVED+1))
+-          printf '%s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$GF_TOOL" "$GF_RULE" >> "$RUN/google-firewall.log"
+-        else GF_FAILED=$((GF_FAILED+1)); fi
+-        [ "$GF_GLOB_OFF" = 1 ] || set +f
++        printf '%s\t%s\t%s\n' "$GF_TOOL" "$GF_CHAIN" "$GF_RULE" >> "$GF_DEL"
+       done < "$GF_FILE"
+     done
+   done
+   rm -f "$GF_FILE"
+-  printf 'checked=%s removed=%s failed=%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" > "$RUN/google-firewall-status"
++  GF_DEFERRED=0; GF_BG_LOCK=0
++  if [ "$GF_MODE" = background ] && [ -s "$GF_DEL" ]; then
++    if [ "$LOCK_HELD" != 1 ] && acquire_lock; then GF_BG_LOCK=1; fi
++    # Same core and switch as when the pass began, else nothing is deleted.
++    if [ "$LOCK_HELD" != 1 ] || [ "${GF_PID:-}" != "$(cat "$PIDFILE" 2>/dev/null)" ] || ! pidcore "$GF_PID" ||
++      ! kill -0 "$GF_PID" 2>/dev/null || [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" != 1 ]; then
++      GF_DEFERRED=$(grep -c . "$GF_DEL"); : > "$GF_DEL"
++    fi
++  fi
++  GF_TAB=$(printf '\t')
++  while IFS="$GF_TAB" read -r GF_TOOL GF_CHAIN GF_RULE; do
++    if [ "$GF_MODE" = background ] && txn_waiter; then GF_DEFERRED=$((GF_DEFERRED+1)); continue; fi
++    # Delete the exact specification; line numbers can change under netd.
++    case $- in *f*) GF_GLOB_OFF=1;; *) GF_GLOB_OFF=0; set -f;; esac
++    set -- $GF_RULE
++    shift 2
++    if $GF_TOOL -t filter -D "$GF_CHAIN" "$@" 2>/dev/null; then
++      GF_REMOVED=$((GF_REMOVED+1))
++      printf '%s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$GF_TOOL" "$GF_RULE" >> "$RUN/google-firewall.log"
++    else GF_FAILED=$((GF_FAILED+1)); fi
++    [ "$GF_GLOB_OFF" = 1 ] || set +f
++  done < "$GF_DEL"
++  rm -f "$GF_DEL"
++  [ "$GF_BG_LOCK" != 1 ] || release_lock
++  printf 'checked=%s removed=%s failed=%s%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" \
++    "$([ "$GF_DEFERRED" = 0 ] || printf ' deferred=%s' "$GF_DEFERRED")" > "$RUN/google-firewall-status"
+   # Which vendor chains this device has at all: without any of them the switch does nothing.
+   printf 'uids=%s chains=%s at=%s\n' "$(printf '%s\n' "$GF_UIDS" | grep -c .)" "$GF_PRESENT" "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$RUN/google-firewall-detail" 2>/dev/null || true
+   if [ -f "$RUN/google-firewall.log" ]; then
      tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
    fi
  }
@@ -40334,13 +40399,17 @@ index ae832da..7e03419 100755
 +    google_firewall_ebpf unblock "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"
 +    exit 0
 +  fi
++  GF_HAD_LOCK="$LOCK_HELD"
    acquire_lock || exit 0
    [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
 -  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
 +  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = "$GF_CLEAN" ] || exit 0
    printf '%s\n' "$GF_NOW" > "$RUN/google-firewall-at"
 -  google_firewall_cleanup
-+  if [ "$GF_CLEAN" = 1 ]; then google_firewall_cleanup
++  if [ "$GF_CLEAN" = 1 ]; then
++    # 7.0.0: a start/stop must not wait behind pm and a few hundred awk runs (it gives up after 5 s).
++    [ "$GF_HAD_LOCK" = 1 ] || release_lock
++    google_firewall_cleanup background
 +  else google_firewall_ebpf check "$(cat "$RUN/google-firewall-uids" 2>/dev/null)"; fi
  ); }
 +# Switch off: one read-only look at the eBPF maps at start, with the App's app IDs (no pm call).
@@ -40433,13 +40502,15 @@ index ae832da..7e03419 100755
    # Neither protocol captured is the same as DNS takeover switched off.
    [ -n "$DNS_PROTOS" ] || START_DNS=off
    mkdir -p "$RUN" || fail "无法创建运行目录"
+-  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
 +  # Before anything is spawned: the core, watchdog and monitor inherit the root cgroup, so freezing
 +  # or killing the App (its uid_/pid_ cgroup) never freezes or kills them.
 +  cg_escape "$$"; START_CG_ESCAPED="$CG_ESCAPED"
-   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
++  # 7.0.0: 15 s, as in stop_transaction.
++  acquire_lock 300 || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +4473,16 @@ start(){
+     [ -n "$BOOT_NOW" ] && [ "$HETU_BOOT_RESTORE_ID" = "$BOOT_NOW" ] && [ -f "$BASE/boot/enabled" ] &&
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -40457,7 +40528,7 @@ index ae832da..7e03419 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +4492,98 @@ start(){
+@@ -1253,75 +4536,98 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -40594,7 +40665,7 @@ index ae832da..7e03419 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +4595,94 @@ start(){
+@@ -1333,19 +4639,94 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -40695,7 +40766,7 @@ index ae832da..7e03419 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +4695,8 @@ status(){
+@@ -1358,6 +4739,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -40704,7 +40775,7 @@ index ae832da..7e03419 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1375,6 +4714,7 @@ status(){
+@@ -1375,6 +4758,7 @@ status(){
    DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
    PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
    GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
@@ -40712,7 +40783,7 @@ index ae832da..7e03419 100755
    TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
    CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
    case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
-@@ -1407,6 +4747,12 @@ status(){
+@@ -1407,6 +4791,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -40725,7 +40796,7 @@ index ae832da..7e03419 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +4833,34 @@ status(){
+@@ -1487,13 +4877,34 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -40762,7 +40833,7 @@ index ae832da..7e03419 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +4984,8 @@ health_collect(){
+@@ -1617,6 +5028,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -40771,7 +40842,7 @@ index ae832da..7e03419 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +5035,18 @@ health_restore_table(){
+@@ -1666,16 +5079,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -40792,7 +40863,7 @@ index ae832da..7e03419 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +5095,7 @@ health_repair(){ (
+@@ -1724,7 +5139,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -40801,7 +40872,7 @@ index ae832da..7e03419 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +5128,481 @@ health_json(){ (
+@@ -1757,6 +5172,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -41283,7 +41354,7 @@ index ae832da..7e03419 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +5620,33 @@ case "${1:-status}" in
+@@ -1774,10 +5664,33 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -55086,7 +55157,7 @@ index 738ebf5..428a4cc 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..babc155 100644
+index 4f004b9..00b57df 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
@@ -55202,7 +55273,7 @@ index 4f004b9..babc155 100644
                  else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
              }
          } else {
-@@ -247,6 +309,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -247,11 +309,15 @@ internal class ProxyComposeController(context: Context) {
                  .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                  .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                  .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
@@ -55210,7 +55281,16 @@ index 4f004b9..babc155 100644
          }
          // A completed status observation supersedes the cached fast hint, including
          // a confirmed stopped core. Missing/failed observations keep only the hint.
-@@ -275,15 +338,22 @@ internal class ProxyComposeController(context: Context) {
+         val running = status.optBoolean("running", fastRunning)
+-        val healthObserved = !status.optBoolean("healthProbeFailed", false) &&
++        // 7.0.0: while another Root transaction holds the lock, health is unknown, not a failed check.
++        val transactionBusy = status.optString("networkIntegrity") == "unknown" &&
++            status.optString("networkFault") == "transaction-in-progress"
++        val healthObserved = !transactionBusy && !status.optBoolean("healthProbeFailed", false) &&
+             if (shouldProbeHealth) status.opt("dataPlaneHealthy") is Boolean
+             else prefs.getBoolean("proxyRootHealthObserved", false)
+         // All observational writes share the read's original control/session/
+@@ -275,15 +341,22 @@ internal class ProxyComposeController(context: Context) {
                      .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
                      .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
                      .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
@@ -55233,7 +55313,7 @@ index 4f004b9..babc155 100644
                      .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
                  val livePort = status.optInt("controllerPort", 0)
                  if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
-@@ -299,13 +369,39 @@ internal class ProxyComposeController(context: Context) {
+@@ -299,13 +372,39 @@ internal class ProxyComposeController(context: Context) {
          var trafficMode = ""
          var controllerReadFailed = false
          var controllerError = ""
@@ -55278,7 +55358,7 @@ index 4f004b9..babc155 100644
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
                  // selection or publish the absent counters as a fresh zero measurement.
-@@ -337,7 +433,8 @@ internal class ProxyComposeController(context: Context) {
+@@ -337,7 +436,8 @@ internal class ProxyComposeController(context: Context) {
          }
          val observed = ProxyComposeState(
              running = running,
@@ -55288,7 +55368,13 @@ index 4f004b9..babc155 100644
              mode = profile.mode.label,
              ipv6 = profile.ipv6.id,
              effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
-@@ -362,6 +459,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -357,11 +457,13 @@ internal class ProxyComposeController(context: Context) {
+                 status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
+                 status.optBoolean("baselineRepairAvailable", false) ->
+                     "旧版运行记录需要校正，可在工具→诊断工具中修复运行记录；当前规则已核对"
++                transactionBusy -> ""
+                 !status.optBoolean("dataPlaneHealthy", false) ->
+                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                  else -> ""
              },
              panelReady = panelReady,
@@ -55296,7 +55382,7 @@ index 4f004b9..babc155 100644
              controllerReadFailed = controllerReadFailed,
              controllerError = controllerError,
              groups = groups,
-@@ -384,6 +482,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -384,6 +486,7 @@ internal class ProxyComposeController(context: Context) {
              watchdog = status.optBoolean("watchdog", false),
              dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
              healthObserved = healthObserved,
@@ -55304,7 +55390,7 @@ index 4f004b9..babc155 100644
              trafficMode = trafficMode,
              continuityRootObserved = continuityRootObserved,
              continuityAutomationOnly = continuityAutomationOnly,
-@@ -410,8 +509,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -410,8 +513,12 @@ internal class ProxyComposeController(context: Context) {
          LegacyAppMigrator.migrateIfNeeded(app)
          var profile = ProxyRuntimeProfile.load(prefs)
          if (!profile.capability().available) {
@@ -55319,7 +55405,7 @@ index 4f004b9..babc155 100644
              profile = ProxyRuntimeProfile.load(prefs)
          }
          if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
-@@ -419,13 +522,47 @@ internal class ProxyComposeController(context: Context) {
+@@ -419,13 +526,47 @@ internal class ProxyComposeController(context: Context) {
              prefs.edit().putString("proxyBaseCore", "mihomo").apply()
              profile = ProxyRuntimeProfile.load(prefs)
          }
@@ -55373,7 +55459,7 @@ index 4f004b9..babc155 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -435,10 +572,22 @@ internal class ProxyComposeController(context: Context) {
+@@ -435,10 +576,22 @@ internal class ProxyComposeController(context: Context) {
      suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
          LegacyAppMigrator.migrateIfNeeded(app)
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -55397,7 +55483,7 @@ index 4f004b9..babc155 100644
          val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
          check(replaced) { "重启未完成，请等待当前操作结束后重试" }
          check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
-@@ -481,7 +630,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -481,7 +634,7 @@ internal class ProxyComposeController(context: Context) {
 
      suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -55406,7 +55492,7 @@ index 4f004b9..babc155 100644
          val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
          var downloaded = 0
          for (chunk in urls.chunked(6)) {
-@@ -515,7 +664,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -515,7 +668,12 @@ internal class ProxyComposeController(context: Context) {
          "disable" to "禁用本机 IPv6",
      )
 
@@ -55420,7 +55506,7 @@ index 4f004b9..babc155 100644
      fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
      fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
      fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
-@@ -532,13 +686,20 @@ internal class ProxyComposeController(context: Context) {
+@@ -532,13 +690,20 @@ internal class ProxyComposeController(context: Context) {
              ProxyConfigUi(
                  name = it.name,
                  selected = it.name == selected,
@@ -55443,7 +55529,7 @@ index 4f004b9..babc155 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -551,8 +712,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -551,8 +716,10 @@ internal class ProxyComposeController(context: Context) {
          val profile = ProxyRuntimeProfile.load(prefs)
          val entry = configs.selected(profile.core)
          val name = entry?.name ?: "尚未选择配置"
@@ -55456,7 +55542,7 @@ index 4f004b9..babc155 100644
          name to items
      }
 
-@@ -563,25 +726,25 @@ internal class ProxyComposeController(context: Context) {
+@@ -563,25 +730,25 @@ internal class ProxyComposeController(context: Context) {
 
      suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -55486,7 +55572,7 @@ index 4f004b9..babc155 100644
          configs.deleteSubscription(entry, name)
      }
 
-@@ -683,6 +846,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -683,6 +850,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -55497,7 +55583,7 @@ index 4f004b9..babc155 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -789,6 +956,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +960,7 @@ internal class ProxyComposeController(context: Context) {
                  size = r.optInt("size", -1),
                  disabled = extra?.optBoolean("disabled", false) ?: false,
                  hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
@@ -55505,7 +55591,7 @@ index 4f004b9..babc155 100644
              )
          }
          return out
-@@ -813,6 +981,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +985,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -55524,7 +55610,7 @@ index 4f004b9..babc155 100644
      private var lastIconSource: String? = null
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
-@@ -824,19 +1004,4 @@ internal class ProxyComposeController(context: Context) {
+@@ -824,19 +1008,4 @@ internal class ProxyComposeController(context: Context) {
          return parsed
      }
 
