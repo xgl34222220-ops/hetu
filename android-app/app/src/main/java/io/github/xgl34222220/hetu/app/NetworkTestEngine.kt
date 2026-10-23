@@ -40,7 +40,7 @@ import org.json.JSONObject
 internal enum class NetCategory(val title: String) { Ai("AI 服务"), Social("社交媒体"), Media("影音娱乐"), Tools("工具与服务") }
 
 /**
- * One service of 网络测试. [brand] names a bundled Simple Icons mark (null draws [monogram]);
+ * One service of 网络测试. [brand] names a bundled full-colour mark (null draws [monogram] on a [color] tile);
  * [trace] asks the service's own host for Cloudflare's `/cdn-cgi/trace`, which reports the country
  * of the exit IP the request actually left from. [aiRegion] marks services that refuse some regions.
  */
@@ -89,11 +89,11 @@ internal object NetworkTest {
     const val PARALLEL = 14
 
     val sites: List<NetSite> = listOf(
-        NetSite("chatgpt", "ChatGPT", NetCategory.Ai, "https://chatgpt.com/cdn-cgi/trace", null, 0xFF10A37FL, "C", aiRegion = true),
+        NetSite("chatgpt", "ChatGPT", NetCategory.Ai, "https://chatgpt.com/cdn-cgi/trace", "openai", NetBrandIcons.colors.getValue("openai"), aiRegion = true),
         NetSite("claude", "Claude", NetCategory.Ai, "https://claude.ai/cdn-cgi/trace", "claude", NetBrandIcons.colors.getValue("claude"), aiRegion = true),
-        NetSite("doubao", "Doubao", NetCategory.Ai, "https://www.doubao.com/", null, 0xFF3B5BFFL, "豆", trace = false),
+        NetSite("doubao", "Doubao", NetCategory.Ai, "https://www.doubao.com/", "doubao", NetBrandIcons.colors.getValue("doubao"), trace = false),
         NetSite("gemini", "Gemini", NetCategory.Ai, "https://gemini.google.com/", "googlegemini", NetBrandIcons.colors.getValue("googlegemini"), aiRegion = true),
-        NetSite("grok", "Grok", NetCategory.Ai, "https://grok.com/", null, 0xFF111111L, "G"),
+        NetSite("grok", "Grok", NetCategory.Ai, "https://grok.com/", "grok", NetBrandIcons.colors.getValue("grok")),
 
         NetSite("discord", "Discord", NetCategory.Social, "https://discord.com/cdn-cgi/trace", "discord", NetBrandIcons.colors.getValue("discord")),
         NetSite("douyin", "Douyin", NetCategory.Social, "https://www.douyin.com/", "tiktok", 0xFF111111L, trace = false),
@@ -104,8 +104,8 @@ internal object NetworkTest {
 
         NetSite("appletv", "Apple TV+", NetCategory.Media, "https://tv.apple.com/", "appletv", NetBrandIcons.colors.getValue("appletv")),
         NetSite("bilibili", "Bilibili", NetCategory.Media, "https://www.bilibili.com/", "bilibili", NetBrandIcons.colors.getValue("bilibili"), trace = false),
-        NetSite("disney", "Disney+", NetCategory.Media, "https://www.disneyplus.com/", null, 0xFF113CCFL, "D+"),
-        NetSite("hulu", "Hulu", NetCategory.Media, "https://www.hulu.com/", null, 0xFF1CE783L, "h"),
+        NetSite("disney", "Disney+", NetCategory.Media, "https://www.disneyplus.com/", "disneyplus", NetBrandIcons.colors.getValue("disneyplus")),
+        NetSite("hulu", "Hulu", NetCategory.Media, "https://www.hulu.com/", "hulu", NetBrandIcons.colors.getValue("hulu")),
         NetSite("netflix", "Netflix", NetCategory.Media, "https://www.netflix.com/", "netflix", NetBrandIcons.colors.getValue("netflix")),
         NetSite("spotify", "Spotify", NetCategory.Media, "https://open.spotify.com/", "spotify", NetBrandIcons.colors.getValue("spotify")),
         NetSite("twitch", "Twitch", NetCategory.Media, "https://www.twitch.tv/", "twitch", NetBrandIcons.colors.getValue("twitch")),
@@ -115,10 +115,10 @@ internal object NetworkTest {
         NetSite("apple", "Apple", NetCategory.Tools, "https://www.apple.com/library/test/success.html", "apple", NetBrandIcons.colors.getValue("apple")),
         NetSite("cloudflare", "Cloudflare", NetCategory.Tools, "https://www.cloudflare.com/cdn-cgi/trace", "cloudflare", NetBrandIcons.colors.getValue("cloudflare")),
         NetSite("github", "GitHub", NetCategory.Tools, "https://github.com/", "github", NetBrandIcons.colors.getValue("github")),
-        NetSite("netease", "NetEase", NetCategory.Tools, "https://www.163.com/", null, 0xFFD81E06L, "易", trace = false),
+        NetSite("netease", "NetEase", NetCategory.Tools, "https://www.163.com/", null, 0xFFE60012L, "网易", trace = false),
         NetSite("paypal", "PayPal", NetCategory.Tools, "https://www.paypal.com/", "paypal", NetBrandIcons.colors.getValue("paypal")),
         NetSite("steam", "Steam", NetCategory.Tools, "https://store.steampowered.com/", "steam", NetBrandIcons.colors.getValue("steam")),
-        NetSite("tencent", "Tencent", NetCategory.Tools, "https://www.qq.com/", null, 0xFF1E88E5L, "腾", trace = false),
+        NetSite("tencent", "Tencent", NetCategory.Tools, "https://www.qq.com/", "qq", NetBrandIcons.colors.getValue("qq"), trace = false),
         NetSite("wikipedia", "Wikipedia", NetCategory.Tools, "https://www.wikipedia.org/", "wikipedia", NetBrandIcons.colors.getValue("wikipedia")),
         NetSite("google", "Google", NetCategory.Tools, "https://www.google.com/generate_204", "google", NetBrandIcons.colors.getValue("google")),
         NetSite("baidu", "Baidu", NetCategory.Tools, "https://www.baidu.com/", "baidu", NetBrandIcons.colors.getValue("baidu"), trace = false),

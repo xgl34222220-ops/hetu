@@ -4,11 +4,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,7 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import io.github.xgl34222220.hetu.home.HomeColors
+import io.github.xgl34222220.hetu.home.HomeFlag
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeRowDims
 import io.github.xgl34222220.hetu.home.HomeRowDivider
@@ -63,6 +64,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.badText
 import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.goodText
+import io.github.xgl34222220.hetu.home.homeFlagAvailable
 import io.github.xgl34222220.hetu.home.warnText
 import io.github.xgl34222220.hetu.panel.PanelIcons
 import io.github.xgl34222220.hetu.ui.ht
@@ -315,24 +317,48 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
 }
 
 private val BrandTileSize = 36.dp
+/** App-icon corner: about 22% of the tile, the squircle-like radius launcher icons use at this size. */
+private val BrandTileShape = RoundedCornerShape(9.dp)
 
-/** Brand colour that stays readable on this theme (black marks turn to the text colour in dark mode). */
-private fun brandColor(site: NetSite, c: HomeColors): Color {
-    val color = Color(site.color)
-    return if (c.dark && color.luminance() < .08f) c.t1 else color
-}
-
+/**
+ * The service as a polished app icon: its real full-colour mark on the brand's own tile background
+ * (same in light and dark, as launcher icons are). A hairline keeps a tile that matches the card
+ * (white in light mode, black in dark mode) from dissolving into it.
+ */
 @Composable
 private fun BrandTile(site: NetSite) {
     val c = LocalHomeColors.current
-    val tint = brandColor(site, c)
+    val art = remember(site.brand) { site.brand?.let(NetBrandIcons::art) }
+    val mark = remember(site.brand) { site.brand?.let(NetBrandIcons::vector) }
+    val top = Color(art?.top ?: site.color)
+    val bottom = Color(art?.bottom ?: site.color)
+    val background = if (top == bottom) androidx.compose.ui.graphics.SolidColor(top) else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(top, bottom))
+    val tone = (top.luminance() + bottom.luminance()) / 2f
+    val edge = when {
+        !c.dark && tone > .85f -> Color.Black.copy(alpha = .08f)
+        c.dark && tone < .06f -> Color.White.copy(alpha = .14f)
+        else -> Color.Transparent
+    }
     Box(
-        Modifier.size(BrandTileSize).clip(RoundedCornerShape(11.dp)).background(tint.copy(alpha = if (c.dark) .16f else .10f)),
+        Modifier.size(BrandTileSize).clip(BrandTileShape).background(background, BrandTileShape)
+            .then(if (edge.alpha > 0f) Modifier.border(.75.dp, edge, BrandTileShape) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        val mark = remember(site.brand) { site.brand?.let(NetBrandIcons::vector) }
-        if (mark != null) Icon(mark, contentDescription = null, Modifier.size(20.dp), tint = tint)
-        else Text(site.monogram, color = tint, style = HomeType.cardLabel.copy(fontWeight = FontWeight.Bold, fontSize = if (site.monogram.length > 1) 13.sp else 16.sp))
+        if (art != null && mark != null) {
+            androidx.compose.foundation.Image(
+                mark, contentDescription = null,
+                modifier = Modifier.fillMaxSize().padding(BrandTileSize * art.inset),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+        } else {
+            // No bundled mark: the service's wordmark in white on its brand colour. Part of the icon,
+            // so it keeps the icon's size at any font scale instead of growing out of the tile.
+            val markSize = with(androidx.compose.ui.platform.LocalDensity.current) { (if (site.monogram.length > 1) 12.dp else 16.dp).toSp() }
+            Text(
+                site.monogram, color = if (tone > .6f) Color(0xFF111111) else Color.White, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+                style = HomeType.cardLabel.copy(fontWeight = FontWeight.Bold, fontSize = markSize, lineHeight = markSize, letterSpacing = 0.sp),
+            )
+        }
     }
 }
 
@@ -359,7 +385,7 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
             }
         }
     }
-    val regionText = if (region == null) "" else (NetworkTest.flag(region) + " " + region).trim()
+    val regionText = region.orEmpty()
     val unlockText = unlock?.let { unlockChipText(it) }.orEmpty()
     // Audit5 N2: the result colour settles in instead of snapping (instant with motion off).
     val shownStatusColor by androidx.compose.animation.animateColorAsState(
@@ -380,7 +406,7 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
             }
         }
         Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
-            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (regionText.isNotEmpty()) RegionLabel(regionText)
             if (state.testing) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
@@ -417,7 +443,23 @@ private fun UnlockChip(unlock: UnlockResult?, checking: Boolean) {
 }
 
 private fun exitLine(exit: ExitIp): String =
-    listOf((NetworkTest.flag(exit.region) + " " + exit.region.orEmpty()).trim(), exit.ip).filter { it.isNotBlank() }.joinToString(" · ")
+    listOf(exit.region.orEmpty().trim(), exit.ip).filter { it.isNotBlank() }.joinToString(" · ")
+
+/**
+ * Region code with the same vector flag the home and panel pages draw (flag emoji are missing
+ * from several ROM fonts); a region without a drawing shows its code alone.
+ */
+@Composable
+private fun RegionLabel(code: String) {
+    val c = LocalHomeColors.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (homeFlagAvailable(code)) {
+            HomeFlag(code, height = 11.dp)
+            Spacer(Modifier.width(5.dp))
+        }
+        Text(code, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
 
 /** Overseas and domestic exit IPs side by side; each side reports its own failure. */
 @Composable
@@ -431,14 +473,14 @@ private fun ExitIpCard(exits: ExitIps?, testing: Boolean) {
                 testing -> ht("测试中")
                 exits != null -> ht(exits.overseasError.ifBlank { "失败" })
                 else -> "—"
-            }, overseas?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") })
+            }, overseas?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") }, flag = overseas?.region)
             HxDivider(0.dp)
             SpeedLine(ht("境内"), when {
                 domestic != null -> exitLine(domestic)
                 testing -> ht("测试中")
                 exits != null -> ht(exits.domesticError.ifBlank { "失败" })
                 else -> "—"
-            }, domestic?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") })
+            }, domestic?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") }, flag = domestic?.region)
         }
     }
 }
@@ -483,7 +525,7 @@ private fun SpeedHeroCard(speed: SpeedUiState, active: Boolean, onToggle: () -> 
 }
 
 @Composable
-private fun SpeedLine(label: String, value: String, detail: String? = null) {
+private fun SpeedLine(label: String, value: String, detail: String? = null, flag: String? = null) {
     val c = LocalHomeColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = HomeRowDims.start, vertical = 8.dp)
@@ -492,7 +534,13 @@ private fun SpeedLine(label: String, value: String, detail: String? = null) {
     ) {
         Text(label, Modifier.weight(1f), color = c.t2, style = HomeType.label)
         Column(horizontalAlignment = Alignment.End) {
-            Text(value, color = c.t1, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!flag.isNullOrBlank() && homeFlagAvailable(flag)) {
+                    HomeFlag(flag, height = 13.dp)
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(value, color = c.t1, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             if (!detail.isNullOrBlank()) Text(detail, color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -504,12 +552,12 @@ private fun SpeedExitCard(speed: SpeedUiState) {
     HxSection(ht("出口")) {
         HxGroup {
             val region = when {
-                meta != null -> listOf((NetworkTest.flag(meta.country) + " " + meta.country).trim(), meta.city, meta.colo.takeIf { it.isNotBlank() }?.let { "$it" })
+                meta != null -> listOf(meta.country.trim(), meta.city, meta.colo.takeIf { it.isNotBlank() }?.let { "$it" })
                     .filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
                 speed.metaKnown -> ht("未知")
                 else -> "—"
             }
-            SpeedLine(ht("地区"), region)
+            SpeedLine(ht("地区"), region, flag = meta?.country)
             HxDivider(0.dp)
             SpeedLine("IP", meta?.ip ?: if (speed.metaKnown) ht("未知") else "—", meta?.org)
         }
