@@ -244,6 +244,28 @@ FAKE_REJECT_CHAIN=HXFAKE_REJECT
 TUN_ROUTE_TABLE=2022
 TUN_RULE_PREF_MIN=9000
 TUN_RULE_PREF_MAX=9099
+# 7.0.0 fail-open (field report, OnePlus PLK110 / ColorOS, Android 17, KernelSU, no ipset): the whole network
+# dropped while Hetu ran (wlan0 moved to another subnet, no default network in `ip rule`, every probe no-dns);
+# the watchdog's Wi-Fi heal did not help, 停止 / 重启 hung and only a reboot gave the phone its network back.
+# When a whole-phone outage outlasts the watchdog's Wi-Fi heal (WD_FAILOPEN_AFTER s since the first offline
+# verdict and the heal finished, or at once after WD_FAILOPEN_FAST s when the heal's check saw a Wi-Fi with
+# validated=0, every probe no-dns and no default network rule), Hetu ends itself (force_teardown: core,
+# watchdog, monitor, every HETU_/BICHEN_ hook and chain by per-command iptables -D/-F/-X, never a table
+# restore, policy rules/routes, eBPF pins, sysctl), reconnects the Wi-Fi once and records FAILOPEN_STATE.
+# Automatic starts (App recovery, network match, watchdog restart, boot restore) refuse while it is set for
+# the current boot; a manual start clears it. With the Kill Switch on Hetu keeps blocking (no fail-open).
+FAILOPEN_STATE="$RUN/failopen-state"
+FAILOPEN_TEXT='检测到整机断网，河图已自动退出并恢复系统网络'
+WD_FAILOPEN_FAST=60
+WD_FAILOPEN_AFTER=150
+WD_FAILOPEN_HEAL_MAX=240
+# Bounded stop: the normal stop transaction gets STOP_FORCE_AFTER s, then force_teardown takes over
+# regardless of locks. Every force step is a single command under FORCE_STEP_TIMEOUT s; chains are only
+# flushed/deleted while FORCE_BUDGET s last (unhooked leftover chains carry no traffic; the next start
+# sweeps them).
+STOP_FORCE_AFTER=10
+FORCE_STEP_TIMEOUT=3
+FORCE_BUDGET=20
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
@@ -849,6 +871,240 @@ stop_verify(){
   if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean after the second sweep"; else wd_log "stop-verify: still left after the second sweep: $SV_LEFT"; fi
   return 0
 }
+# ---- 7.0.0 bounded force teardown (fail-open and the stop fallback) -------------------------------
+# Never waits for the transaction lock and never restores a whole table: on ColorOS netd's oplus
+# `-m bpf --object-pinned` matches make a table rewrite fail. Every step is one command under
+# FORCE_STEP_TIMEOUT s; hooks (the jumps that carry traffic) and policy rules go first.
+fx(){ if has timeout; then timeout -s TERM -k 1 "$FORCE_STEP_TIMEOUT" "$@"; else "$@"; fi; }
+force_now(){ FN_UP=0; read -r FN_UP FN_UNUSED < /proc/uptime 2>/dev/null || FN_UP=0; FN_UP=${FN_UP%%.*}; case "$FN_UP" in ''|*[!0-9]*) FN_UP=0;; esac; }
+force_budget_left(){ force_now; [ "$FN_UP" -lt "${FORCE_DEADLINE:-0}" ]; }
+# `-S` lines of one table on stdin. hooks: every rule of a non-Hetu chain that jumps to a Hetu chain, as the
+# matching -D command; chains: the Hetu chains. HETU_*, BICHEN_* and the legacy fake-IP reject chain are Hetu's.
+force_plan(){
+  awk -v want="$1" -v fr="$FAKE_REJECT_CHAIN" '
+    function own(c){ return c ~ /^(HETU|BICHEN)_/ || c == fr }
+    $1 == "-N" && own($2) { if (want == "chains") print $2; next }
+    $1 == "-A" && !own($2) { for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1))) {
+      if (want == "hooks") { line = $0; sub(/^-A /, "-D ", line); print line }
+      if (want == "simple") print $2, $(i+1)
+      break } }'
+}
+# Hooks to try when a table cannot be listed: every Hetu hook is a plain "-j <chain>" in a builtin chain.
+force_known(){
+  case "$1" in
+    mangle) printf '%s\n' OUTPUT:HETU_MOUT PREROUTING:HETU_MPRE OUTPUT:HETU_CNC PREROUTING:HETU_CNC OUTPUT:BICHEN_MOUT PREROUTING:BICHEN_MPRE;;
+    nat) printf '%s\n' OUTPUT:HETU_DNSOUT PREROUTING:HETU_DNSPRE OUTPUT:HETU_NOUT PREROUTING:HETU_NPRE OUTPUT:BICHEN_DNSOUT PREROUTING:BICHEN_DNSPRE OUTPUT:BICHEN_NOUT PREROUTING:BICHEN_NPRE;;
+    filter) printf '%s\n' OUTPUT:HETU_QUICOUT FORWARD:HETU_QUICFWD OUTPUT:HETU_DOTOUT OUTPUT:HETU_WROUT FORWARD:HETU_WRFWD OUTPUT:HETU_V6OUT FORWARD:HETU_V6FWD \
+      OUTPUT:HETU_KOUT FORWARD:HETU_KFWD "OUTPUT:$FAKE_REJECT_CHAIN" OUTPUT:BICHEN_QUICOUT FORWARD:BICHEN_QUICFWD OUTPUT:BICHEN_V6OUT FORWARD:BICHEN_V6FWD OUTPUT:BICHEN_KOUT FORWARD:BICHEN_KFWD;;
+  esac
+}
+# $1 iptables|ip6tables, $2 table. Per command: -D each hook, then -F and -X each Hetu chain (budget allowing).
+force_xt_table(){
+  FXT_BIN="$1"; FXT_T="$2"; FXT_PASS=0
+  while [ "$FXT_PASS" -lt 2 ]; do
+    FXT_PASS=$((FXT_PASS+1))
+    FXT_RULES=$(fx "$FXT_BIN" -w 1 -t "$FXT_T" -S 2>/dev/null) || FXT_RULES=""
+    if [ -z "$FXT_RULES" ]; then
+      # Unlistable (or empty) table: the known hooks while the budget lasts; a hung iptables would
+      # otherwise cost FORCE_STEP_TIMEOUT s for each of them.
+      for FXT_K in $(force_known "$FXT_T"); do
+        force_budget_left || return 0
+        FXT_N=0
+        while [ "$FXT_N" -lt 4 ] && fx "$FXT_BIN" -w 1 -t "$FXT_T" -D "${FXT_K%%:*}" -j "${FXT_K#*:}" >/dev/null 2>&1; do FXT_N=$((FXT_N+1)); done
+      done
+      for FXT_K in $(force_known "$FXT_T"); do force_budget_left || return 0; fx "$FXT_BIN" -w 1 -t "$FXT_T" -F "${FXT_K#*:}" >/dev/null 2>&1 || true; done
+      for FXT_K in $(force_known "$FXT_T"); do force_budget_left || return 0; fx "$FXT_BIN" -w 1 -t "$FXT_T" -X "${FXT_K#*:}" >/dev/null 2>&1 || true; done
+      return 0
+    fi
+    FXT_HOOKS=$(printf '%s\n' "$FXT_RULES" | force_plan hooks)
+    FXT_CHAINS=$(printf '%s\n' "$FXT_RULES" | force_plan chains)
+    [ -n "$FXT_HOOKS$FXT_CHAINS" ] || return 0
+    if [ -n "$FXT_HOOKS" ]; then
+      while IFS= read -r FXT_L; do
+        [ -n "$FXT_L" ] || continue
+        case "$FXT_L" in
+          *\"*|*\'*|*\\*)
+            # Not splittable safely: the plain "-j <chain>" form of the same hook.
+            FXT_S=$(printf '%s\n' "$FXT_L" | sed 's/^-D /-A /' | force_plan simple)
+            [ -z "$FXT_S" ] || fx "$FXT_BIN" -w 1 -t "$FXT_T" -D ${FXT_S%% *} -j ${FXT_S#* } >/dev/null 2>&1 || true;;
+          *)
+            case $- in *f*) FXT_GLOB=1;; *) FXT_GLOB=0; set -f;; esac
+            # shellcheck disable=SC2086
+            fx "$FXT_BIN" -w 1 -t "$FXT_T" $FXT_L >/dev/null 2>&1 || true
+            [ "$FXT_GLOB" = 1 ] || set +f;;
+        esac
+      done <<EOF_FXT
+$FXT_HOOKS
+EOF_FXT
+    fi
+    for FXT_C in $FXT_CHAINS; do force_budget_left || break; fx "$FXT_BIN" -w 1 -t "$FXT_T" -F "$FXT_C" >/dev/null 2>&1 || true; done
+    for FXT_C in $FXT_CHAINS; do force_budget_left || break; fx "$FXT_BIN" -w 1 -t "$FXT_T" -X "$FXT_C" >/dev/null 2>&1 || true; done
+    force_budget_left || return 0
+  done
+  return 0
+}
+# fwmark rules looking up tables 20260..20299 (pref 14500 and any other), the routes of those tables, the
+# legacy BICHEN rule/route and the TUN link; each rule removal repeated while duplicates remain.
+force_routes(){
+  for FR_F in 4 6; do
+    FR_TABLES=""; FR_PASS=0
+    while [ "$FR_PASS" -lt 3 ]; do
+      FR_PASS=$((FR_PASS+1))
+      FR_LIST=$(fx ip -"$FR_F" rule show 2>/dev/null | owned_policy_rules)
+      [ -n "$FR_LIST" ] || break
+      for FR_E in $FR_LIST; do
+        fx ip -"$FR_F" rule del pref "${FR_E%%:*}" table "${FR_E#*:}" >/dev/null 2>&1 || true
+        FR_TABLES="$FR_TABLES ${FR_E#*:}"
+      done
+    done
+    FR_TABLES="$FR_TABLES $(fx ip -"$FR_F" route show table all 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "table" && $(i+1) ~ /^[0-9]+$/ && $(i+1) + 0 >= 20260 && $(i+1) + 0 <= 20299) print $(i+1) }' | tr '\n' ' ')"
+    for FR_T in $(printf '%s\n' $FR_TABLES | sort -u); do fx ip -"$FR_F" route flush table "$FR_T" >/dev/null 2>&1 || true; done
+    fx ip -"$FR_F" rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
+  done
+  fx ip route del local 0.0.0.0/0 dev lo table "$LEGACY_TABLE" >/dev/null 2>&1 || true
+  fx ip -6 route del local ::/0 dev lo table "$LEGACY_TABLE" >/dev/null 2>&1 || true
+  fx ip link del hetu0 >/dev/null 2>&1 || true
+  return 0
+}
+# PIDs of $1 and its ancestors (never killed by force_kill_helpers).
+force_ancestors(){
+  FA_P="$1"; FA_N=0
+  while [ -n "$FA_P" ] && [ "$FA_P" != 0 ] && [ "$FA_N" -lt 32 ]; do
+    printf '%s ' "$FA_P"
+    FA_P=$(sed 's/^.*) //' "/proc/$FA_P/stat" 2>/dev/null | awk '{print $2}')
+    case "$FA_P" in ''|*[!0-9]*) break;; esac
+    FA_N=$((FA_N+1))
+  done
+}
+# SIGKILL every other hetu-root.sh process: watchdog, monitor, start/stop transactions and their shielded
+# children, txn-deadline timers, repair-network / google firewall passes, Wi-Fi heal and net-recover runs.
+force_kill_helpers(){
+  FK_KEEP=" $(force_ancestors "$SELF_PID")$$ "
+  FK_LIST=""
+  for FK_D in /proc/[0-9]*; do
+    FK_P=${FK_D#/proc/}
+    case "$FK_KEEP" in *" $FK_P "*) continue;; esac
+    tr '\000' '\n' < "$FK_D/cmdline" 2>/dev/null | grep -qxF "$BASE/hetu-root.sh" || continue
+    FK_LIST="$FK_LIST $FK_P"
+  done
+  for FK_P in $FK_LIST; do kill -9 "$FK_P" 2>/dev/null || true; done
+  printf '%s' "${FK_LIST# }"
+}
+force_kill_core(){
+  FC_LIST=""
+  FC_P=$(cat "$PIDFILE" 2>/dev/null || true)
+  if pidcore "$FC_P"; then FC_LIST="$FC_P"; fi
+  for FC_D in /proc/[0-9]*; do
+    FC_O=${FC_D#/proc/}; case "$FC_O" in ''|*[!0-9]*) continue;; esac
+    case " $FC_LIST " in *" $FC_O "*) continue;; esac
+    if core_candidate "$FC_O" && pidcore "$FC_O"; then FC_LIST="$FC_LIST $FC_O"; fi
+  done
+  for FC_P in $FC_LIST; do kill -9 "$FC_P" 2>/dev/null || true; done
+  FC_N=0
+  while [ "$FC_N" -lt 20 ]; do
+    FC_ALIVE=0
+    for FC_P in $FC_LIST; do process_exited "$FC_P" || FC_ALIVE=1; done
+    [ "$FC_ALIVE" = 1 ] || break
+    FC_N=$((FC_N+1)); sleep 0.05
+  done
+  FORCE_CORES="${FC_LIST# }"
+  rm -f "$PIDFILE" "$MODEFILE"
+}
+# What is still there after a force teardown (bounded reads only): hooks, chains, policy rules, core.
+force_left(){
+  FL_OUT=""
+  for FL_BIN in iptables ip6tables; do
+    has "$FL_BIN" || continue
+    for FL_T in mangle nat filter; do
+      FL_RULES=$(fx "$FL_BIN" -w 1 -t "$FL_T" -S 2>&1); FL_RC=$?
+      if [ "$FL_RC" != 0 ]; then
+        case "$FL_RULES" in *"Table does not exist"*) ;; *) FL_OUT="$FL_OUT $FL_BIN-$FL_T-unreadable";; esac
+        continue
+      fi
+      [ -z "$(printf '%s\n' "$FL_RULES" | force_plan hooks)" ] || FL_OUT="$FL_OUT $FL_BIN-$FL_T-hook"
+      [ -z "$(printf '%s\n' "$FL_RULES" | force_plan chains)" ] || FL_OUT="$FL_OUT $FL_BIN-$FL_T-chain"
+    done
+  done
+  for FL_F in 4 6; do
+    [ -z "$(fx ip -"$FL_F" rule show 2>/dev/null | owned_policy_rules)" ] || FL_OUT="$FL_OUT ip$FL_F-rule"
+  done
+  for FL_P in ${FORCE_CORES:-}; do process_exited "$FL_P" || FL_OUT="$FL_OUT core-$FL_P"; done
+  printf '%s' "${FL_OUT# }"
+}
+# $1 why (stop | failopen | ...). Ends every Hetu process except this one and its callers, then removes
+# every Hetu network change. FORCE_LEFT says what could not be removed (empty = clean).
+force_teardown(){
+  trap '' TERM INT HUP
+  force_now; FORCE_DEADLINE=$((FN_UP+FORCE_BUDGET))
+  PRESERVE_KILL=0; START_ACTIVE=0; XT_BATCH=0; CLEAN_SNAPSHOT_ACTIVE=0
+  mkdir -p "$RUN" 2>/dev/null || true
+  cancel_boot >/dev/null 2>&1 || true
+  printf 'stopped-%s-%s\n' "$1" "$SELF_PID" > "$RUN/generation" 2>/dev/null || true
+  FORCE_KILLED=$(force_kill_helpers)
+  stopmonitor >/dev/null 2>&1 || true
+  rm -f "$WATCHDOG_PID" 2>/dev/null
+  force_kill_core
+  rm -rf "$LOCK_DIR" "$RUN/.txn.reap" "$RUN/wifi-heal.lock" "$RUN"/.xt-batch.* 2>/dev/null
+  for FTD_BIN in iptables ip6tables; do
+    has "$FTD_BIN" || continue
+    for FTD_T in mangle nat filter; do force_xt_table "$FTD_BIN" "$FTD_T"; done
+  done
+  force_routes
+  [ ! -d "$CG_ESCAPE_GATE" ] || tun_rule_sweep
+  if [ -d "$EBPF_PIN" ]; then
+    [ ! -x "$EBPF_TOOL" ] || fx "$EBPF_TOOL" unload "$EBPF_PIN" >/dev/null 2>&1 || true
+    rm -f "$EBPF_PIN"/prog_* "$EBPF_PIN"/map_* "$EBPF_PIN"/probe_* >/dev/null 2>&1 || true
+    rmdir "$EBPF_PIN" >/dev/null 2>&1 || true
+  fi
+  if has ipset; then for FTD_S in "$CN_SET4" "$CN_SET6" hetu_cn4_new hetu_cn6_new hetu_probe; do fx ipset destroy "$FTD_S" >/dev/null 2>&1 || true; done; fi
+  restorev6 >/dev/null 2>&1 || true
+  net_sysctl_restore; cgroup_release
+  rm -f "$SESSION" "$NET_STATE" "$RUN/egress-state" "$RUN/fake-reject" 2>/dev/null
+  FORCE_LEFT=$(force_left)
+  wd_log "force-stop ($1): ended ${FORCE_KILLED:-no other} Hetu process(es), core ${FORCE_CORES:-none}; ${FORCE_LEFT:+still left: $FORCE_LEFT}${FORCE_LEFT:-network clean (no Hetu hook, chain or policy rule)}"
+  [ -z "$FORCE_LEFT" ]
+}
+# The normal stop transaction, at most STOP_FORCE_AFTER s; when it fails or does not finish (a stuck
+# lock, an iptables call that hangs), every Hetu process is killed and force_teardown runs regardless.
+# $RUN/stop-result tells the dispatcher (whose shielded child this is) which way it ended.
+stop_transaction_bounded(){
+  rm -f "$RUN/stop-result" 2>/dev/null
+  ( stop_transaction; SBT_RC=$?; release_lock; exit "$SBT_RC" ) </dev/null >/dev/null 2>&1 &
+  SB_CHILD=$!
+  SB_N=0; SB_LIMIT=$((STOP_FORCE_AFTER*10))
+  while kill -0 "$SB_CHILD" 2>/dev/null && [ "$SB_N" -lt "$SB_LIMIT" ]; do sleep 0.1; SB_N=$((SB_N+1)); done
+  if kill -0 "$SB_CHILD" 2>/dev/null; then
+    SB_WHY="normal stop did not finish within ${STOP_FORCE_AFTER}s"
+    kill -9 "$SB_CHILD" 2>/dev/null || true
+  else
+    wait "$SB_CHILD"; SB_RC=$?
+    if [ "$SB_RC" = 0 ]; then printf 'normal\n' > "$RUN/stop-result" 2>/dev/null; return 0; fi
+    SB_WHY="normal stop failed"
+  fi
+  wd_log "stop: $SB_WHY; forcing"
+  force_stop_run stop
+}
+# force_teardown plus the result line; fails only when a core survived SIGKILL.
+force_stop_run(){
+  rm -f "$RUN/stop-result" 2>/dev/null
+  force_teardown "$1"
+  printf 'forced %s\n' "${FORCE_LEFT:-clean}" > "$RUN/stop-result" 2>/dev/null
+  # Resolver caches and NetworkMonitor, as after a normal stop (Android only, detached).
+  [ "$1" = failopen ] || net_recover_async "force-$1"
+  case " $FORCE_LEFT" in *" core-"*) return 1;; esac
+  return 0
+}
+# JSON for stop / force-stop from $RUN/stop-result; $1 the message of a forced stop.
+stop_reply(){
+  SRP=$(cat "$RUN/stop-result" 2>/dev/null); rm -f "$RUN/stop-result" 2>/dev/null
+  case "$SRP" in
+    'forced clean') printf '{"ok":true,"forced":true,"running":false,"clean":true,"message":"%s"}\n' "$1";;
+    forced\ *)
+      SRP=$(printf '%s' "${SRP#forced }" | tr -cd 'A-Za-z0-9 ._-')
+      printf '{"ok":true,"forced":true,"running":false,"clean":false,"left":"%s","message":"Root 代理已强制停止并恢复网络；仍有少量残留规则，下次启动时会再清理"}\n' "$SRP";;
+    *) ok "Root 代理已停止并恢复网络状态";;
+  esac
+}
 # Removes the legacy post-stop fake-IP REJECT chain (3.0.0-3.3.3) in both families, whether or not the
 # old marker file is still there, and checks that it is gone: a lost marker or a lock timeout used to
 # leave it (and every fake-IP connection of every app) blocked. Returns 1 if it could not be removed.
@@ -982,6 +1238,11 @@ wifi_check(){
   wifi_probe "$WC_IF"; WC_RC=$?
   WC_DETAIL="$WC_IF validated=$WC_VALID probe=$WP_HOW"
   if [ "$WC_RC" = 1 ] || [ "$WC_VALID" != 1 ]; then WC_STATE=bad; else WC_STATE=ok; fi
+  # 7.0.0: "<uptime> <state> <detail>" of the latest check, read by the watchdog's fail-open decision.
+  { WC_UP=0; read -r WC_UP WC_UNUSED < /proc/uptime; mkdir -p "$RUN/state" &&
+    printf '%s %s %s\n' "${WC_UP%%.*}" "$WC_STATE" "$WC_DETAIL" > "$RUN/state/wifi-check.new.$$" &&
+    mv -f "$RUN/state/wifi-check.new.$$" "$RUN/state/wifi-check"; } 2>/dev/null || rm -f "$RUN/state/wifi-check.new.$$" 2>/dev/null
+  return 0
 }
 # 0 when another Wi-Fi reconnect is allowed now (WIFI_HEAL_GAP since the last, < WIFI_HEAL_HOUR_MAX in an hour).
 wifi_heal_allowed(){
@@ -1919,7 +2180,6 @@ cnip_xt_capable(){
   fi
   [ "$CX_OK" = 1 ]
 }
-cnip_xt_full_restore(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 20 "$1" -w 5 -T mangle; else "$1" -w 5 -T mangle; fi; }
 cnip_xt_restore(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 20 "$1" -w 5 --noflush; else "$1" -w 5 --noflush; fi; }
 # iptables-restore body (mangle) of one family's tree, read from the CN list on stdin; the number
 # of accepted networks goes to $5. Same validation and limits as the ipset import; exit 3 when the
@@ -1994,14 +2254,9 @@ cnip_xt_drop(){
   [ -n "$CXD_PLAN" ] || return 0
   has "$CXD_RESTORE" || return 1
   if ! printf '*mangle\n%s\nCOMMIT\n' "$CXD_PLAN" | cnip_xt_restore "$CXD_RESTORE" >/dev/null 2>&1; then
-    # One stale line aborts the whole restore: rewrite mangle without the tree in one commit,
-    # else remove piece by piece.
-    CXD_SAVE=iptables-save; [ "$1" != 6 ] || CXD_SAVE=ip6tables-save
-    if has "$CXD_SAVE" && CXD_DUMP=$("$CXD_SAVE" -t mangle 2>/dev/null) && printf '%s\n' "$CXD_DUMP" | grep -q '^\*mangle'; then
-      printf '%s\n' "$CXD_DUMP" | grep -Ev '(^:|^-A |-j |-g )HETU_CN(C|Y|L|_)' | cnip_xt_full_restore "$CXD_RESTORE" >/dev/null 2>&1 || true
-      CXD_RULES=$(cleanup_snapshot_read "$CXD_BIN" mangle) || return 1
-      printf '%s\n' "$CXD_RULES" | grep -Eq '(^-N | -j | -g )HETU_CN(C|Y|L|_)' || return 0
-    fi
+    # One stale line aborts the whole restore: remove piece by piece, one command each. 7.0.0: never
+    # rewrite the whole mangle table (a table dump fed back to restore): ColorOS netd's oplus
+    # `-m bpf --object-pinned` matches do not survive that round trip and the restore fails or hangs.
     printf '%s\n' "$CXD_PLAN" | while IFS= read -r CXD_LINE; do
       [ -n "$CXD_LINE" ] || continue
       # shellcheck disable=SC2086
@@ -3006,7 +3261,7 @@ wd_selfheal_init(){
   # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
   # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
   WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BAD_NAMES=""
-  WD_OFF_N=0; WD_OFF_NEXT=0; WD_CACHE_SEEN=0; WD_STALL_AT=$((WD_NOW+WD_STALL_EVERY)); WD_PIN_TTL="$WD_STALL_PIN_TTL"
+  WD_OFF_N=0; WD_OFF_NEXT=0; WD_OFF_SINCE=0; WD_OFF_LAST=0; WD_OFF_HEAL_AT=0; WD_FO_HELD=0; WD_CACHE_SEEN=0; WD_STALL_AT=$((WD_NOW+WD_STALL_EVERY)); WD_PIN_TTL="$WD_STALL_PIN_TTL"
   WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
   WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
   if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
@@ -3160,7 +3415,7 @@ wd_egress_tick(){
   wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
   case "$WET_RC" in
     0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-       WD_OFF_N=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; return 0;;
+       WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; return 0;;
     2) WD_EG_TARGET=""; return 0;;
   esac
   # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
@@ -3168,7 +3423,7 @@ wd_egress_tick(){
   for WET_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WET_U" && { WET_DIRECT=0; break; }; done
   # 3.3.3: DIRECT failing too is a whole-phone outage, not "nothing to do": check the Wi-Fi outside Hetu.
   if [ "$WET_DIRECT" != 0 ]; then WD_EG_FAIL=0; wd_offline_seen "proxy egress via $WD_EG_TARGET and DIRECT fail"; return 0; fi
-  WD_OFF_N=0
+  WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0
   WD_EG_FAIL=$((WD_EG_FAIL+1)); WD_EG_AT=$((WD_NOW+WD_EGRESS_RETRY))
   wd_log "proxy egress probe failed via $WD_EG_TARGET while direct works ($WD_EG_FAIL/$WD_EGRESS_LIMIT)"
   [ "$WD_EG_FAIL" -ge "$WD_EGRESS_LIMIT" ] || return 0
@@ -3476,14 +3731,107 @@ wd_dp_classify(){
 # probes the Wi-Fi outside Hetu and escalates (flushnet + reevaluate, reconnect, Wi-Fi off/on; rate-limited there).
 # A new check at most every WIFI_HEAL_GAP/2 s while the outage lasts.
 wd_offline_seen(){
+  # One outage = offline verdicts at most 300 s apart; an older start belongs to an outage that ended.
+  if [ "${WD_OFF_SINCE:-0}" = 0 ] || [ $((WD_NOW-${WD_OFF_LAST:-0})) -gt 300 ]; then WD_OFF_SINCE="$WD_NOW"; WD_OFF_HEAL_AT=0; fi
+  WD_OFF_LAST="$WD_NOW"
+  # 7.0.0 fail-open: the outage outlasted the Wi-Fi heal (see FAILOPEN_STATE). wd_failopen exits the watchdog.
+  if [ "${WD_OFF_HEAL_AT:-0}" != 0 ] && [ $((WD_NOW-WD_OFF_SINCE)) -ge "${WD_FAILOPEN_FAST:-60}" ]; then
+    if wd_failopen_due; then wd_failopen "$1"; return 0; fi
+  fi
   WD_OFF_N=$((WD_OFF_N+1))
   [ "$WD_OFF_N" -ge "$WIFI_HEAL_OFFLINE_LIMIT" ] || return 0
   WD_OFF_N=0
   [ "$WD_NOW" -ge "$WD_OFF_NEXT" ] || return 0
   wifi_heal_async watchdog || return 0
   WD_OFF_NEXT=$((WD_NOW+WIFI_HEAL_GAP/2))
+  [ "${WD_OFF_HEAL_AT:-0}" != 0 ] || WD_OFF_HEAL_AT="$WD_NOW"
   wd_log "whole-phone outage ($1) while the core answers; checking Wi-Fi outside Hetu"
   return 0
+}
+# 0 = no default network: Android's default-network rule (pref 22000, "fwmark 0x0/0xffff iif lo lookup <if>")
+# is missing from a readable, non-empty `ip rule` list (root itself then gets "Network is unreachable").
+wd_no_default_network(){
+  WNDN=$(ip -4 rule show 2>/dev/null) || return 1
+  [ -n "$WNDN" ] || return 1
+  ! printf '%s\n' "$WNDN" | grep -Eq '^22000:.*lookup '
+}
+# 0 when Hetu should end itself now (WD_FO_WHY says why). Called only once the outage has lasted
+# WD_FAILOPEN_FAST s and the Wi-Fi heal was started for it.
+wd_failopen_due(){
+  WD_FO_WHY=""
+  if [ "${KILL:-0}" = 1 ]; then
+    [ "${WD_FO_HELD:-0}" = 1 ] || { WD_FO_HELD=1; wd_log "fail-open: whole-phone outage persists, but the Kill Switch is on: Hetu keeps blocking"; }
+    return 1
+  fi
+  WFD_AGE=$((WD_NOW-WD_OFF_SINCE))
+  # The heal's own check, newer than its start: Wi-Fi not validated, no probe host even resolves, and
+  # Android has no default network. Nothing Hetu could still fix; waiting only prolongs the outage.
+  WFD_CHECK=$(cat "$RUN/state/wifi-check" 2>/dev/null)
+  WFD_AT=${WFD_CHECK%% *}
+  case "$WFD_AT" in ''|*[!0-9]*) WFD_AT=0;; esac
+  if [ "$WFD_AT" -ge "$WD_OFF_HEAL_AT" ]; then
+    case "$WFD_CHECK" in
+      *" bad "*" validated=0 probe="*no-dns*)
+        WFD_PROBE=${WFD_CHECK##*probe=}
+        if ! printf '%s\n' "$WFD_PROBE" | tr ',' '\n' | grep -v '=no-dns$' | grep -q . && wd_no_default_network; then
+          WD_FO_WHY="Wi-Fi validated=0, every probe no-dns, no default network"; return 0
+        fi;;
+    esac
+  fi
+  [ "$WFD_AGE" -ge "${WD_FAILOPEN_AFTER:-150}" ] || return 1
+  # Still bad after the heal (or the heal itself hangs): give the network back.
+  WFD_PID=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
+  if [ -n "$WFD_PID" ] && kill -0 "$WFD_PID" 2>/dev/null && [ $((WD_NOW-WD_OFF_HEAL_AT)) -lt "${WD_FAILOPEN_HEAL_MAX:-240}" ]; then return 1; fi
+  WD_FO_WHY="still offline ${WFD_AGE}s after the outage began, after the Wi-Fi heal"
+  return 0
+}
+# Records why Hetu ended itself; the App and diagnostics read it, automatic starts refuse while it holds
+# for the current boot (FAILOPEN_STATE).
+failopen_record(){
+  { printf 'AT=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    printf 'BOOT=%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
+    printf 'SOURCE=%s\n' "$1"
+    printf 'REASON=%s\n' "$(printf '%s' "$2" | tr -d '\n\r"\\' | cut -c1-300)"
+  } > "$FAILOPEN_STATE.new.$$" 2>/dev/null && mv -f "$FAILOPEN_STATE.new.$$" "$FAILOPEN_STATE" 2>/dev/null || rm -f "$FAILOPEN_STATE.new.$$" 2>/dev/null
+  return 0
+}
+# AT of a fail-open recorded during the current boot, else nothing (and status 1).
+failopen_current(){
+  [ -r "$FAILOPEN_STATE" ] || return 1
+  FOC_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+  [ -n "$FOC_BOOT" ] && [ "$(sed -n 's/^BOOT=//p' "$FAILOPEN_STATE" 2>/dev/null | head -n 1)" = "$FOC_BOOT" ] || return 1
+  sed -n 's/^AT=//p' "$FAILOPEN_STATE" 2>/dev/null | head -n 1 | tr -cd '0-9A-Za-z:+.-'
+}
+# Wi-Fi off/on once after the fail-open teardown, unless the user turned Wi-Fi reconnect off or Wi-Fi is off.
+failopen_wifi(){
+  if [ -f "$WIFI_HEAL_OFF" ]; then wd_log "fail-open: Wi-Fi reconnect is turned off in the settings; not reconnecting"; return 0; fi
+  FW_ON=$(timeout 5 settings get global wifi_on 2>/dev/null | tr -cd '0-9')
+  if [ "$FW_ON" = 0 ]; then wd_log "fail-open: Wi-Fi is off; not reconnecting"; return 0; fi
+  # A heal still running would switch the Wi-Fi a second time.
+  FW_PID=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
+  case "$FW_PID" in ''|*[!0-9]*) ;; *) [ "$FW_PID" = "$$" ] || kill -9 "$FW_PID" 2>/dev/null || true;; esac
+  rm -rf "$RUN/wifi-heal.lock" 2>/dev/null
+  wifi_heal_record
+  if has svc; then timeout 8 svc wifi disable >/dev/null 2>&1; sleep 2; timeout 8 svc wifi enable >/dev/null 2>&1; FW_HOW="svc wifi"
+  elif has cmd; then timeout 8 cmd wifi set-wifi-enabled disabled >/dev/null 2>&1; sleep 2; timeout 8 cmd wifi set-wifi-enabled enabled >/dev/null 2>&1; FW_HOW="cmd wifi"
+  else wd_log "fail-open: no svc or cmd to switch Wi-Fi"; return 0; fi
+  wd_log "fail-open: Wi-Fi switched off and on ($FW_HOW)"
+  return 0
+}
+# The watchdog ends Hetu (fail-open) and exits: nothing may restart it into the same outage.
+wd_failopen(){
+  trap '' TERM INT HUP
+  wd_log "fail-open: whole-phone outage ($1): $WD_FO_WHY; Hetu exits and gives the network back to the system"
+  failopen_record watchdog "$WD_FO_WHY; $1"
+  force_teardown failopen
+  printf 'RESULT=%s\n' "${FORCE_LEFT:-clean}" >> "$FAILOPEN_STATE" 2>/dev/null || true
+  date '+%Y-%m-%dT%H:%M:%S%z core ended; fail-open whole-phone outage' > "$CRASH_STATE" 2>/dev/null || true
+  wd_notify "failopen whole-phone-outage" "$FAILOPEN_TEXT。网络恢复后请在河图中手动启动代理。"
+  failopen_wifi
+  sleep "${WIFI_HEAL_WAIT:-20}"
+  net_recover "fail-open"
+  rm -f "$RUN/watchdog.ready.$$" "${WD_TMP:-$RUN/.wd.$$}".* 2>/dev/null
+  exit 0
 }
 wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
@@ -3959,6 +4307,7 @@ wd_dataplane_tick(){
     ok)
       if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
       WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
+      WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0
       wd_egress_state ok; return 0;;
     offline)
       [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
@@ -3966,7 +4315,7 @@ wd_dataplane_tick(){
       # 3.3.3: whole-phone outage (DIRECT fails too while core and rules answer): Wi-Fi check / reconnect.
       WD_DP_AT=$((WD_NOW+WD_DP_RETRY)); wd_offline_seen "$WD_DP_DETAIL"; return 0;;
   esac
-  WD_OFF_N=0
+  WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0
   # 6.0.0: lost fake-IP records need a new core at once (wd_fakeip_heal: restart budget, no backoff).
   if [ "$WDT_C" = fakeip-lost ]; then
     WD_DP_FAIL=0; WD_DP_LAST="$WDT_C"; wd_egress_state "$WDT_C"; WD_DP_AT=$((WD_NOW+WD_DP_RETRY))
@@ -4442,6 +4791,8 @@ start_selfheal_body(){
   mkdir -p "$RUN/state" 2>/dev/null || true
   { for SSR_A in "$@"; do printf '%s\n' "$SSR_A"; done; } > "$RUN/state/start.args.new.$$" 2>/dev/null && mv -f "$RUN/state/start.args.new.$$" "$RUN/state/start.args" 2>/dev/null || rm -f "$RUN/state/start.args.new.$$"
   [ -n "${HETU_SELFHEAL_RESTART:-}" ] || rm -f "$RUN/state/selfheal-budget" "$RUN/selfheal-state" 2>/dev/null
+  # 7.0.0: a started session (manual, or automatic after a reboot) ends the previous fail-open record.
+  [ -n "${HETU_SELFHEAL_RESTART:-}" ] || rm -f "$FAILOPEN_STATE" 2>/dev/null
   SSR_CG=$(tr '\n' ' ' < "/proc/$START_PID/cgroup" 2>/dev/null | cut -c1-400)
   printf 'shell=%s setsid=%s core=%s\n' "${START_CG_ESCAPED:-none}" "${SETSID:-no}" "$SSR_CG" > "$RUN/cgroup-escape" 2>/dev/null || true
   wd_log "session start core=$START_PID cgroup-escape=${START_CG_ESCAPED:-none} setsid=${SETSID:-no}${HETU_SELFHEAL_RESTART:+ (self-heal restart)}"
@@ -4463,6 +4814,12 @@ start(){
   # Neither protocol captured is the same as DNS takeover switched off.
   [ -n "$DNS_PROTOS" ] || START_DNS=off
   mkdir -p "$RUN" || fail "无法创建运行目录"
+  # 7.0.0: after a fail-open in this boot only a manual start runs (it clears the record when it succeeds):
+  # App recovery, network match, the watchdog's restart and boot restore would start into the same outage.
+  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}${HETU_SELFHEAL_RESTART:-}${HETU_BOOT_RESTORE_ID:-}" ] && FO_AT=$(failopen_current); then
+    wd_log "start refused: fail-open at $FO_AT in this boot; only a manual start runs"
+    fail "$FAILOPEN_TEXT；本次开机不再自动启动，网络恢复后请手动启动"
+  fi
   # Before anything is spawned: the core, watchdog and monitor inherit the root cgroup, so freezing
   # or killing the App (its uid_/pid_ cgroup) never freezes or kills them.
   cg_escape "$$"; START_CG_ESCAPED="$CG_ESCAPED"
@@ -4853,8 +5210,10 @@ status(){
   fi
   ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
   # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | route-down | fakeip-lost | offline), else empty.
+  # 7.0.0: when this boot's watchdog ended Hetu for a whole-phone outage (failopen-state), its time.
+  FOV=""; if [ "$STATUS_RUNNING" = false ]; then FOV=$(failopen_current 2>/dev/null || true); fi
   EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"cnipUdpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_UDPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"cnipUdpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s","failOpen":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$({ [ "$CNIP_STATE" = ipset ] || [ "$CNIP_STATE" = iptables ] || [ "$CNIP_STATE" = ebpf ]; } && [ "$CN_UDPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV" "$FOV"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -5622,7 +5981,10 @@ case "${1:-status}" in
     root; shift; start "$@";;
   txn-deadline) [ "$#" = 5 ] || exit 1; root; transaction_deadline "$2" "$3" "$4" "$5";;
   cancel-boot) root; cancel_boot || fail "无法撤销本次自动恢复"; ok "自动恢复已撤销";;
-  stop) root; trap '' TERM INT HUP; shield_run stop_transaction || fail "停止未完成：核心或网络清理尚未确认，请重试停止"; ok "Root 代理已停止并恢复网络状态";;
+  # 7.0.0: bounded. The normal stop transaction gets STOP_FORCE_AFTER s, then the force teardown runs.
+  stop) root; trap '' TERM INT HUP; shield_run stop_transaction_bounded || fail "停止未完成：核心进程未能结束，请重启手机"; stop_reply "Root 代理已强制停止并恢复网络（正常停止未能完成）";;
+  # The App's fallback when stop itself did not answer: no lock, no table restore, every step bounded.
+  force-stop) root; trap '' TERM INT HUP; shield_run force_stop_run manual || fail "强制停止未能结束核心进程，请重启手机"; stop_reply "Root 代理已强制停止并恢复网络";;
   status) status;;
   # Config check with the deployed core's own CLI (sing-box check, xray run -test, v2ray test).
   validate) [ "$#" = 3 ] || fail "参数错误"; root; validate_action "$2" "$3";;

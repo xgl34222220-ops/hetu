@@ -32,6 +32,10 @@ final class RootProxyManager {
     private static final long RULESET_FRESH_MS=72L*60L*60L*1000L;
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
     private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
+    /** 7.0.0: the APK's own hetu-root.sh copy that runs force-stop, so the fallback works with an older deployed script. */
+    private static final String FORCE_STOPPER=ROOT+"/run/state/hetu-force-stop.sh";
+    /** 7.0.0: shown (and kept in proxyAutoRecoveryError) after the watchdog ended Hetu for a whole-phone outage. */
+    static final String FAIL_OPEN_MESSAGE="检测到整机断网，河图已自动退出并恢复系统网络";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
     /** Default 内存限制 (GOMEMLIMIT soft target / cgroup memory.high): 100M made large rule sets GC-thrash. */
     static final String DEFAULT_MEMORY_LIMIT="256M";
@@ -1144,7 +1148,19 @@ final class RootProxyManager {
         PRE_START_HOOK.set(Boolean.TRUE);
         try{return startOwned(profile,progress,false);}finally{PRE_START_HOOK.remove();}
     }
-    JSONObject replaceRunningManually(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,true);}
+    JSONObject replaceRunningManually(ProxyRuntimeProfile profile,Progress progress)throws Exception{
+        // 7.0.0: 重启 must not wait forever behind a transaction that hangs (whole-phone outage on ColorOS).
+        final long request=STOP_GENERATION.get();
+        if(!CONTROL_LOCK.tryLock(10000L)){
+            stopOrForce(progress);
+            throw new IOException("上一个操作未能在 10 秒内结束，已强制停止并恢复网络；请重新启动代理");
+        }
+        try{
+            // A Stop pressed while this restart waited keeps its revocation.
+            if(request!=STOP_GENERATION.get())throw new IOException("重启请求已被停止取代");
+            return startOwned(profile,progress,true);
+        }finally{CONTROL_LOCK.unlock();}
+    }
     private JSONObject startOwned(ProxyRuntimeProfile profile,Progress progress,boolean replace)throws Exception{
         final long request=STOP_GENERATION.get();
         CONTROL_LOCK.lock();
@@ -1798,6 +1814,78 @@ final class RootProxyManager {
             return r;
         }finally{STOP_DEADLINE.remove();CONTROL_LOCK.unlock();}
     }
+    /**
+     * 7.0.0 (field report: 停止 hung during a whole-phone outage, only a reboot helped): the user's Stop. The
+     * normal [stop] runs first (hetu-root.sh stop is itself bounded and forces after 10 s); when it throws or
+     * does not confirm the cleanup, the APK's own script runs force-stop (no lock, every step bounded,
+     * per-command iptables removal), and the App ends in the stopped state either way.
+     */
+    JSONObject stopOrForce(Progress progress)throws Exception{
+        RootBridge.requireWorkerThread();
+        Exception normal;
+        try{
+            JSONObject done=stop(progress);
+            clearFailOpenMessage();
+            return done;
+        }catch(Exception failed){normal=failed;}
+        synchronized(INTENT_LOCK){
+            STOP_GENERATION.incrementAndGet();CONTROL_LOCK.invalidateObservations();
+            prefs.edit().putBoolean("proxyRootWanted",false)
+                    .putLong("proxyRootStoppedManualGeneration",prefs.getLong("proxyRootManualStartGeneration",0L)).commit();
+        }
+        stage(progress,"正常停止未完成，正在强制停止并恢复网络…");
+        JSONObject forced;
+        try{forced=forceStopNative();}
+        catch(Exception error){forced=new JSONObject().put("ok",false).put("message",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage());}
+        try{ProxyAdblockCoordinator.exit(context);}catch(Exception ignored){}
+        String message=forced.optBoolean("ok",false)?forced.optString("message","Root 代理已强制停止并恢复网络")
+                :"已强制停止代理，但未能确认网络清理完成；如仍无法上网请重启手机";
+        prefs.edit().putBoolean("proxyRootWanted",false).putBoolean("proxyRootRuntimeRunning",false)
+                .putBoolean("proxyAdblockCounterArmed",false).putLong("proxyRootHealthProbeElapsed",0L)
+                .putString("proxyNetworkIntegrity","stopped").putString("proxyNetworkFault","force-stopped")
+                .putString("proxyRootLastForcedStop",message).remove("proxyRootSessionOwner").apply();
+        clearFailOpenMessage();
+        ensureContinuityService(false);
+        NetworkRevalidation.kick(context,"stop");
+        stage(progress,message);
+        return forced.put("ok",true).put("forced",true).put("running",false).put("message",message)
+                .put("normalStopError",normal.getMessage()==null?normal.getClass().getSimpleName():normal.getMessage());
+    }
+
+    /** hetu-root.sh force-stop from the APK's copy (installed beside the health checker when it differs). */
+    private JSONObject forceStopNative()throws Exception{
+        File stage=new File(context.getNoBackupFilesDir(),"hetu-force-stage");
+        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建强制停止目录");
+        File script=new File(stage,"hetu-root.sh");
+        copyScriptAsset(script);
+        String digest=RuntimeCompatibility14.sha256(script);
+        String temporary=FORCE_STOPPER+".new";
+        String command="mkdir -p "+RootBridge.quote(ROOT+"/run/state")
+                +" && if [ \"$(sha256sum "+RootBridge.quote(FORCE_STOPPER)+" 2>/dev/null | cut -d ' ' -f 1)\" != "+RootBridge.quote(digest)+" ]; then"
+                +" cp "+RootBridge.quote(script.getAbsolutePath())+" "+RootBridge.quote(temporary)
+                +" && chmod 700 "+RootBridge.quote(temporary)+" && chown 0:0 "+RootBridge.quote(temporary)
+                +" && mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(FORCE_STOPPER)+"; fi"
+                +" && exec "+RootBridge.quote(FORCE_STOPPER)+" force-stop";
+        RootBridge.Result reply=RootBridge.rootShell(context,command,40000L);
+        return RootCommandReply.read(reply.code,reply.output);
+    }
+
+    /**
+     * 7.0.0: the watchdog ended Hetu for a whole-phone outage (status failOpen = when, this boot). The App
+     * takes that as a stop: nothing wanted, so no automatic recovery starts it into the same outage.
+     */
+    private void acknowledgeFailOpen(String at){
+        if(at==null||at.isEmpty()||at.equals(prefs.getString("proxyRootFailOpenAt","")))return;
+        prefs.edit().putString("proxyRootFailOpenAt",at).putBoolean("proxyRootWanted",false)
+                .putBoolean("proxyRootRuntimeRunning",false)
+                .putLong("proxyRootStoppedManualGeneration",prefs.getLong("proxyRootManualStartGeneration",0L))
+                .putString("proxyNetworkIntegrity","stopped").putString("proxyNetworkFault","fail-open")
+                .putString("proxyAutoRecoveryError",FAIL_OPEN_MESSAGE).remove("proxyRootSessionOwner").apply();
+    }
+    private void clearFailOpenMessage(){
+        if(FAIL_OPEN_MESSAGE.equals(prefs.getString("proxyAutoRecoveryError","")))prefs.edit().remove("proxyAutoRecoveryError").apply();
+    }
+
     private int liveControllerPort(JSONObject state){
         int port=state.optInt("controllerPort",0);
         if(port>=29090&&port<=29149)return port;
@@ -1890,6 +1978,8 @@ final class RootProxyManager {
                     ||networkEpoch!=prefs.getLong("proxyNetworkEpoch",0L))return;
             if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort)
                 prefs.edit().putInt("proxyControllerPort",livePort).apply();
+            // 7.0.0: never inside a control transaction (a manual start reads status before it clears the record).
+            if(!controlOwned&&!state.optBoolean("running",false))acknowledgeFailOpen(state.optString("failOpen",""));
             current[0]=true;
         };
         // Existing operation-owned reads stay inside their original lock. A
@@ -2079,7 +2169,8 @@ final class RootProxyManager {
         }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
         try{
             String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
-                    +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
+                    +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")
+                    +" 2>/dev/null; echo; echo '--- fail-open ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/failopen-state")+" 2>/dev/null; true";
             RootBridge.Result logs=boundedRootShell(context,cmd,5000L);
             report.section("最近核心日志",logs.output,10000);
         }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}

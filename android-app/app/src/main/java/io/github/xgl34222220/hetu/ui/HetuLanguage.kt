@@ -1431,7 +1431,23 @@ IPv6 未生效：需要 IPv6「启用 / 严格」模式|IPv6 not applied: needs 
 测速连接中断（%s）|The speed test connection broke off (%s)|測速連線中斷（%s）|Соединение теста скорости прервалось (%s)
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed).joinToString("\n")
+
+// 7.0.0 fail-open: the watchdog ends Hetu after a whole-phone outage; Stop / Restart never hang (bounded force-stop).
+private val vocabularyFailOpen700 = """
+检测到整机断网，河图已自动退出并恢复系统网络|The whole phone lost its network, so Hetu exited on its own and gave the network back to the system|偵測到整機斷網，河圖已自動退出並恢復系統網路|Телефон полностью потерял сеть, поэтому Hetu сам завершился и вернул сеть системе
+检测到整机断网，河图已自动退出并恢复系统网络；本次开机不再自动启动，网络恢复后请手动启动|The whole phone lost its network, so Hetu exited on its own and gave the network back to the system. It will not start automatically again until the next reboot; start it yourself once the network is back|偵測到整機斷網，河圖已自動退出並恢復系統網路；本次開機不再自動啟動，網路恢復後請手動啟動|Телефон полностью потерял сеть, поэтому Hetu сам завершился и вернул сеть системе. До следующей перезагрузки он не запустится автоматически; запустите его вручную, когда сеть вернётся
+Root 代理已强制停止并恢复网络|Root proxy force-stopped and the network restored|Root 代理已強制停止並恢復網路|Root-прокси принудительно остановлен, сеть восстановлена
+Root 代理已强制停止并恢复网络（正常停止未能完成）|Root proxy force-stopped and the network restored (the normal stop did not finish)|Root 代理已強制停止並恢復網路（正常停止未能完成）|Root-прокси принудительно остановлен, сеть восстановлена (обычная остановка не завершилась)
+Root 代理已强制停止并恢复网络；仍有少量残留规则，下次启动时会再清理|Root proxy force-stopped and the network restored; a few leftover rules remain and are cleaned up on the next start|Root 代理已強制停止並恢復網路；仍有少量殘留規則，下次啟動時會再清理|Root-прокси принудительно остановлен, сеть восстановлена; осталось несколько правил, они будут удалены при следующем запуске
+强制停止未能结束核心进程，请重启手机|The force-stop could not end the core process. Restart the phone|強制停止未能結束核心程序，請重新啟動手機|Принудительная остановка не смогла завершить процесс ядра. Перезагрузите телефон
+停止未完成：核心进程未能结束，请重启手机|Stop not completed: the core process could not be ended. Restart the phone|停止未完成：核心程序未能結束，請重新啟動手機|Остановка не завершена: процесс ядра не удалось завершить. Перезагрузите телефон
+正常停止未完成，正在强制停止并恢复网络…|The normal stop did not finish; force-stopping and restoring the network…|正常停止未完成，正在強制停止並恢復網路…|Обычная остановка не завершилась; принудительная остановка и восстановление сети…
+上一个操作未能在 10 秒内结束，已强制停止并恢复网络；请重新启动代理|The previous operation did not finish within 10 seconds, so the proxy was force-stopped and the network restored. Start the proxy again|上一個操作未能在 10 秒內結束，已強制停止並恢復網路；請重新啟動代理|Предыдущая операция не завершилась за 10 секунд, поэтому прокси принудительно остановлен и сеть восстановлена. Запустите прокси снова
+已强制停止代理，但未能确认网络清理完成；如仍无法上网请重启手机|The proxy was force-stopped, but the network cleanup could not be confirmed. If there is still no internet, restart the phone|已強制停止代理，但未能確認網路清理完成；如仍無法上網請重新啟動手機|Прокси принудительно остановлен, но очистку сети подтвердить не удалось. Если интернета по-прежнему нет, перезагрузите телефон
+重启请求已被停止取代|The restart was superseded by a stop|重新啟動請求已被停止取代|Перезапуск отменён остановкой
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

@@ -597,7 +597,8 @@ internal class ProxyComposeController(context: Context) {
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val selected = configs.selected(profile.core)
-        val result = root.stop { onProgress(it) }
+        // 7.0.0: always ends stopped; a stop that hangs or fails falls back to the bounded force-stop.
+        val result = root.stopOrForce { onProgress(it) }
         onProgress("执行服务停止后脚本…")
         ProxyScriptHooks.run(app, "post-stop", profile.mode.id, selected?.name ?: "")
         result

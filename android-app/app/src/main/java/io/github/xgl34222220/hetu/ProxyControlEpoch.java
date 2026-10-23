@@ -14,6 +14,11 @@ final class ProxyControlEpoch {
         if (!gate.tryLock()) return false;
         transactions++; generation.incrementAndGet(); return true;
     }
+    /** 7.0.0: bounded wait for a control transaction (重启 never waits forever). */
+    boolean tryLock(long millis) throws InterruptedException {
+        if (!gate.tryLock(millis, java.util.concurrent.TimeUnit.MILLISECONDS)) return false;
+        transactions++; generation.incrementAndGet(); return true;
+    }
     void unlock() { if (gate.isHeldByCurrentThread() && transactions > 0) transactions--; gate.unlock(); }
     boolean isHeldByCurrentThread() { return gate.isHeldByCurrentThread(); }
     long observe() {
