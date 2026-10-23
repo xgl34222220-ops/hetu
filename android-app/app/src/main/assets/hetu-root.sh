@@ -978,6 +978,26 @@ force_ancestors(){
 }
 # SIGKILL every other hetu-root.sh process: watchdog, monitor, start/stop transactions and their shielded
 # children, txn-deadline timers, repair-network / google firewall passes, Wi-Fi heal and net-recover runs.
+# Every descendant of the given pids ("pid ppid" read from /proc without a fork per process): the
+# iptables-restore, curl or sleep a killed helper leaves behind (an orphaned iptables-restore can keep
+# the xtables lock and make every per-command removal fail).
+force_descendants(){
+  FDS_ROOTS=" $* "
+  for FDS_F in /proc/[0-9]*/stat; do
+    FDS_L=""; read -r FDS_L < "$FDS_F" 2>/dev/null || continue
+    FDS_P=${FDS_F#/proc/}; FDS_P=${FDS_P%/stat}
+    FDS_R=${FDS_L##*) }
+    # shellcheck disable=SC2086
+    set -- $FDS_R
+    printf '%s %s\n' "$FDS_P" "${2:-0}"
+  done | awk -v roots="$FDS_ROOTS" '
+    { parent[$1] = $2 }
+    END {
+      n = split(roots, r, " "); for (i = 1; i <= n; i++) want[r[i]] = 1
+      do { added = 0; for (p in parent) if (!(p in want) && (parent[p] in want)) { want[p] = 1; out[p] = 1; added = 1 } } while (added)
+      for (p in out) printf "%s ", p
+    }'
+}
 force_kill_helpers(){
   FK_KEEP=" $(force_ancestors "$SELF_PID")$$ "
   FK_LIST=""
@@ -987,7 +1007,11 @@ force_kill_helpers(){
     tr '\000' '\n' < "$FK_D/cmdline" 2>/dev/null | grep -qxF "$BASE/hetu-root.sh" || continue
     FK_LIST="$FK_LIST $FK_P"
   done
-  for FK_P in $FK_LIST; do kill -9 "$FK_P" 2>/dev/null || true; done
+  if [ -n "$FK_LIST" ]; then
+    FK_SUB=$(force_descendants $FK_LIST)
+    for FK_P in $FK_LIST; do kill -9 "$FK_P" 2>/dev/null || true; done
+    for FK_P in $FK_SUB; do case "$FK_KEEP" in *" $FK_P "*) continue;; esac; kill -9 "$FK_P" 2>/dev/null || true; done
+  fi
   printf '%s' "${FK_LIST# }"
 }
 force_kill_core(){
@@ -1075,7 +1099,9 @@ stop_transaction_bounded(){
   while kill -0 "$SB_CHILD" 2>/dev/null && [ "$SB_N" -lt "$SB_LIMIT" ]; do sleep 0.1; SB_N=$((SB_N+1)); done
   if kill -0 "$SB_CHILD" 2>/dev/null; then
     SB_WHY="normal stop did not finish within ${STOP_FORCE_AFTER}s"
+    SB_SUB=$(force_descendants "$SB_CHILD")
     kill -9 "$SB_CHILD" 2>/dev/null || true
+    for SB_P in $SB_SUB; do kill -9 "$SB_P" 2>/dev/null || true; done
   else
     wait "$SB_CHILD"; SB_RC=$?
     if [ "$SB_RC" = 0 ]; then printf 'normal\n' > "$RUN/stop-result" 2>/dev/null; return 0; fi

@@ -331,6 +331,9 @@ class BoundedStop(NetModelCase):
         self.assertGreaterEqual(elapsed, 9)
         self.assertEqual([], self.owned())
         self.assertIn('normal stop did not finish within 10s; forcing', (self.base / 'run' / 'watchdog.log').read_text())
+        # The hung iptables-restore of the killed stop is killed with it (it could hold the xtables lock).
+        hung = subprocess.run(['pgrep', '-f', str(MODEL) + ' iptables-restore'], capture_output=True, text=True)
+        self.assertEqual('', hung.stdout.strip())
 
     def test_normal_stop_stays_normal(self):
         self.install()
@@ -349,6 +352,15 @@ class BoundedStop(NetModelCase):
         self.assertEqual({'ok': True, 'forced': True, 'running': False, 'clean': True, 'message': 'Root 代理已强制停止并恢复网络'}, reply)
         self.assertEqual([], self.owned())
         self.no_table_rewrite(self.calls())
+
+
+class Descendants(NetModelCase):
+    def test_descendants_are_found_without_touching_others(self):
+        r = self.body('sh -c "sleep 30 & sleep 30 & wait" & ROOT=$!; sleep 0.5; sleep 31 & OTHER=$!\n'
+                      'D=$(force_descendants "$ROOT"); echo "D=[$D]"; for p in $D; do ps -o args= -p "$p"; done\n'
+                      'case " $D " in *" $OTHER "*) echo other-included;; esac; kill $ROOT $OTHER $D 2>/dev/null; true')
+        self.assertEqual(r.stdout.count('sleep 30'), 2, r.stdout + r.stderr)
+        self.assertNotIn('other-included', r.stdout)
 
 
 class CnipDrop(NetModelCase):
