@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "7619063ccc0e5183c78c27b7d3cefe1504968b22875695d2dc71f81f6fb12477",
+  "patchSha256": "005abe9fd8a7b56a25bacab6121649b0b66e25abbf5eda8e53e1c5739aabf1b0",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -430,6 +430,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetBrandTiles700Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetlossSelfHeal108Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NoNetwork500Test.java",
@@ -562,10 +563,10 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "ab3c1e692f8d468e3212f628634f021bf8f632f8610d0c6da64aa6df37279b89",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/LastGoodConfig.kt": "1b1f4dbcf1404ba109a881dfcc09f9ced83cd5f2a26fac1af33b595508c0bc25",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt": "ad44195de41e2ab5d40f2dee3f413b316b1109b55ebecb4e8cdd7b77a3e9401c",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt": "727b32098a2b502ac31b10f06e354c1f4dacc2fc92842b000c37c6f2cab7e738",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt": "a27287b38e3657fe72c2170b4a1e11d15b778e5c8f941ae0e3320f21570dfd4d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt": "0f954fc42bdb4bb9936dfbebdcb02a2165bad5a8573f392f7811424862314645",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt": "0121b70507e1693d3fb0c30fac21ab07219507852eea7ad5fbda855720744563",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt": "cb915fcd46a3efb4e1c4772807901232137943808f3831a4d3276bfa53fd2145",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt": "715e4c41064a60ca065a236854c2e4a77f0777226ef618ea60a9916d00c7c59e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt": "88f84ec53a46403970d2d282d64007b2960f183ed8661e93be1a93129a18c2b2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkUnlockEngine.kt": "8468dbecc573c47140089ea890f3ab494e29480860a0981d9f7b8f543fa41ccd",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt": "4a8df6926934bf6debfd3625a1ce7f3c753044e54d10ad1b482462374d2660d6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt": "3e4cf0906cbc6e8fd1370e3a4a1d313513e43bdcd1453fc4244420636a042901",
@@ -690,6 +691,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "fc0f25a8f7e60e662928b945dec2437347105c803666d39999871389c859b50c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt": "631dd126802f701089435953627bdf995933f5f90f10e143ec58210f75776679",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt": "93916facbd7b66f9348abb19dd06e4754e0c210326c5be4df49e2172bd277900",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetBrandTiles700Test.kt": "6b9db2cdbdb5d50617f6e01583d8957d3b7fadcaf1a85611d42c24bbc50bc86e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetlossSelfHeal108Test.kt": "fb17d8e684df23d7ae98c5ddf865e0a64b00c96b206899bcc06dcbbe631d34bf",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt": "b18170e72fa75012fcee1e6a3e956221440663c7959cb0e847558db528e3b78a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NoNetwork500Test.java": "7d25ebc23917dcceb263a65cf03833d22dfff04e1051d1a6475b17b6b01b1a0b",
@@ -3025,6 +3027,13 @@
         "applyRollsBackOnlyWhenTheRunningCoreRejectsTheChange"
       ]
     },
+    "io.github.xgl34222220.hetu.NetBrandTiles700Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetBrandTiles700Test.kt",
+      "methods": [
+        "everyServiceWithAPublishedMarkDrawsItAsATile",
+        "multiColourLogosKeepTheirColours"
+      ]
+    },
     "io.github.xgl34222220.hetu.NetlossSelfHeal108Test": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetlossSelfHeal108Test.kt",
       "methods": [
@@ -3975,8 +3984,8 @@
       ]
     }
   },
-  "expectedUnitTests": 1106,
-  "expectedTestXmlFiles": 128,
+  "expectedUnitTests": 1108,
+  "expectedTestXmlFiles": 129,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,
   "signingUnchanged": true,
