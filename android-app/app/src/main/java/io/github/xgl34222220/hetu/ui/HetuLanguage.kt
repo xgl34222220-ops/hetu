@@ -1452,6 +1452,8 @@ private val vocabularyPanelFix700 = """
 已取消固定，核心将自动选择节点|Unpinned. The core will choose the node automatically|已取消固定，核心將自動選擇節點|Закрепление снято. Ядро будет выбирать узел автоматически
 取消固定失败|Could not unpin|取消固定失敗|Не удалось снять закрепление
 已固定（再次点按取消固定）|Pinned (tap again to unpin)|已固定（再次點按取消固定）|Закреплено (нажмите ещё раз, чтобы открепить)
+从文件或链接导入配置，导入后设为当前配置|Import a configuration from a file or link; it becomes the current one|從檔案或連結匯入設定，匯入後設為目前設定|Импорт конфигурации из файла или по ссылке; она станет текущей
+请先选择配置文件|Choose a configuration file first|請先選擇設定檔|Сначала выберите файл конфигурации
 """.trimIndent()
 
 private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700, vocabularyPanelFix700).joinToString("\n")

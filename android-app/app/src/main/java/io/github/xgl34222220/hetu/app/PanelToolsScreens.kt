@@ -127,7 +127,8 @@ internal fun ToolsScreen(
         onConfigSelected = { name -> vm.applyConfigChange("已切换到 $name") },
         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
         requestedEntry = vm.toolsRequest,
-        onRequestConsumed = { vm.toolsRequest = null },
+        onRequestConsumed = { vm.toolsRequest = null; vm.toolsImportRequest = false },
+        requestedImport = vm.toolsImportRequest,
         onOpenExternalEntry = { entry ->
             when (entry) {
                 io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }

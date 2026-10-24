@@ -54985,7 +54985,7 @@ index f104cef..c2518aa 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-index 71d5484..5fa85da 100644
+index 71d5484..58c3db8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 @@ -69,6 +69,73 @@ final class MihomoStartupConfig {
@@ -55205,6 +55205,19 @@ index 71d5484..5fa85da 100644
      /** Turn off AAAA answers without replacing the user's DNS policy or resolvers. */
      private static String disableDnsIpv6(String source)throws IOException{
          String[] lines=normalize(source).split("\n",-1);
+@@ -697,6 +849,12 @@ final class MihomoStartupConfig {
+         try{int v=Integer.parseInt(m.group(1));return v>0&&v<=65535?v:0;}catch(Exception ignored){return 0;}
+     }
+     private static String normalize(String s){return s.replace("\r\n","\n").replace('\r','\n');}
++    /** 7.0.0: the editor/import check sees the same fingerprint migration the start path applies,
++     *  so a config with the removed `global-client-fingerprint` key is not rejected by the new core. */
++    static String editorValidationCompat(String source)throws IOException{
++        if(source==null||!source.contains("global-client-fingerprint"))return source;
++        return removeTopLevelScalar(RuntimeCompatibility14.migrateFingerprint(source),"global-client-fingerprint");
++    }
+     private static String removeTopLevelScalar(String source,String key){StringBuilder out=new StringBuilder();String[] lines=source.split("\n",-1);for(String line:lines){if(indent(line)==0&&key.equals(keyOfMappingLine(line.trim())))continue;out.append(line).append('\n');}return trimOne(out.toString());}
+     private static String removeTopLevelKey(String source,String key){
+         String[] lines=source.split("\n",-1);StringBuilder out=new StringBuilder();boolean skipping=false;Pattern start=Pattern.compile("^"+Pattern.quote(key)+"\\s*:(.*)$");Pattern nextKey=Pattern.compile("^[A-Za-z0-9_.-]+\\s*:");
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java
 new file mode 100644
 index 0000000..fe1a275
@@ -62390,7 +62403,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..7de57e4 100644
+index 9cd82da..6b7a0a4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -14,6 +14,7 @@ import java.nio.file.*;
@@ -64177,7 +64190,7 @@ index 9cd82da..7de57e4 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +2288,10 @@ final class RootProxyManager {
+@@ -1224,6 +2288,11 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -64185,10 +64198,18 @@ index 9cd82da..7de57e4 100644
 +            validateNativeText(text,profile);
 +            return;
 +        }
++        bytes=MihomoStartupConfig.editorValidationCompat(text).getBytes(StandardCharsets.UTF_8);
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +2309,7 @@ final class RootProxyManager {
+@@ -1238,10 +2307,14 @@ final class RootProxyManager {
+                 +"; copy_rc=$?; if [ \"$copy_rc\" -ne 0 ]; then rm -f "+RootBridge.quote(rootFile)
+                 +"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$copy_rc\"; fi"
+                 +"; chmod 600 "+RootBridge.quote(rootFile)
++                // 7.0.0: a GEOSITE / GEOIP rule makes `-t` download GeoSite.dat / the MMDB into an empty -d
++                // (90 s, past this 30 s bound); link the core home's copies so the check reads them offline.
++                +"; for f in "+RootBridge.quote(ROOT+"/run")+"/*.dat "+RootBridge.quote(ROOT+"/run")+"/*.mmdb "+RootBridge.quote(ROOT+"/run")+"/*.metadb"
++                +"; do [ -f \"$f\" ] && ln -sf \"$f\" "+RootBridge.quote(workDir)+"/; done"
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -64197,7 +64218,7 @@ index 9cd82da..7de57e4 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +2319,46 @@ final class RootProxyManager {
+@@ -1251,11 +2324,46 @@ final class RootProxyManager {
          }
      }
 
@@ -64245,7 +64266,7 @@ index 9cd82da..7de57e4 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +2372,155 @@ final class RootProxyManager {
+@@ -1269,14 +2377,155 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -64404,7 +64425,7 @@ index 9cd82da..7de57e4 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2533,7 @@ final class RootProxyManager {
+@@ -1289,7 +2538,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -64413,7 +64434,7 @@ index 9cd82da..7de57e4 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2557,7 @@ final class RootProxyManager {
+@@ -1313,7 +2562,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -64422,7 +64443,7 @@ index 9cd82da..7de57e4 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2577,28 @@ final class RootProxyManager {
+@@ -1333,13 +2582,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -64452,7 +64473,7 @@ index 9cd82da..7de57e4 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2625,64 @@ final class RootProxyManager {
+@@ -1366,13 +2630,64 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -64517,7 +64538,7 @@ index 9cd82da..7de57e4 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2694,12 @@ final class RootProxyManager {
+@@ -1384,7 +2699,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -64531,7 +64552,7 @@ index 9cd82da..7de57e4 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2708,13 @@ final class RootProxyManager {
+@@ -1393,6 +2713,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -64545,7 +64566,7 @@ index 9cd82da..7de57e4 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,22 +2734,111 @@ final class RootProxyManager {
+@@ -1412,22 +2739,111 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -68561,7 +68582,7 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..d71e5ea 100644
+index 250b8a8..2aaed19 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -14,13 +14,24 @@ import androidx.compose.runtime.mutableStateOf
@@ -68589,7 +68610,7 @@ index 250b8a8..d71e5ea 100644
  import kotlinx.coroutines.flow.MutableSharedFlow
  import kotlinx.coroutines.flow.SharedFlow
  import kotlinx.coroutines.isActive
-@@ -73,6 +84,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -73,6 +84,24 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          get() = tabState
          set(value) { tabState = value }
 
@@ -68602,10 +68623,19 @@ index 250b8a8..d71e5ea 100644
 +        tab = HxTab.Tools
 +    }
 +
++    /** With [toolsRequest] = 配置管理: open its 导入配置 form (设置 › 基础代理配置 › 导入配置). */
++    var toolsImportRequest by mutableStateOf(false)
++
++    /** Opens 工具 › 配置管理 › 导入配置, the one import page, from another tab. */
++    fun openToolsImport() {
++        toolsImportRequest = true
++        openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
++    }
++
      /** Open a live panel section from home cards, tools or deep links. */
      fun openPanel(section: String) {
          val requested = section.ifBlank { "overview" }
-@@ -80,6 +100,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -80,6 +109,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          tabState = HxTab.Panel
      }
 
@@ -68621,7 +68651,7 @@ index 250b8a8..d71e5ea 100644
      fun setDefaultPanelSection(section: String) {
          val value = section.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
          prefs.edit().putString("defaultPanelSection", value).apply()
-@@ -142,10 +171,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -142,10 +180,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      /* ---------------- runtime state ---------------- */
@@ -68636,7 +68666,7 @@ index 250b8a8..d71e5ea 100644
      var upRate by mutableLongStateOf(0L)
          private set
      var downRate by mutableLongStateOf(0L)
-@@ -212,15 +245,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -212,15 +254,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var providersUpdatingAll by mutableStateOf(false)
          private set
 
@@ -68678,7 +68708,7 @@ index 250b8a8..d71e5ea 100644
 
      /* ---------------- polling ---------------- */
      private var pollJob: Job? = null
-@@ -339,6 +395,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -339,6 +404,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          return request.takeIf { state.running && operation == null }
      }
 
@@ -68689,7 +68719,7 @@ index 250b8a8..d71e5ea 100644
      private fun currentRuntimeRequest(request: RuntimeRequest, requireRunning: Boolean = true): Boolean {
          syncRequestSettings()
          return request.generation == runtimeRequestGeneration &&
-@@ -369,6 +429,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -369,6 +438,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              latestNodeProbe[node] = owner
              delays[node] = value
              measuredAt[node] = stamp
@@ -68713,7 +68743,7 @@ index 250b8a8..d71e5ea 100644
          }
      }
 
-@@ -398,8 +475,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -398,8 +484,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -68741,7 +68771,7 @@ index 250b8a8..d71e5ea 100644
              }
          }
          ProxyStatusNotificationService.refresh(app)
-@@ -412,20 +506,79 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,20 +515,79 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -68824,7 +68854,7 @@ index 250b8a8..d71e5ea 100644
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
          rssBytes = prefs.getLong("proxyUiLastRss", 0L),
-@@ -449,15 +602,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +611,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -68860,7 +68890,7 @@ index 250b8a8..d71e5ea 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +679,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +688,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -68888,7 +68918,7 @@ index 250b8a8..d71e5ea 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -535,7 +724,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -535,7 +733,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
              lastProcessTicks = sampled.processTicks
              lastSystemTicks = sampled.systemTicks
@@ -68897,7 +68927,7 @@ index 250b8a8..d71e5ea 100644
 
              if (!next.running) {
                  providers = emptyList()
-@@ -550,6 +739,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -550,6 +748,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                      if (owner == latestProviderRead && currentRuntimeRequest(request, requireRunning = false)) {
                          lastProviderRefreshAt = now
                          if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
@@ -68905,7 +68935,7 @@ index 250b8a8..d71e5ea 100644
                      }
                  }
                  if (coreVersion.isBlank()) {
-@@ -560,17 +750,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +759,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -68923,7 +68953,7 @@ index 250b8a8..d71e5ea 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +758,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +767,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -68931,7 +68961,7 @@ index 250b8a8..d71e5ea 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +769,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +778,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -68942,7 +68972,7 @@ index 250b8a8..d71e5ea 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -626,6 +807,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -626,6 +816,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              refreshing = true
              try {
                  refreshNow()
@@ -68950,7 +68980,7 @@ index 250b8a8..d71e5ea 100644
                  val request = activeRuntimeRequest()
                  if (request != null) {
                      val providerOwner = beginProviderRead()
-@@ -636,6 +818,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -636,6 +827,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          p.await()?.let {
                              if (providerOwner == latestProviderRead && currentRuntimeRequest(request)) {
                                  providers = it
@@ -68958,7 +68988,7 @@ index 250b8a8..d71e5ea 100644
                                  lastProviderRefreshAt = SystemClock.elapsedRealtime()
                              }
                          }
-@@ -664,7 +847,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -664,7 +856,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          viewModelScope.launch {
              try { toast(controller.setAutoStart(enabled)) }
              catch (cancel: CancellationException) { throw cancel }
@@ -68967,7 +68997,7 @@ index 250b8a8..d71e5ea 100644
              finally { autoStartBusy = false; bumpSettings() }
          }
      }
-@@ -674,33 +857,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -674,33 +866,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          val stopping = state.running
          invalidateRuntimeRequests()
          operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
@@ -69067,7 +69097,7 @@ index 250b8a8..d71e5ea 100644
                  }
              } finally {
                  operation = null
-@@ -727,14 +968,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -727,14 +977,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              operationText = "正在重启…"
              ProxyRuntimeSettings.beginApply(prefs)
              try {
@@ -69085,7 +69115,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -746,6 +987,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +996,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -69099,7 +69129,7 @@ index 250b8a8..d71e5ea 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -755,7 +1003,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -755,7 +1012,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69108,7 +69138,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -764,8 +1012,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +1021,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -69143,7 +69173,7 @@ index 250b8a8..d71e5ea 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,22 +1047,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,22 +1056,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69186,7 +69216,7 @@ index 250b8a8..d71e5ea 100644
          val ticket = repo.captureSelection()
          val owner = ++requestSequence
          selectionOwners[group] = owner
-@@ -801,11 +1091,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -801,11 +1100,39 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false), ticket)
                  // The already-sent PUT cannot be revoked, but must not revive a stopped UI.
                  if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
@@ -69205,7 +69235,8 @@ index 250b8a8..d71e5ea 100644
 +                        outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
 +                        if (outcome == SelectionOutcome700.Confirmed) break
 +                    }
-+                    if (attempt < SELECT_CONFIRM_POLLS_700 - 1) delay(SELECT_CONFIRM_INTERVAL_MS_700)
++                    if (attempt < SELECT_CONFIRM_POLLS_700 - 1)
++                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { delay(SELECT_CONFIRM_INTERVAL_MS_700) }
 +                }
                  val fresh = refreshNow()
                  if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
@@ -69228,7 +69259,7 @@ index 250b8a8..d71e5ea 100644
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
-@@ -820,6 +1137,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -820,6 +1147,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -69267,7 +69298,7 @@ index 250b8a8..d71e5ea 100644
      private suspend fun probe(node: String, request: RuntimeRequest, owner: Long) {
          try {
              applyNodeProbe(request, owner, node, repo.delay(node), SystemClock.elapsedRealtime())
-@@ -827,13 +1176,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,13 +1186,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -69289,7 +69320,7 @@ index 250b8a8..d71e5ea 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1197,45 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1207,45 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -69339,7 +69370,7 @@ index 250b8a8..d71e5ea 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1243,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1253,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -69360,7 +69391,7 @@ index 250b8a8..d71e5ea 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1265,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1275,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -69416,7 +69447,7 @@ index 250b8a8..d71e5ea 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,22 +1341,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,22 +1351,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -69532,7 +69563,7 @@ index 250b8a8..d71e5ea 100644
      fun measureSites() {
          val request = activeRuntimeRequest() ?: return
          if (siteTesting) return
-@@ -964,7 +1465,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1475,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69541,7 +69572,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1482,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1492,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69550,7 +69581,7 @@ index 250b8a8..d71e5ea 100644
              }
          }
      }
-@@ -995,7 +1496,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1506,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69559,7 +69590,7 @@ index 250b8a8..d71e5ea 100644
              }
          }
      }
-@@ -1014,7 +1515,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1525,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69568,7 +69599,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1534,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1544,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69577,7 +69608,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1542,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1552,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -69586,7 +69617,7 @@ index 250b8a8..d71e5ea 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1574,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1584,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -69595,7 +69626,7 @@ index 250b8a8..d71e5ea 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1635,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1645,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69604,7 +69635,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1153,18 +1654,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1153,18 +1664,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val fresh = repo.providers()
                  if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                      providers = fresh
@@ -69626,7 +69657,7 @@ index 250b8a8..d71e5ea 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1175,7 +1677,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1175,7 +1687,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                  beginProviderRead()
                  if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
@@ -69636,7 +69667,7 @@ index 250b8a8..d71e5ea 100644
                  refreshNow()
              } catch (cancel: CancellationException) {
                  if (providerTaskOwners[name] == owner) providerTasks.remove(name)
-@@ -1193,7 +1697,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1707,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -69645,7 +69676,7 @@ index 250b8a8..d71e5ea 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1216,7 +1720,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1216,7 +1730,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                              async {
                                  if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
                                  try {
@@ -69665,7 +69696,7 @@ index 250b8a8..d71e5ea 100644
                                      if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
                                          providerTasks[item.name] = HxTask(ok = true, message = "已更新")
                                          ok++
-@@ -1239,14 +1754,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1239,14 +1764,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                  if (readOwner == latestProviderRead) {
                      providers = fresh
@@ -69683,7 +69714,7 @@ index 250b8a8..d71e5ea 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1257,12 +1774,35 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1257,12 +1784,35 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -75499,7 +75530,7 @@ index 0000000..f15c8ed
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
-index 820f6b5..745335c 100644
+index 820f6b5..7396fc1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
 @@ -75,6 +75,11 @@ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -75514,7 +75545,7 @@ index 820f6b5..745335c 100644
  @Composable
  internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
      HxTabbedPage(
-@@ -118,109 +123,23 @@ internal fun ToolsScreen(
+@@ -118,109 +123,24 @@ internal fun ToolsScreen(
          ),
          onSubPageVisibleChanged = onSubPageVisibleChanged,
          onConfigChanged = { scope.launch { vm.refreshNow() } },
@@ -75523,7 +75554,8 @@ index 820f6b5..745335c 100644
 +        onConfigSelected = { name -> vm.applyConfigChange("已切换到 $name") },
          onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
 +        requestedEntry = vm.toolsRequest,
-+        onRequestConsumed = { vm.toolsRequest = null },
++        onRequestConsumed = { vm.toolsRequest = null; vm.toolsImportRequest = false },
++        requestedImport = vm.toolsImportRequest,
          onOpenExternalEntry = { entry ->
              when (entry) {
                  io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }
@@ -76113,7 +76145,7 @@ index bb42974..966d773 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 2b4638e..6922f33 100644
+index 2b4638e..0277b46 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 @@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
@@ -76256,7 +76288,18 @@ index 2b4638e..6922f33 100644
      fun changed(key: String) {
          ProxyRuntimeSettings.markDirty(prefs, key)
          revision++
-@@ -465,10 +515,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -460,15 +510,18 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+                     SettingsNavRow(ht("查看启动配置"), subtitle = ht("查看当前生成的运行配置文件"), icon = ToolsIcons.FileCog) {
+                         context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
+                     }
++                    SettingsDivider()
++                    // The one import page (工具 › 配置管理 › 导入配置), reached from here too.
++                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件或链接导入配置，导入后设为当前配置"), icon = ToolsIcons.Download) {
++                        nav.openRequested(HxRoute.Main)
++                        vm.openToolsImport()
++                    }
+                 }
+             }
          }
          item(key = "config") {
              SettingsSection {
@@ -76268,7 +76311,7 @@ index 2b4638e..6922f33 100644
              }
          }
          if (pending) {
-@@ -485,49 +532,56 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -485,49 +538,56 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      }
 
      when (choice) {
@@ -76356,7 +76399,7 @@ index 2b4638e..6922f33 100644
              selected = profile.mode.id,
              onPick = { putString("proxyBaseMode", it); choice = null },
              onDismiss = { choice = null },
-@@ -627,9 +681,10 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
+@@ -627,9 +687,10 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
      val tileShape = RoundedCornerShape(18.dp)
      Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
          listOf(
@@ -76370,7 +76413,7 @@ index 2b4638e..6922f33 100644
          ).forEach { (value, label, note) ->
              val active = selected == value
              val source = remember { MutableInteractionSource() }
-@@ -652,7 +707,8 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
+@@ -652,7 +713,8 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
              ) {
                  Box(Modifier.fillMaxWidth().height(58.dp)) {
                      val accent = c.accent
@@ -76380,7 +76423,7 @@ index 2b4638e..6922f33 100644
                      HomePop(active, Modifier.align(Alignment.TopEnd).padding(5.dp)) {
                          Box(Modifier.size(20.dp).background(c.accent, CircleShape), contentAlignment = Alignment.Center) {
                              Icon(HomeIcons.Check, null, Modifier.size(13.dp), tint = c.onAccent)
-@@ -662,17 +718,20 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
+@@ -662,17 +724,20 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
                  Spacer(Modifier.height(10.dp))
                  Text(label, color = c.t1, style = HomeType.noteStrong.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), maxLines = 2, textAlign = TextAlign.Center)
                  Spacer(Modifier.height(2.dp))
@@ -76405,7 +76448,7 @@ index 2b4638e..6922f33 100644
          val card = if (dark) Color(0xFF20232B) else Color(0xFFFFFFFF)
          val ink = if (dark) Color(0xFFEBEDF2) else Color(0xFF12161A)
          drawRoundRect(canvas, cornerRadius = radius)
-@@ -794,7 +853,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -794,7 +859,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      SettingsDivider()
                      SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = HxIcons.PanelBottom)
                      SettingsDivider()
@@ -82867,7 +82910,7 @@ index 0000000..c69a546
 +        if (ms <= 0L) "" else isoFormat.format(OffsetDateTime.ofInstant(Instant.ofEpochMilli(ms), ZoneId.systemDefault()))
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
-index 800055c..a7dd43e 100644
+index 800055c..7fb1b70 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 @@ -18,29 +18,23 @@ import androidx.compose.runtime.rememberUpdatedState
@@ -82910,7 +82953,7 @@ index 800055c..a7dd43e 100644
   */
  @Composable
  internal fun HetuToolsV2(
-@@ -69,9 +64,12 @@ internal fun HetuToolsV2(
+@@ -69,9 +64,13 @@ internal fun HetuToolsV2(
      contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
      onSubPageVisibleChanged: (Boolean) -> Unit = {},
      onConfigChanged: () -> Unit = {},
@@ -82920,10 +82963,11 @@ index 800055c..a7dd43e 100644
      onOpenConfigEditor: (() -> Unit)? = null,
 +    requestedEntry: ToolsEntry? = null,
 +    onRequestConsumed: () -> Unit = {},
++    requestedImport: Boolean = false,
  ) {
      val context = LocalContext.current
      val app = context.applicationContext
-@@ -81,6 +79,7 @@ internal fun HetuToolsV2(
+@@ -81,6 +80,7 @@ internal fun HetuToolsV2(
      val haptics = rememberHetuHaptics()
      val log by rememberUpdatedState(onLog)
      val changed by rememberUpdatedState(onConfigChanged)
@@ -82931,7 +82975,7 @@ index 800055c..a7dd43e 100644
      val openExternal by rememberUpdatedState(onOpenExternalEntry)
      val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
      val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
-@@ -110,7 +109,7 @@ internal fun HetuToolsV2(
+@@ -110,7 +110,7 @@ internal fun HetuToolsV2(
                  } catch (cancel: CancellationException) {
                      throw cancel
                  } catch (error: Exception) {
@@ -82940,7 +82984,7 @@ index 800055c..a7dd43e 100644
                  }
              }
          }
-@@ -120,34 +119,18 @@ internal fun HetuToolsV2(
+@@ -120,34 +120,18 @@ internal fun HetuToolsV2(
          ToolsActions(
              onOpenEntry = openEntry@{ entry ->
                  if (openExternal(entry)) return@openEntry
@@ -82979,7 +83023,7 @@ index 800055c..a7dd43e 100644
              },
              onOpenEditor = if (onOpenConfigEditor == null) null else { { openConfigEditor?.invoke() } },
              loadConfigs = {
-@@ -160,19 +143,31 @@ internal fun HetuToolsV2(
+@@ -160,19 +144,39 @@ internal fun HetuToolsV2(
                      subscriptions = subscriptions.map { ToolsSubscription(it.name, it.url, it.placeholder) },
                  )
              },
@@ -83002,21 +83046,29 @@ index 800055c..a7dd43e 100644
 +            importFromUrl = { url, name ->
 +                // Validated by Mihomo before it is stored, like 设置 › 导入配置.
 +                val text = HxConfigTransaction.decode(HxConfigTransaction.download(url).first)
-+                controller.validateConfigText(text)
-+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
++                toolsImportCheck { controller.validateConfigText(text) }
++                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }
++                    .also { changed(); selected?.invoke(it) }
 +            },
 +            onPickImportFile = { io.github.xgl34222220.hetu.launchDocumentPicker(::toast) { picker.launch(arrayOf("*/*")) } },
              onClearPickedFile = { pickedFile = null },
              importFile = { file ->
                  val uri = file.token as? Uri ?: throw IOException("无法读取配置文件")
 -                controller.importConfig(uri, file.name).also { changed() }
-+                val text = HxConfigTransaction.decode(HxConfigTransaction.readUri(app, uri))
-+                controller.validateConfigText(text)
-+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, file.name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
++                val bytes = try {
++                    HxConfigTransaction.readUri(app, uri)
++                } catch (denied: SecurityException) {
++                    throw IOException("无法读取所选文件，请重新选择文件", denied)
++                }
++                val text = HxConfigTransaction.decode(bytes)
++                toolsImportCheck { controller.validateConfigText(text) }
++                // A picker name without .yaml/.yml (some providers drop it) would be refused by the library.
++                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, toolsImportFileName(file.name), text.toByteArray(Charsets.UTF_8).inputStream()) }
++                    .also { changed(); selected?.invoke(it) }
              },
              readConfig = { withContext(Dispatchers.IO) { ToolsConfigBridge.document(app) } },
              validateConfig = { text -> controller.validateConfigText(text) },
-@@ -185,19 +180,11 @@ internal fun HetuToolsV2(
+@@ -185,19 +189,11 @@ internal fun HetuToolsV2(
          )
      }
 
@@ -83038,24 +83090,29 @@ index 800055c..a7dd43e 100644
          ) {
              ToolsRoute(
                  actions = actions,
-@@ -208,6 +195,8 @@ internal fun HetuToolsV2(
+@@ -208,6 +204,9 @@ internal fun HetuToolsV2(
                  features = features.actions,
                  appIcon = features.appIcon,
                  onDestinationChanged = { destination = it },
 +                requestedEntry = requestedEntry,
 +                onRequestConsumed = onRequestConsumed,
++                requestedImport = requestedImport,
              )
          }
        }
-@@ -239,19 +228,3 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
-     }
+@@ -240,18 +239,37 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
      return ToolsPickedFile(name, detail, uri)
  }
--
+
 -/** Fetches [url] and hands the body to the config library under [name]; returns the stored name. */
 -private suspend fun download(context: Context, url: String, name: String): String = withContext(Dispatchers.IO) {
 -    val connection = URL(url).openConnection() as? HttpURLConnection ?: throw IOException("请输入有效的 http/https 链接")
--    try {
++/**
++ * 7.0.0: the core's `-t` answer is many log lines; a toast shows two, so the reason was cut off and an
++ * import seemed to do nothing. Keeps the core's own error line, in a Chinese sentence.
++ */
++private suspend fun toolsImportCheck(check: suspend () -> Unit) {
+     try {
 -        connection.connectTimeout = 15_000
 -        connection.readTimeout = 30_000
 -        connection.instanceFollowRedirects = true
@@ -83065,8 +83122,34 @@ index 800055c..a7dd43e 100644
 -        ToolsConfigBridge.importStream(context, name, connection.inputStream)
 -    } finally {
 -        connection.disconnect()
--    }
--}
++        check()
++    } catch (cancel: CancellationException) {
++        throw cancel
++    } catch (error: Exception) {
++        throw IOException("配置校验未通过：" + toolsCoreCheckReason(error.message.orEmpty()), error)
+     }
+ }
++
++/** The `level=error msg="…"` (or `level=fatal`) text of a core check, else its last meaningful line. */
++internal fun toolsCoreCheckReason(message: String): String {
++    val body = message.substringAfter("YAML 校验失败：", message).trim()
++    val logged = Regex("""level=(?:error|fatal)\s+msg="((?:[^"\\]|\\.)*)"""").findAll(body).lastOrNull()?.groupValues?.get(1)
++        ?.replace("\\\"", "\"")?.trim()
++    val reason = logged?.takeIf { it.isNotEmpty() } ?: body.lineSequence().map { it.trim() }
++        .filter { it.isNotEmpty() && !it.startsWith("configuration file") && !it.contains("level=info") && !it.contains("level=warning") }
++        .lastOrNull().orEmpty()
++    return reason.ifEmpty { body.ifEmpty { "未知原因" } }.take(300)
++}
++
++/** A picked document's name as a library file name: keeps .yaml/.yml, otherwise appends .yaml; at most 120 characters. */
++internal fun toolsImportFileName(raw: String): String {
++    val base = raw.trim().replace('/', '_').replace('\\', '_').ifEmpty { "config.yaml" }
++    val named = if (base.endsWith(".yaml", ignoreCase = true) || base.endsWith(".yml", ignoreCase = true)) base else "$base.yaml"
++    if (named.substringBeforeLast('.').isBlank()) return "config.yaml"
++    if (named.length <= 120) return named
++    val ext = named.substring(named.lastIndexOf('.'))
++    return named.substring(0, 120 - ext.length) + ext
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 index d256004..954cdae 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
@@ -84529,19 +84612,21 @@ index 4bdee7e..bb21682 100644
 +internal fun cnIpKernelStatusText(state: ToolsCnIpState): String =
 +    cnIpKernelStatusParts(state).joinToString(" · ") { it.key.fill(*it.args.toTypedArray()) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
-index 7967521..2261ef4 100644
+index 7967521..ad986b4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
-@@ -54,6 +54,8 @@ internal fun ToolsRoute(
+@@ -54,6 +54,10 @@ internal fun ToolsRoute(
      features: ToolsFeatureActions? = null,
      appIcon: (@Composable (ToolsApp, Modifier) -> Unit)? = null,
      onDestinationChanged: (ToolsDestination) -> Unit = {},
 +    requestedEntry: ToolsEntry? = null,
 +    onRequestConsumed: () -> Unit = {},
++    /** With [requestedEntry] = 配置管理: open its 导入配置 form on top (设置 › 基础代理配置 › 导入配置). */
++    requestedImport: Boolean = false,
  ) {
      val act by rememberUpdatedState(actions)
      val scope = rememberCoroutineScope()
-@@ -127,7 +129,7 @@ internal fun ToolsRoute(
+@@ -127,7 +131,7 @@ internal fun ToolsRoute(
      fun selectConfig(config: ToolsConfig) {
          configOverlay = null
          if (config.current) return
@@ -84550,16 +84635,45 @@ index 7967521..2261ef4 100644
      }
 
      fun confirmRename(overlay: ToolsConfigOverlay.Rename) {
-@@ -338,6 +340,24 @@ internal fun ToolsRoute(
+@@ -176,6 +180,12 @@ internal fun ToolsRoute(
+         }
+     }
+
++    // A picked file shows on the 从文件导入 tab: the form is not saved across an activity re-creation while the
++    // system picker is open, so it came back on 从链接导入 and 导入配置 checked the empty link instead.
++    LaunchedEffect(pickedFile) {
++        if (pickedFile != null && import.tab != ToolsImportTab.File && !import.importing) import = import.copy(tab = ToolsImportTab.File, urlError = null)
++    }
++
+     fun runImport() {
+         val form = import
+         if (form.importing) return
+@@ -184,6 +194,7 @@ internal fun ToolsRoute(
+             val urlError = ToolsRules.urlError(form.url)
+             if (urlError != null) { import = form.copy(urlError = urlError); return }
+         } else if (file == null) {
++            act.onMessage("请先选择配置文件")
+             return
+         }
+         import = form.copy(urlError = null, importing = true)
+@@ -338,6 +349,32 @@ internal fun ToolsRoute(
          }
      }
 
 +    // Another tab asked for one of these pages: open it on top of the root, once.
 +    val consumeRequest by rememberUpdatedState(onRequestConsumed)
-+    LaunchedEffect(requestedEntry) {
++    LaunchedEffect(requestedEntry, requestedImport) {
 +        val entry = requestedEntry ?: return@LaunchedEffect
 +        val feature = entry.featureDestination()
 +        when {
++            entry == ToolsEntry.Configs && requestedImport -> {
++                if (top != ToolsDestination.Import) {
++                    import = ToolsImportForm()
++                    act.onClearPickedFile()
++                    stackNames = listOf(ToolsDestination.Root.name, ToolsDestination.Configs.name, ToolsDestination.Import.name)
++                }
++                refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
++            }
 +            entry == ToolsEntry.Configs -> {
 +                if (top != ToolsDestination.Configs) {
 +                    stackNames = listOf(ToolsDestination.Root.name, ToolsDestination.Configs.name)
@@ -84575,7 +84689,7 @@ index 7967521..2261ef4 100644
      /* ------------------------------ 页面 ------------------------------ */
 
      AnimatedContent(
-@@ -499,4 +519,5 @@ internal fun ToolsRoute(
+@@ -499,4 +536,5 @@ internal fun ToolsRoute(
      }
  }
 
@@ -84906,7 +85020,7 @@ index 9841062..4f452b7 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..5482e34 100644
+index 578ce9d..79fad8c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -84982,7 +85096,7 @@ index 578ce9d..5482e34 100644
  没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
  本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
  本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
-@@ -969,16 +998,480 @@ private val vocabularyConnection = """
+@@ -969,16 +998,482 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -85441,6 +85555,8 @@ index 578ce9d..5482e34 100644
 +已取消固定，核心将自动选择节点|Unpinned. The core will choose the node automatically|已取消固定，核心將自動選擇節點|Закрепление снято. Ядро будет выбирать узел автоматически
 +取消固定失败|Could not unpin|取消固定失敗|Не удалось снять закрепление
 +已固定（再次点按取消固定）|Pinned (tap again to unpin)|已固定（再次點按取消固定）|Закреплено (нажмите ещё раз, чтобы открепить)
++从文件或链接导入配置，导入后设为当前配置|Import a configuration from a file or link; it becomes the current one|從檔案或連結匯入設定，匯入後設為目前設定|Импорт конфигурации из файла или по ссылке; она станет текущей
++请先选择配置文件|Choose a configuration file first|請先選擇設定檔|Сначала выберите файл конфигурации
 +""".trimIndent()
 +
 +private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700, vocabularyPanelFix700).joinToString("\n")
@@ -101991,6 +102107,48 @@ index 0000000..af760ec
 +        shows("Current mode: Global")
 +        absent("当前为")
 +        capture("106-adblock-tools-global-warning-en", state)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsImportFix700Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsImportFix700Test.kt
+new file mode 100644
+index 0000000..7a1a9a3
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsImportFix700Test.kt
+@@ -0,0 +1,36 @@
++package io.github.xgl34222220.hetu.tools
++
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotEquals
++import org.junit.Test
++
++/** 7.0.0 import fix: picker names, the core check reason in a toast, and the new settings entry's words. */
++class ToolsImportFix700Test {
++    @Test fun pickedNamesBecomeLibraryNames() {
++        assertEquals("自用_tproxy.yaml", toolsImportFileName("自用_tproxy.yaml"))
++        assertEquals("自用_tproxy.YML", toolsImportFileName(" 自用_tproxy.YML "))
++        assertEquals("document:1234.yaml", toolsImportFileName("document:1234"))
++        assertEquals("config.txt.yaml", toolsImportFileName("config.txt"))
++        assertEquals("config.yaml", toolsImportFileName(""))
++        assertEquals("config.yaml", toolsImportFileName(".yaml"))
++        val long = toolsImportFileName("长".repeat(200) + ".yaml")
++        assertEquals(120, long.length)
++        assertEquals(true, long.endsWith(".yaml"))
++    }
++
++    @Test fun coreCheckKeepsTheErrorLine() {
++        val output = "YAML 校验失败：time=\"2026-10-24T12:00:00+08:00\" level=info msg=\"Start initial configuration in progress\"\n" +
++            "time=\"2026-10-24T12:00:00+08:00\" level=error msg=\"Parse config error: proxy 3: missing type\"\n" +
++            "configuration file /data/x.yaml test failed"
++        assertEquals("Parse config error: proxy 3: missing type", toolsCoreCheckReason(output))
++        assertEquals("Sing-Box 配置校验失败：bad", toolsCoreCheckReason("Sing-Box 配置校验失败：bad"))
++        assertEquals("未知原因", toolsCoreCheckReason(""))
++    }
++
++    @Test fun settingsImportEntryIsTranslated() {
++        listOf("从文件或链接导入配置，导入后设为当前配置", "请先选择配置文件").forEach { word ->
++            for (language in listOf("en", "zh-TW", "ru")) assertNotEquals(word, word, translateHetuText(word, language))
++        }
 +    }
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml b/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml

@@ -70,6 +70,7 @@ internal fun HetuToolsV2(
     onOpenConfigEditor: (() -> Unit)? = null,
     requestedEntry: ToolsEntry? = null,
     onRequestConsumed: () -> Unit = {},
+    requestedImport: Boolean = false,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext
@@ -158,16 +159,24 @@ internal fun HetuToolsV2(
             importFromUrl = { url, name ->
                 // Validated by Mihomo before it is stored, like 设置 › 导入配置.
                 val text = HxConfigTransaction.decode(HxConfigTransaction.download(url).first)
-                controller.validateConfigText(text)
-                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
+                toolsImportCheck { controller.validateConfigText(text) }
+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }
+                    .also { changed(); selected?.invoke(it) }
             },
             onPickImportFile = { io.github.xgl34222220.hetu.launchDocumentPicker(::toast) { picker.launch(arrayOf("*/*")) } },
             onClearPickedFile = { pickedFile = null },
             importFile = { file ->
                 val uri = file.token as? Uri ?: throw IOException("无法读取配置文件")
-                val text = HxConfigTransaction.decode(HxConfigTransaction.readUri(app, uri))
-                controller.validateConfigText(text)
-                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, file.name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
+                val bytes = try {
+                    HxConfigTransaction.readUri(app, uri)
+                } catch (denied: SecurityException) {
+                    throw IOException("无法读取所选文件，请重新选择文件", denied)
+                }
+                val text = HxConfigTransaction.decode(bytes)
+                toolsImportCheck { controller.validateConfigText(text) }
+                // A picker name without .yaml/.yml (some providers drop it) would be refused by the library.
+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, toolsImportFileName(file.name), text.toByteArray(Charsets.UTF_8).inputStream()) }
+                    .also { changed(); selected?.invoke(it) }
             },
             readConfig = { withContext(Dispatchers.IO) { ToolsConfigBridge.document(app) } },
             validateConfig = { text -> controller.validateConfigText(text) },
@@ -197,6 +206,7 @@ internal fun HetuToolsV2(
                 onDestinationChanged = { destination = it },
                 requestedEntry = requestedEntry,
                 onRequestConsumed = onRequestConsumed,
+                requestedImport = requestedImport,
             )
         }
       }
@@ -227,4 +237,39 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
         else -> String.format(Locale.ROOT, "%.1f MB", size / 1024.0 / 1024.0)
     }
     return ToolsPickedFile(name, detail, uri)
+}
+
+/**
+ * 7.0.0: the core's `-t` answer is many log lines; a toast shows two, so the reason was cut off and an
+ * import seemed to do nothing. Keeps the core's own error line, in a Chinese sentence.
+ */
+private suspend fun toolsImportCheck(check: suspend () -> Unit) {
+    try {
+        check()
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (error: Exception) {
+        throw IOException("配置校验未通过：" + toolsCoreCheckReason(error.message.orEmpty()), error)
+    }
+}
+
+/** The `level=error msg="…"` (or `level=fatal`) text of a core check, else its last meaningful line. */
+internal fun toolsCoreCheckReason(message: String): String {
+    val body = message.substringAfter("YAML 校验失败：", message).trim()
+    val logged = Regex("""level=(?:error|fatal)\s+msg="((?:[^"\\]|\\.)*)"""").findAll(body).lastOrNull()?.groupValues?.get(1)
+        ?.replace("\\\"", "\"")?.trim()
+    val reason = logged?.takeIf { it.isNotEmpty() } ?: body.lineSequence().map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("configuration file") && !it.contains("level=info") && !it.contains("level=warning") }
+        .lastOrNull().orEmpty()
+    return reason.ifEmpty { body.ifEmpty { "未知原因" } }.take(300)
+}
+
+/** A picked document's name as a library file name: keeps .yaml/.yml, otherwise appends .yaml; at most 120 characters. */
+internal fun toolsImportFileName(raw: String): String {
+    val base = raw.trim().replace('/', '_').replace('\\', '_').ifEmpty { "config.yaml" }
+    val named = if (base.endsWith(".yaml", ignoreCase = true) || base.endsWith(".yml", ignoreCase = true)) base else "$base.yaml"
+    if (named.substringBeforeLast('.').isBlank()) return "config.yaml"
+    if (named.length <= 120) return named
+    val ext = named.substring(named.lastIndexOf('.'))
+    return named.substring(0, 120 - ext.length) + ext
 }

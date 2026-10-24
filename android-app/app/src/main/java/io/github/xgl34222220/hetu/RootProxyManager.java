@@ -2292,6 +2292,7 @@ final class RootProxyManager {
             validateNativeText(text,profile);
             return;
         }
+        bytes=MihomoStartupConfig.editorValidationCompat(text).getBytes(StandardCharsets.UTF_8);
         File stage=new File(context.getCacheDir(),"hetu-config-validator");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
         File source=File.createTempFile("editor-", ".yaml", stage);
@@ -2306,6 +2307,10 @@ final class RootProxyManager {
                 +"; copy_rc=$?; if [ \"$copy_rc\" -ne 0 ]; then rm -f "+RootBridge.quote(rootFile)
                 +"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$copy_rc\"; fi"
                 +"; chmod 600 "+RootBridge.quote(rootFile)
+                // 7.0.0: a GEOSITE / GEOIP rule makes `-t` download GeoSite.dat / the MMDB into an empty -d
+                // (90 s, past this 30 s bound); link the core home's copies so the check reads them offline.
+                +"; for f in "+RootBridge.quote(ROOT+"/run")+"/*.dat "+RootBridge.quote(ROOT+"/run")+"/*.mmdb "+RootBridge.quote(ROOT+"/run")+"/*.metadb"
+                +"; do [ -f \"$f\" ] && ln -sf \"$f\" "+RootBridge.quote(workDir)+"/; done"
                 +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                 +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
         try{

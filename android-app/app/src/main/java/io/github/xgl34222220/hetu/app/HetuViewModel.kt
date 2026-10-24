@@ -93,6 +93,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         tab = HxTab.Tools
     }
 
+    /** With [toolsRequest] = 配置管理: open its 导入配置 form (设置 › 基础代理配置 › 导入配置). */
+    var toolsImportRequest by mutableStateOf(false)
+
+    /** Opens 工具 › 配置管理 › 导入配置, the one import page, from another tab. */
+    fun openToolsImport() {
+        toolsImportRequest = true
+        openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
+    }
+
     /** Open a live panel section from home cards, tools or deep links. */
     fun openPanel(section: String) {
         val requested = section.ifBlank { "overview" }
@@ -1106,7 +1115,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
                         if (outcome == SelectionOutcome700.Confirmed) break
                     }
-                    if (attempt < SELECT_CONFIRM_POLLS_700 - 1) delay(SELECT_CONFIRM_INTERVAL_MS_700)
+                    if (attempt < SELECT_CONFIRM_POLLS_700 - 1)
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { delay(SELECT_CONFIRM_INTERVAL_MS_700) }
                 }
                 val fresh = refreshNow()
                 if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch

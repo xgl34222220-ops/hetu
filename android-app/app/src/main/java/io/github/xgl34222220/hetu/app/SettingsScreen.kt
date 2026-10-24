@@ -510,6 +510,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                     SettingsNavRow(ht("查看启动配置"), subtitle = ht("查看当前生成的运行配置文件"), icon = ToolsIcons.FileCog) {
                         context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
                     }
+                    SettingsDivider()
+                    // The one import page (工具 › 配置管理 › 导入配置), reached from here too.
+                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件或链接导入配置，导入后设为当前配置"), icon = ToolsIcons.Download) {
+                        nav.openRequested(HxRoute.Main)
+                        vm.openToolsImport()
+                    }
                 }
             }
         }

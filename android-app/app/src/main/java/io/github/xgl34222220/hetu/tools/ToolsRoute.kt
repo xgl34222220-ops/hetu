@@ -56,6 +56,8 @@ internal fun ToolsRoute(
     onDestinationChanged: (ToolsDestination) -> Unit = {},
     requestedEntry: ToolsEntry? = null,
     onRequestConsumed: () -> Unit = {},
+    /** With [requestedEntry] = 配置管理: open its 导入配置 form on top (设置 › 基础代理配置 › 导入配置). */
+    requestedImport: Boolean = false,
 ) {
     val act by rememberUpdatedState(actions)
     val scope = rememberCoroutineScope()
@@ -178,6 +180,12 @@ internal fun ToolsRoute(
         }
     }
 
+    // A picked file shows on the 从文件导入 tab: the form is not saved across an activity re-creation while the
+    // system picker is open, so it came back on 从链接导入 and 导入配置 checked the empty link instead.
+    LaunchedEffect(pickedFile) {
+        if (pickedFile != null && import.tab != ToolsImportTab.File && !import.importing) import = import.copy(tab = ToolsImportTab.File, urlError = null)
+    }
+
     fun runImport() {
         val form = import
         if (form.importing) return
@@ -186,6 +194,7 @@ internal fun ToolsRoute(
             val urlError = ToolsRules.urlError(form.url)
             if (urlError != null) { import = form.copy(urlError = urlError); return }
         } else if (file == null) {
+            act.onMessage("请先选择配置文件")
             return
         }
         import = form.copy(urlError = null, importing = true)
@@ -342,10 +351,18 @@ internal fun ToolsRoute(
 
     // Another tab asked for one of these pages: open it on top of the root, once.
     val consumeRequest by rememberUpdatedState(onRequestConsumed)
-    LaunchedEffect(requestedEntry) {
+    LaunchedEffect(requestedEntry, requestedImport) {
         val entry = requestedEntry ?: return@LaunchedEffect
         val feature = entry.featureDestination()
         when {
+            entry == ToolsEntry.Configs && requestedImport -> {
+                if (top != ToolsDestination.Import) {
+                    import = ToolsImportForm()
+                    act.onClearPickedFile()
+                    stackNames = listOf(ToolsDestination.Root.name, ToolsDestination.Configs.name, ToolsDestination.Import.name)
+                }
+                refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
+            }
             entry == ToolsEntry.Configs -> {
                 if (top != ToolsDestination.Configs) {
                     stackNames = listOf(ToolsDestination.Root.name, ToolsDestination.Configs.name)

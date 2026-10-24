@@ -849,6 +849,12 @@ final class MihomoStartupConfig {
         try{int v=Integer.parseInt(m.group(1));return v>0&&v<=65535?v:0;}catch(Exception ignored){return 0;}
     }
     private static String normalize(String s){return s.replace("\r\n","\n").replace('\r','\n');}
+    /** 7.0.0: the editor/import check sees the same fingerprint migration the start path applies,
+     *  so a config with the removed `global-client-fingerprint` key is not rejected by the new core. */
+    static String editorValidationCompat(String source)throws IOException{
+        if(source==null||!source.contains("global-client-fingerprint"))return source;
+        return removeTopLevelScalar(RuntimeCompatibility14.migrateFingerprint(source),"global-client-fingerprint");
+    }
     private static String removeTopLevelScalar(String source,String key){StringBuilder out=new StringBuilder();String[] lines=source.split("\n",-1);for(String line:lines){if(indent(line)==0&&key.equals(keyOfMappingLine(line.trim())))continue;out.append(line).append('\n');}return trimOne(out.toString());}
     private static String removeTopLevelKey(String source,String key){
         String[] lines=source.split("\n",-1);StringBuilder out=new StringBuilder();boolean skipping=false;Pattern start=Pattern.compile("^"+Pattern.quote(key)+"\\s*:(.*)$");Pattern nextKey=Pattern.compile("^[A-Za-z0-9_.-]+\\s*:");
