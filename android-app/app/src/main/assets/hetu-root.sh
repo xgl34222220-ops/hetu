@@ -262,6 +262,14 @@ FAILOPEN_TEXT='检测到整机断网，河图已自动退出并恢复系统网�
 WD_FAILOPEN_FAST=60
 WD_FAILOPEN_AFTER=150
 WD_FAILOPEN_HEAL_MAX=240
+# Boot grace: an automatic start early in a boot (service.d restore or App boot recovery, uptime below
+# WD_BOOT_WINDOW s) records BOOT_GRACE_STATE. Its watchdog then neither runs the Wi-Fi heal nor fails open
+# for WD_BOOT_GRACE s unless this session already saw the network work once: a network that is still
+# associating / validating right after boot is not a whole-phone outage caused by Hetu, and a fail-open
+# there would also block every further automatic start for the whole boot.
+BOOT_GRACE_STATE="$RUN/state/boot-grace"
+WD_BOOT_GRACE=300
+WD_BOOT_WINDOW=600
 # Bounded stop: the normal stop transaction gets STOP_FORCE_AFTER s, then force_teardown takes over
 # regardless of locks. Every force step is a single command under FORCE_STEP_TIMEOUT s; chains are only
 # flushed/deleted while FORCE_BUDGET s last (unhooked leftover chains carry no traffic; the next start
@@ -3292,6 +3300,12 @@ wd_selfheal_init(){
   WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BAD_NAMES=""
   WD_OFF_N=0; WD_OFF_NEXT=0; WD_OFF_SINCE=0; WD_OFF_LAST=0; WD_OFF_HEAL_AT=0; WD_FO_HELD=0; WD_CACHE_SEEN=0; WD_STALL_AT=$((WD_NOW+WD_STALL_EVERY)); WD_PIN_TTL="$WD_STALL_PIN_TTL"
   WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
+  WD_BOOT_GRACE_UNTIL=0; WD_BOOT_GRACE_LOGGED=0
+  WD_BG_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+  if [ -n "$WD_BG_BOOT" ] && [ "$(cat "${BOOT_GRACE_STATE:-$RUN/state/boot-grace}" 2>/dev/null)" = "$WD_BG_BOOT" ]; then
+    WD_BOOT_GRACE_UNTIL=$((WD_NOW+${WD_BOOT_GRACE:-300}))
+    [ "$WD_BOOT_GRACE_UNTIL" -le $((${WD_BOOT_WINDOW:-600}+${WD_BOOT_GRACE:-300})) ] || WD_BOOT_GRACE_UNTIL=$((${WD_BOOT_WINDOW:-600}+${WD_BOOT_GRACE:-300}))
+  fi
   WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
   if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
     [ "$(sed -n 's/^TCP=//p' "$SESSION" 2>/dev/null | head -n 1)" = 1 ]; then
@@ -3546,7 +3560,7 @@ wd_egress_tick(){
   wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
   case "$WET_RC" in
     0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-       WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; return 0;;
+       WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; WD_BOOT_GRACE_UNTIL=0; return 0;;
     2) WD_EG_TARGET=""; return 0;;
   esac
   # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
@@ -3862,6 +3876,11 @@ wd_dp_classify(){
 # probes the Wi-Fi outside Hetu and escalates (flushnet + reevaluate, reconnect, Wi-Fi off/on; rate-limited there).
 # A new check at most every WIFI_HEAL_GAP/2 s while the outage lasts.
 wd_offline_seen(){
+  # Boot grace (BOOT_GRACE_STATE): the network of a boot-time start was never seen working yet.
+  if [ "${WD_BOOT_GRACE_UNTIL:-0}" -gt "$WD_NOW" ]; then
+    [ "${WD_BOOT_GRACE_LOGGED:-0}" = 1 ] || { WD_BOOT_GRACE_LOGGED=1; wd_log "boot grace: no network yet ($1); no Wi-Fi heal or fail-open before uptime $WD_BOOT_GRACE_UNTIL s"; }
+    WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_LAST=0; WD_OFF_HEAL_AT=0; return 0
+  fi
   # One outage = offline verdicts at most 300 s apart; an older start belongs to an outage that ended.
   if [ "${WD_OFF_SINCE:-0}" = 0 ] || [ $((WD_NOW-${WD_OFF_LAST:-0})) -gt 300 ]; then WD_OFF_SINCE="$WD_NOW"; WD_OFF_HEAL_AT=0; fi
   WD_OFF_LAST="$WD_NOW"
@@ -3914,6 +3933,21 @@ wd_failopen_due(){
   WFD_PID=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
   if [ -n "$WFD_PID" ] && kill -0 "$WFD_PID" 2>/dev/null && [ $((WD_NOW-WD_OFF_HEAL_AT)) -lt "${WD_FAILOPEN_HEAL_MAX:-240}" ]; then return 1; fi
   WD_FO_WHY="still offline ${WFD_AGE}s after the outage began, after the Wi-Fi heal"
+  return 0
+}
+# Boot grace marker for this session's watchdog (see BOOT_GRACE_STATE). A self-heal restart keeps the
+# session's marker as it is; a manual start never gets one.
+boot_grace_mark(){
+  [ -z "${HETU_SELFHEAL_RESTART:-}" ] || return 0
+  BGM_FILE="${BOOT_GRACE_STATE:-$RUN/state/boot-grace}"
+  rm -f "$BGM_FILE" 2>/dev/null
+  [ -n "${HETU_BOOT_RESTORE_ID:-}${HETU_AUTOMATIC_RECOVERY_ID:-}" ] || return 0
+  BGM_UP=""; read -r BGM_UP BGM_UNUSED < /proc/uptime 2>/dev/null || return 0
+  BGM_UP=${BGM_UP%%.*}; case "$BGM_UP" in ''|*[!0-9]*) return 0;; esac
+  [ "$BGM_UP" -lt "${WD_BOOT_WINDOW:-600}" ] || return 0
+  BGM_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); [ -n "$BGM_BOOT" ] || return 0
+  mkdir -p "$RUN/state" 2>/dev/null || return 0
+  printf '%s\n' "$BGM_BOOT" > "$BGM_FILE" 2>/dev/null || true
   return 0
 }
 # Records why Hetu ended itself; the App and diagnostics read it, automatic starts refuse while it holds
@@ -4438,7 +4472,7 @@ wd_dataplane_tick(){
     ok)
       if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
       WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
-      WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0
+      WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_BOOT_GRACE_UNTIL=0
       wd_egress_state ok; return 0;;
     offline)
       [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
@@ -5106,6 +5140,7 @@ start(){
   health_record || { fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
   start_selfheal_record "$@"
+  boot_grace_mark
   rm -f "$RUN/google-firewall-at" "$RUN/google-firewall-ebpf" "$RUN/google-firewall-uids"
   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
   [ "$START_VENDOR_CLEAN" = 1 ] || google_firewall_detect

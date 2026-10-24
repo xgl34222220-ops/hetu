@@ -29,6 +29,13 @@ public final class BootReceiver extends BroadcastReceiver {
 
         boolean bootOrUnlock=Intent.ACTION_BOOT_COMPLETED.equals(action)||Intent.ACTION_USER_UNLOCKED.equals(action);
         if (!bootOrUnlock) return;
+        if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
+            // The persisted running flag describes the previous boot. Left set, the UI and the
+            // status notification showed "running" with no network while Root was not ready yet,
+            // and a boot start with an unconfirmable probe treated it as an unverified live core
+            // ("核心存活但网络接管未通过完整验证"). Only a live probe or native adoption sets it again.
+            prefs.edit().putBoolean("proxyRootRuntimeRunning", false).apply();
+        }
         if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartInstalled",false)
                 &&!prefs.getBoolean("proxyRootWanted",false)){
             // Native service.d can restore before credential storage unlock. This
