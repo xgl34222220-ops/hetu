@@ -155,6 +155,11 @@ final class MihomoControllerClient {
         request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));
     }
 
+    /** Releases a URLTest/Fallback pin (Mihomo DELETE /proxies/{group} clears `fixed`). */
+    void unfix(String group)throws Exception{
+        request("DELETE","/proxies/"+Uri.encode(group),null);
+    }
+
     void updateRuleProvider(String name)throws Exception{
         request("PUT","/providers/rules/"+Uri.encode(name),null,30000);
     }

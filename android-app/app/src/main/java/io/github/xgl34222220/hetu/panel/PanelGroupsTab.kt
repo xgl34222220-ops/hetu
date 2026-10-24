@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -133,6 +135,7 @@ internal fun LazyListScope.panelGroupsTab(
                         row.nodes.forEach { node ->
                             NodeCard(
                                 node = node, selected = row.group.now == node.name, switching = data.switching[row.group.name] == node.name,
+                                pinned = row.group.fixed.isNotEmpty() && row.group.fixed == node.name,
                                 delay = data.delayOf(node.name), view = view,
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 onSelect = { onSelectNode(row.group.name, node.name) }, onTest = { onTestNode(node.name) }, onInfo = { onNodeInfo(node.name) },
@@ -326,6 +329,7 @@ private fun NodeCard(
     node: PanelNode,
     selected: Boolean,
     switching: Boolean,
+    pinned: Boolean = false,
     delay: PanelDelay?,
     view: PanelViewState,
     modifier: Modifier,
@@ -345,10 +349,11 @@ private fun NodeCard(
         HomeMotion.fade(motion), label = "nodeOutline",
     )
     val info = ht("节点信息")
+    val pinnedLabel = ht("已固定（再次点按取消固定）")
     val shell = modifier
         .heightIn(min = if (compact) 80.dp else 92.dp)
         .testTag("panel-node:${node.name}")
-        .semantics { this.selected = selected }
+        .semantics { this.selected = selected; if (pinned) stateDescription = pinnedLabel }
         .hetuPressScale(source, pressedScale = .975f, motion = motion)
         .clip(PanelDims.nodeShape)
         .background(fill)
@@ -370,6 +375,11 @@ private fun NodeCard(
             Text(
                 label, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
                 maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis, inlineContent = flag,
+            )
+            // 7.0.0: the node an automatic group is pinned to carries a pin; tapping it again unpins.
+            if (pinned && !switching) Icon(
+                Icons.Filled.PushPin, null,
+                Modifier.padding(top = 2.dp).size(16.dp).testTag("panel-node-pin:${node.name}"), tint = c.accent,
             )
             PanelSwapFade(switching, motion) { busy ->
                 if (busy) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)

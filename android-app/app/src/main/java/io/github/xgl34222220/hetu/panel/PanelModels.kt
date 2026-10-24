@@ -73,6 +73,8 @@ internal data class PanelGroup(
     val now: String,
     val hidden: Boolean = false,
     val availableCount: Int = nodes.size,
+    /** URLTest/Fallback pin (Mihomo `fixed`); "" when the core chooses on its own. */
+    val fixed: String = "",
 ) {
     val isGlobal: Boolean get() = name == "GLOBAL"
     val summary: String get() = "$type · $availableCount/${nodes.size}"
@@ -380,6 +382,8 @@ internal class PanelActions(
     val onStart: () -> Unit = {},
     val onSelectNode: (group: String, node: String) -> Unit = { _, _ -> },
     val onTestNode: (node: String) -> Unit = {},
+    /** Releases a URLTest/Fallback pin (DELETE /proxies/{group}). */
+    val onUnpin: (group: String) -> Unit = {},
     val onTestGroup: (group: String) -> Unit = {},
     /** 排序与布局 › 测试全部节点. */
     val onTestAll: () -> Unit = {},

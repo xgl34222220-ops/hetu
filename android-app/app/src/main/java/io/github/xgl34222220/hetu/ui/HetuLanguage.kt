@@ -1447,7 +1447,14 @@ Root 代理已强制停止并恢复网络；仍有少量残留规则，下次启
 重启请求已被停止取代|The restart was superseded by a stop|重新啟動請求已被停止取代|Перезапуск отменён остановкой
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700).joinToString("\n")
+private val vocabularyPanelFix700 = """
+已固定，节点测通后核心会使用它|Pinned. The core will use it once the node passes its test|已固定，節點測通後核心會使用它|Закреплено. Ядро начнёт использовать узел, когда он пройдёт проверку
+已取消固定，核心将自动选择节点|Unpinned. The core will choose the node automatically|已取消固定，核心將自動選擇節點|Закрепление снято. Ядро будет выбирать узел автоматически
+取消固定失败|Could not unpin|取消固定失敗|Не удалось снять закрепление
+已固定（再次点按取消固定）|Pinned (tap again to unpin)|已固定（再次點按取消固定）|Закреплено (нажмите ещё раз, чтобы открепить)
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700, vocabularyPanelFix700).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

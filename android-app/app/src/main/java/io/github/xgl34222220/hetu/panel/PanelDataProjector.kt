@@ -226,7 +226,7 @@ internal class PanelDataProjector {
         val names = source.mapTo(HashSet()) { it.name }
         val delays = HashMap<String, PanelDelay>()
         val groups = source.map { g ->
-            PanelGroup(name = g.name, type = groupType(g.type), now = g.now, hidden = g.hidden,
+            PanelGroup(name = g.name, type = groupType(g.type), now = g.now, hidden = g.hidden, fixed = g.fixed,
                 availableCount = g.nodes.count { (it.lastDelay ?: -1L) > 0L },
                 nodes = g.nodes.map { n ->
                     if (n.name !in names && n.lastDelay != null) delays[n.name] = panelDelayOf(n.lastDelay)

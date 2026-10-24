@@ -241,6 +241,19 @@ internal class ProxyDashboardRepository(context: Context) {
             .putInt("proxyLastSelectionCloseFailed", failed)
             .apply()
     }
+    /** 7.0.0: live (now, fixed, type) of one group, read from the ticket's controller. */
+    suspend fun readSelection(group: String, ticket: SelectionTicket): Triple<String, String, String>? =
+        withContext(Dispatchers.IO) {
+            requireCurrentOrigin(ticket.identity)
+            val entry = ticket.client(app).proxies().optJSONObject(group) ?: return@withContext null
+            Triple(entry.optString("now", ""), entry.optString("fixed", ""), entry.optString("type", ""))
+        }
+    /** 7.0.0: releases an automatic group's pin so the core resumes its own choice. */
+    suspend fun unpin(group: String, ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        ticket.client(app).unfix(group)
+        acknowledgeMutation(ticket)
+    }
     suspend fun closeConnection(id: String) = controller.closeConnection(id)
     /** V19: live Mihomo traffic mode (rule / global / direct); "rule" when unreadable. */
     suspend fun trafficMode(): String = withContext(Dispatchers.IO) {

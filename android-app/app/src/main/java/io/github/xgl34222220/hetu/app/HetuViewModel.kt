@@ -14,6 +14,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.xgl34222220.hetu.panel.RETRY_DELAY_CONCURRENCY_700
+import io.github.xgl34222220.hetu.panel.SELECT_CONFIRM_INTERVAL_MS_700
+import io.github.xgl34222220.hetu.panel.SELECT_CONFIRM_POLLS_700
+import io.github.xgl34222220.hetu.panel.SelectionOutcome700
+import io.github.xgl34222220.hetu.panel.isSelectorGroup700
+import io.github.xgl34222220.hetu.panel.selectionOutcome700
+import io.github.xgl34222220.hetu.panel.tapUnpins700
 import io.github.xgl34222220.hetu.ui.HetuComposeController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -1067,7 +1074,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
         if (pendingSelection.containsKey(group)) return
         val current = state.groups.firstOrNull { it.name == group } ?: return
-        if (current.now == node || current.nodes.none { it.name == node }) return
+        if (current.nodes.none { it.name == node }) return
+        // 7.0.0: tapping the node an automatic group is pinned to releases the pin.
+        if (tapUnpins700(current.type, current.fixed, node)) return unpin(group)
+        if (current.now == node && (isSelectorGroup700(current.type) || current.fixed == node)) return
         val ticket = repo.captureSelection()
         val owner = ++requestSequence
         selectionOwners[group] = owner
@@ -1080,16 +1090,75 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false), ticket)
                 // The already-sent PUT cannot be revoked, but must not revive a stopped UI.
                 if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
+                // 7.0.0: poll the live group (now + fixed) instead of judging one readback.
+                // URLTest/Fallback store the PUT as `fixed` and only move `now` once the
+                // pinned node tests alive, so a fixed match is a pin, not a failure.
+                var outcome = SelectionOutcome700.Unconfirmed
+                var lastNow = ""
+                for (attempt in 0 until SELECT_CONFIRM_POLLS_700) {
+                    val live = try { repo.readSelection(group, ticket) }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (_: Exception) { null }
+                    if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
+                    if (live != null) {
+                        lastNow = live.first
+                        outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
+                        if (outcome == SelectionOutcome700.Confirmed) break
+                    }
+                    if (attempt < SELECT_CONFIRM_POLLS_700 - 1) delay(SELECT_CONFIRM_INTERVAL_MS_700)
+                }
                 val fresh = refreshNow()
                 if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
-                val actual = fresh?.takeIf { it.running && it.panelReady }
-                    ?.groups?.firstOrNull { it.name == group }?.now
-                check(actual == node) { "核心尚未确认所选节点，当前为 ${actual.orEmpty().ifBlank { "未知" }}" }
+                if (outcome == SelectionOutcome700.Unconfirmed) {
+                    val readback = fresh?.takeIf { it.running && it.panelReady }?.groups?.firstOrNull { it.name == group }
+                    if (readback != null) {
+                        lastNow = readback.now
+                        outcome = selectionOutcome700(readback.type, readback.now, readback.fixed, node)
+                    }
+                }
+                when (outcome) {
+                    SelectionOutcome700.Confirmed -> Unit
+                    SelectionOutcome700.Pinned -> toast("已固定，节点测通后核心会使用它")
+                    SelectionOutcome700.Unconfirmed ->
+                        error("核心尚未确认所选节点，当前为 ${lastNow.ifBlank { "未知" }}")
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 if (currentRuntimeRequest(request) && selectionOwners[group] == owner)
                     toast("切换失败：" + errorText(error, "未知错误"))
+            } finally {
+                if (selectionOwners[group] == owner) {
+                    selectionOwners.remove(group)
+                    pendingSelection.remove(group)
+                }
+            }
+        }
+    }
+
+    /** 7.0.0: releases a URLTest/Fallback pin (DELETE /proxies/{group}). */
+    fun unpin(group: String) {
+        if (refuseRestoredGroups()) return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
+        if (pendingSelection.containsKey(group)) return
+        val current = state.groups.firstOrNull { it.name == group } ?: return
+        if (current.fixed.isEmpty()) return
+        val ticket = repo.captureSelection()
+        val owner = ++requestSequence
+        selectionOwners[group] = owner
+        pendingSelection[group] = current.fixed
+        viewModelScope.launch {
+            try {
+                repo.unpin(group, ticket)
+                if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
+                refreshNow()
+                if (currentRuntimeRequest(request) && selectionOwners[group] == owner)
+                    toast("已取消固定，核心将自动选择节点")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                if (currentRuntimeRequest(request) && selectionOwners[group] == owner)
+                    toast("取消固定失败：" + errorText(error, "未知错误"))
             } finally {
                 if (selectionOwners[group] == owner) {
                     selectionOwners.remove(group)

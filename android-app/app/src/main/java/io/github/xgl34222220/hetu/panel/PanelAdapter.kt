@@ -536,7 +536,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     // visible group/node card fresh lambdas and recomposed the whole list while scrolling.
     val currentTab by rememberUpdatedState(tab)
     val actions = remember(vm, context) { PanelActions(
-        onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
+        onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode, onUnpin = vm::unpin,
         onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
         onTestAll = vm::testAll,
         onUpdateSubscription = vm::updateProvider, onUpdateAllSubscriptions = vm::updateAllProviders,

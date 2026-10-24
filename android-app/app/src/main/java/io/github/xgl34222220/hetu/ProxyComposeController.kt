@@ -39,6 +39,10 @@ internal data class ProxyGroupUi(
     val iconUrl: String = "",
     val iconPath: String = "",
     val hidden: Boolean = false,
+    /** Mihomo `fixed`: node pinned by PUT on URLTest/Fallback groups ("" when not pinned). */
+    val fixed: String = "",
+    /** Mihomo group `testUrl`, used for per-node delay retries ("" when absent). */
+    val testUrl: String = "",
 )
 
 internal data class ProxyConnectionUi(
@@ -800,6 +804,8 @@ internal class ProxyComposeController(context: Context) {
                 iconUrl = iconUrl,
                 iconPath = icons.diskPath(iconUrl),
                 hidden = group.optBoolean("hidden", false),
+                fixed = group.optString("fixed", ""),
+                testUrl = group.optString("testUrl", ""),
             )
         }
         // GLOBAL.all carries configuration order; JSON object key order does not.
