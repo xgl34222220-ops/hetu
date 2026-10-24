@@ -115,7 +115,10 @@ internal fun PanelScreen(
     // reserves that room too, so the right column's delays and the last row can scroll clear of it.
     var fabStack by remember { mutableStateOf(0.dp) }
     val fabShown = view.tab == PanelTab.Groups && data.running && view.expandedGroups.isNotEmpty() && data.readError.isBlank() && !data.loading && data.core.supports(PanelTab.Groups)
-    val listBottom = if (fabShown && fabStack > 0.dp) maxOf(bottomPad, bottomPad.coerceAtLeast(16.dp) + fabStack + 12.dp) else bottomPad
+    val measuredBottom = if (fabShown && fabStack > 0.dp) maxOf(bottomPad, bottomPad.coerceAtLeast(16.dp) + fabStack + 12.dp) else bottomPad
+    // 7.0.0: with a group open, the last node rows must clear the dock, 定位当前节点 and the group
+    // capsule even before (or while) the floating stack is measured / popping in.
+    val listBottom = if (fabShown) maxOf(measuredBottom, bottomPad + PanelFabClearance700) else measuredBottom
     // The title block follows the font scale, so a large system font never spills into the tabs.
     val titleHeight = with(density) { HomeType.largeTitle.lineHeight.toDp() } + 8.dp
     val titlePx = with(density) { titleHeight.toPx() }
@@ -252,7 +255,9 @@ internal fun PanelScreen(
         SideEffect { if (openGroup != null) lastOpen = openGroup }
         val shownGroup = openGroup ?: lastOpen
         Column(
-            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp))
+            // 7.0.0: the stack hugs the screen edge (inside the gutter) rather than the card edge,
+            // so it covers less of the right node column's names and delay pills.
+            Modifier.align(Alignment.BottomEnd).padding(end = PanelFabEdge700, bottom = bottomPad.coerceAtLeast(16.dp))
                 .onSizeChanged { size -> fabStack = with(density) { size.height.toDp() } },
             horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -475,3 +480,8 @@ private fun PanelSyncChip() {
         Text(ht("同步中"), color = c.accentText, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
+
+/** 7.0.0: minimum list clearance above the dock while the 策略 floating stack is shown. */
+internal val PanelFabClearance700 = 140.dp
+/** 7.0.0: end inset of the 策略 floating stack. */
+internal val PanelFabEdge700 = 6.dp
