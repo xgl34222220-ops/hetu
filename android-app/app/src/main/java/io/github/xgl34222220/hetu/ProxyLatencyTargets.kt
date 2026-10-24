@@ -12,11 +12,18 @@ internal object ProxyLatencyTargets {
     private const val URL_PREFIX = "proxyLatencyTargetUrl"
     private const val LAST_PREFIX = "proxyUiLastDelayTarget"
 
+    /**
+     * The Google target measures google.com itself. www.gstatic.com is served from mainland
+     * China as well, so it answered without a proxy and read as "Google reachable".
+     */
     val defaults = listOf(
         ProxyLatencyTarget("Baidu", "https://www.baidu.com/"),
         ProxyLatencyTarget("Cloudflare", "https://cp.cloudflare.com/generate_204"),
-        ProxyLatencyTarget("Google", "https://www.gstatic.com/generate_204"),
+        ProxyLatencyTarget("Google", "https://www.google.com/generate_204"),
     )
+
+    /** The former Google default; a saved copy of it (written with the other targets) is migrated. */
+    internal const val LEGACY_GOOGLE_URL = "https://www.gstatic.com/generate_204"
 
     fun load(context: Context): List<ProxyLatencyTarget> =
         load(context.getSharedPreferences("hetu", Context.MODE_PRIVATE))
@@ -24,10 +31,9 @@ internal object ProxyLatencyTargets {
     fun load(prefs: SharedPreferences): List<ProxyLatencyTarget> =
         (0 until COUNT).map { index ->
             val fallback = defaults[index]
-            ProxyLatencyTarget(
-                prefs.getString("$NAME_PREFIX$index", fallback.name).orEmpty().trim().ifBlank { fallback.name },
-                prefs.getString("$URL_PREFIX$index", fallback.url).orEmpty().trim().ifBlank { fallback.url },
-            )
+            val name = prefs.getString("$NAME_PREFIX$index", fallback.name).orEmpty().trim().ifBlank { fallback.name }
+            val url = prefs.getString("$URL_PREFIX$index", fallback.url).orEmpty().trim().ifBlank { fallback.url }
+            ProxyLatencyTarget(name, if (name == fallback.name && url == LEGACY_GOOGLE_URL && fallback.name == "Google") fallback.url else url)
         }
 
     fun save(prefs: SharedPreferences, values: List<ProxyLatencyTarget>) {

@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -37,7 +38,8 @@ internal enum class HomeDestination { Main, IpDetail, Targets, Resource }
  * - 本机直测 › 滑杆图标 → [HomeDestination.Targets]
  * - 资源占用 card → [HomeDestination.Resource]
  * - 网速 card → 网速数据来源 sheet
- * - [HomeStatus.StartFailed] → 启动失败 sheet (dismiss calls [HomeActions.onDismissStartFailure])
+ * - [HomeStatus.StartFailed] → 启动失败 sheet. Swiping it away only hides it (audit4 U4): the home page keeps a
+ *   「查看原因」 strip until the next start or its ×, which calls [HomeActions.onDismissStartFailure].
  *
  * @param onDetailVisibleChange true while a sub-page is shown; use it to hide the dock and to let
  *        the shell's own BackHandler stand down (same idea as `panelDetailVisible` in RefProxyShell).
@@ -56,8 +58,15 @@ internal fun HomeRoute(
     var destination by rememberSaveable { mutableStateOf(HomeDestination.Main) }
     var ipSide by rememberSaveable { mutableStateOf(HomeNetSide.Wan) }
     var speedSheet by rememberSaveable { mutableStateOf(false) }
+    val failure = state.status as? HomeStatus.StartFailed
+    // Hidden per failure text: a new failure opens its sheet again.
+    var failureSheetHidden by rememberSaveable(failure?.detail) { mutableStateOf(false) }
     var targets by remember { mutableStateOf(HomeTargetsConfig()) }
     var feedback by remember { mutableStateOf<HomeTargetsFeedback?>(null) }
+
+    // Navigation lambdas read the latest state instead of capturing it, so they stay the same
+    // instances across polls and the cards they are handed can skip recomposition.
+    val latestState by rememberUpdatedState(state)
 
     LaunchedEffect(destination) { onDetailVisibleChange(destination != HomeDestination.Main) }
     BackHandler(enabled = destination != HomeDestination.Main) { destination = HomeDestination.Main }
@@ -86,12 +95,13 @@ internal fun HomeRoute(
             HomeDestination.Main -> HomeScreen(
                 state = state,
                 actions = actions,
-                onOpenIpDetail = { ipSide = state.netSide; destination = HomeDestination.IpDetail },
+                onOpenIpDetail = { ipSide = latestState.netSide; destination = HomeDestination.IpDetail },
                 onOpenTargets = { targets = actions.loadTargets(); feedback = null; destination = HomeDestination.Targets },
                 onOpenResource = { destination = HomeDestination.Resource },
                 onOpenSpeedSource = { speedSheet = true },
                 contentPadding = contentPadding,
                 motion = animate,
+                onShowStartFailure = { failureSheetHidden = false },
             )
             HomeDestination.IpDetail -> HomeIpDetailScreen(
                 state = state,
@@ -142,14 +152,15 @@ internal fun HomeRoute(
         }
     }
 
-    val failure = state.status as? HomeStatus.StartFailed
-    if (failure != null && destination == HomeDestination.Main) {
-        HomeModalSheet(onDismiss = actions.onDismissStartFailure) {
+    if (failure != null && !failureSheetHidden && destination == HomeDestination.Main) {
+        HomeModalSheet(onDismiss = { failureSheetHidden = true }) {
             HomeStartFailedSheetContent(
                 detail = failure.detail,
+                lastGood = state.lastGood,
                 onCopy = { haptics(HomeHaptic.Confirm); actions.onCopy("诊断信息", failure.detail) },
                 onViewConfig = { actions.onDismissStartFailure(); actions.onViewConfig() },
                 onRetry = { actions.onDismissStartFailure(); actions.onStart() },
+                onStartLastGood = { actions.onDismissStartFailure(); actions.onStartLastGood() },
             )
         }
     }

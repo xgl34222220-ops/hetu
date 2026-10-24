@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.github.xgl34222220.hetu.home.HomeModalSheet
+import io.github.xgl34222220.hetu.home.HomeTone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -54,7 +55,8 @@ internal fun ToolsFeaturePage(
     }
 }
 
-private fun Throwable.reason(fallback: String): String = message?.takeIf { it.isNotBlank() } ?: fallback
+/** A friendly Chinese message (hxErrorMessage maps timeouts, DNS and HTTP failures); the raw text goes to the log. */
+private fun Throwable.reason(fallback: String): String = io.github.xgl34222220.hetu.hxErrorMessage(this, fallback)
 
 /** Launches [block]; anything it throws except cancellation goes to [onError]. */
 private fun CoroutineScope.attempt(onError: (Exception) -> Unit, block: suspend () -> Unit) {
@@ -143,6 +145,8 @@ private fun AppsHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
 private fun CoresHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier: Modifier) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(ToolsCoresState()) }
+    /** Remove / Restore wait for a confirmation (5.5.5: deleting the core in use made the next start fail). */
+    var confirm by remember { mutableStateOf<Pair<ToolsCore, ToolsCoreAction>?>(null) }
 
     suspend fun read(network: Boolean) {
         val snapshot = (actions.loadCores ?: return)(network)
@@ -197,13 +201,19 @@ private fun CoresHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier
         onCheck = { check(announce = true) },
         onPrimary = { core, action ->
             when (action) {
-                ToolsCoreAction.Update, ToolsCoreAction.Download ->
-                    run(core, "${core.name} 已更新", "${core.name} 下载失败") {
+                ToolsCoreAction.Update, ToolsCoreAction.Download -> {
+                    val inUse = state.running == core.name
+                    val done = (if (action == ToolsCoreAction.Download) "${core.name} 已安装" else "${core.name} 已更新") + when {
+                        inUse -> "，重启代理后使用新版本"
+                        action == ToolsCoreAction.Download -> "，可在「设置 → 基础代理配置 → 代理核心」选用"
+                        else -> ""
+                    }
+                    run(core, done, "${core.name} 下载失败") {
                         // Progress arrives on the download thread; hop to the UI scope before touching state.
                         actions.downloadCore(core.id) { line -> scope.launch { state = state.copy(progress = line) } }
                     }
-                ToolsCoreAction.Restore -> run(core, "${core.name} 已恢复内置版本", "恢复失败") { actions.removeCore(core.id) }
-                ToolsCoreAction.Remove -> run(core, "${core.name} 下载核心已删除", "删除失败") { actions.removeCore(core.id) }
+                }
+                ToolsCoreAction.Restore, ToolsCoreAction.Remove -> if (state.busyId == null) confirm = core to action
             }
         },
         onImport = { core ->
@@ -219,6 +229,27 @@ private fun CoresHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier
         onRetry = { state = state.copy(load = ToolsLoad.Loading); check(announce = false) },
         modifier = modifier,
     )
+
+    confirm?.let { (core, action) ->
+        val inUse = state.running == core.name
+        val restore = action == ToolsCoreAction.Restore
+        ToolsDialog(onDismiss = { confirm = null }) {
+            ToolsDialogCard(
+                title = if (restore) "恢复内置 ${core.name}？" else "删除 ${core.name}？",
+                text = (if (restore) "将删除下载的版本，改用 App 内置版本。" else "将删除下载的 ${core.name} 核心文件，之后可重新下载。") +
+                    if (inUse) "\n这是正在运行的核心：重启代理后才会生效" + (if (restore) "。" else "，删除后选用它的启动会失败。") else "",
+                confirmLabel = if (restore) "恢复" else "删除",
+                confirmKind = if (restore) ToolsConfirmKind.Primary else ToolsConfirmKind.Danger,
+                icon = if (restore) null else ToolsIcons.Trash2, iconTone = if (restore) HomeTone.Accent else HomeTone.Bad,
+                onConfirm = {
+                    confirm = null
+                    if (restore) run(core, "${core.name} 已恢复内置版本", "恢复失败") { actions.removeCore(core.id) }
+                    else run(core, "${core.name} 下载核心已删除", "删除失败") { actions.removeCore(core.id) }
+                },
+                onCancel = { confirm = null },
+            )
+        }
+    }
 }
 
 /* ------------------------------ 绕过规则 ------------------------------ */
@@ -328,7 +359,12 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
     LaunchedEffect(Unit) {
         val loader = actions.loadCnIp ?: return@LaunchedEffect
         state = try {
-            ToolsCnIpState(ToolsLoad.Ready, loader())
+            val kernel = actions.loadCnIpKernel?.invoke()
+            val udp = actions.loadCnIpUdp?.invoke()
+            if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
+            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries,
+                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false,
+                udpDirect = udp?.first ?: true, kernelUdpOnly = udp?.second ?: false)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -346,6 +382,30 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
             }
         },
         modifier = modifier,
+        onKernelChange = if (actions.loadCnIpKernel == null) null else { v4, v6 ->
+            val previous = state
+            state = state.copy(kernelV4 = v4, kernelV6 = v6)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpKernel(v4, v6)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
+        onTcpOnlyChange = if (actions.loadCnIpTcpOnly == null) null else { on ->
+            val previous = state
+            state = state.copy(kernelTcpOnly = on)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpTcpOnly(on)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
+        onUdpDirectChange = if (actions.loadCnIpUdp == null) null else { on ->
+            val previous = state
+            state = state.copy(udpDirect = on)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpUdp(on)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
     )
 }
 
@@ -356,6 +416,24 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(ToolsDiagState()) }
     var overlay by remember { mutableStateOf<ToolsDiagOverlay?>(null) }
+
+    // func-400 D1: pick the file first, then collect (Root reads take a few seconds) and write it.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var exporting by remember { mutableStateOf(false) }
+    // Hosts without an activity-result registry (previews) simply do not offer the row.
+    val canExport = actions.exportDiagnostics != null &&
+        androidx.activity.compose.LocalActivityResultRegistryOwner.current != null
+    val exportLauncher = if (!canExport) null else androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(io.github.xgl34222220.hetu.HxDiagnosticsBundle.MIME),
+    ) { uri ->
+        val build = actions.exportDiagnostics
+        if (uri == null || build == null) { exporting = false; return@rememberLauncherForActivityResult }
+        scope.attempt({ error -> exporting = false; actions.onMessage(error.reason("诊断包导出失败")) }) {
+            io.github.xgl34222220.hetu.HxDiagnosticsBundle.write(context, uri, build())
+            exporting = false
+            actions.onMessage("诊断包已导出")
+        }
+    }
 
     fun preflight() {
         val runner = actions.runPreflight ?: return
@@ -388,7 +466,20 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
-        onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
+        onExport = if (exportLauncher == null) null else { {
+            if (!exporting) {
+                exporting = true
+                try { exportLauncher.launch(io.github.xgl34222220.hetu.HxDiagnosticsBundle.fileName()) }
+                catch (_: android.content.ActivityNotFoundException) { exporting = false; actions.onMessage("没有可用的文件保存应用") }
+            }
+        } },
+        exporting = exporting,
+        onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
+            { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
+        } ?: actions.onOpenDiagnosticsDetails,
+        onRepairRecord = actions.repairSessionRecord?.let { repair ->
+            { open(ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接"), repair) { ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接", it) } }
+        },
         modifier = modifier,
     )
 
@@ -398,6 +489,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         }
         is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
             ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
+        }
+        is ToolsDiagOverlay.Record -> HomeModalSheet(onDismiss = { overlay = null }) {
+            ToolsRecordSheetContent(current.title, current.subtitle, current.content, onCopy = { actions.onCopy(current.title, it) })
         }
         is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
             ToolsRestoreNetworkDialogCard(
@@ -427,7 +521,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
     suspend fun read() {
         val snapshot = (actions.loadAdblock ?: return)()
-        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false)
+        // A re-read keeps the last 实测 result; it is the user's evidence, not part of the snapshot.
+        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, dnsProbe = state.dnsProbe, probing = state.probing)
     }
 
     fun reload(announce: String? = null) {
@@ -506,8 +601,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
         },
         onStandaloneDnsChange = { on -> change(state.copy(standaloneDns = on), "独立 DNS 过滤切换失败") { actions.setStandaloneDns(on) } },
         onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
+        onRecommendedDnsChange = { on -> change(state.copy(recommendedDns = on), "保存失败") { actions.setRecommendedDns(on) } },
         onRetry = { state = ToolsAdblockState(); reload() },
         modifier = modifier,
+        onProbe = actions.probeAdblock?.let { probeOnce ->
+            {
+                if (!state.probing) {
+                    state = state.copy(probing = true)
+                    scope.launch {
+                        val result = try { probeOnce() } catch (cancel: CancellationException) { throw cancel }
+                            catch (error: Exception) { ToolsAdProbe(null, error.reason("实测失败")) }
+                        val dns = actions.probeAdblockDns?.let { dnsOnce ->
+                            try { dnsOnce() } catch (cancel: CancellationException) { throw cancel }
+                            catch (error: Exception) { ToolsAdProbe(null, error.reason("DNS 实测失败")) }
+                        }
+                        state = state.copy(probing = false, probe = result, dnsProbe = dns)
+                        reload()
+                    }
+                }
+            }
+        },
     )
 
     when (val current = overlay) {

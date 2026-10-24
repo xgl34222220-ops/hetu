@@ -90,6 +90,10 @@ def run_exporter(source, mode):
                    'io/github/xgl34222220/hetu/ProxyAdblockRules.java': source,
                    'io/github/xgl34222220/hetu/RuntimeCompatibility14.java': compatibility,
                    'io/github/xgl34222220/hetu/ExportHarness.java': HARNESS}
+        # The current exporter also writes the DNS-layer set through the pure-Java AdblockDnsPolicy
+        # (no Android API); compile it alongside when present. Fixtures and assertions are unchanged.
+        if 'AdblockDnsPolicy' in source:
+            sources['io/github/xgl34222220/hetu/AdblockDnsPolicy.java'] = (PRODUCTION/'AdblockDnsPolicy.java').read_text()
         paths = []
         for name, text in sources.items():
             path = root/name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(text); paths.append(str(path))

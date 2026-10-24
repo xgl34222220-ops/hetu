@@ -39,6 +39,10 @@ internal data class ProxyGroupUi(
     val iconUrl: String = "",
     val iconPath: String = "",
     val hidden: Boolean = false,
+    /** Mihomo `fixed`: node pinned by PUT on URLTest/Fallback groups ("" when not pinned). */
+    val fixed: String = "",
+    /** Mihomo group `testUrl`, used for per-node delay retries ("" when absent). */
+    val testUrl: String = "",
 )
 
 internal data class ProxyConnectionUi(
@@ -68,6 +72,8 @@ internal data class ProxyRuleUi(
     val size: Int = -1,
     val disabled: Boolean = false,
     val hitCount: Long = 0L,
+    /** Mihomo RuleWrapper: connections this rule was checked against and did not match. */
+    val missCount: Long = 0L,
 )
 
 internal data class ProxyRuleProviderUi(
@@ -114,6 +120,8 @@ internal data class ProxyComposeState(
     val watchdog: Boolean = false,
     val dataPlaneHealthy: Boolean = false,
     val healthObserved: Boolean = false,
+    /** 6.0.0: the Root watchdog's latest data-plane verdict for the running core (status "egress"). */
+    val egressVerdict: String = "",
     val trafficMode: String = "",
     // Ephemeral authority from this read only; cached UI/health hints never arm
     // Android service recovery. This is independent from dataPlaneHealthy.
@@ -122,7 +130,30 @@ internal data class ProxyComposeState(
     val continuityObservationTicket: Long = -1L,
     val continuityObservationSession: String = "",
     val continuityObservationNetworkEpoch: Long = 0L,
+    /**
+     * False while the running core has no Clash controller (Xray / V2Fly / Hysteria 2) and no external
+     * API is configured: there is nothing to read, so no controller read is made or reported as failed.
+     */
+    val controllerSupported: Boolean = true,
 )
+
+/**
+ * A manual start refused before Root is touched: the selected configuration or the app scope
+ * cannot run. Callers branch on the type; the message is the unchanged user-facing text, so a
+ * reworded or translated message never changes how the failure is handled.
+ */
+internal sealed class ProxyStartProblem(message: String, cause: Throwable? = null) : IllegalStateException(message, cause) {
+    class NoConfig : ProxyStartProblem("尚未选择配置")
+    class PlaceholderConfig : ProxyStartProblem(
+        "当前是河图内置占位配置，尚未填写真实订阅。请到「工具 → 配置管理」添加订阅链接，或导入一份完整可运行的 YAML 配置。",
+    )
+    /** 「仅所选应用代理」 with no usable selected app (RootProxyPolicy's own message is kept). */
+    class AppScope(cause: Throwable) : ProxyStartProblem(cause.message ?: "当前是“仅所选应用代理”，但没有可用的已选应用", cause)
+    /** 5.5.5: the selected core was never downloaded (or was deleted): said before Root is asked, with where to fix it. */
+    class CoreMissing(label: String) : ProxyStartProblem(
+        "$label 尚未安装。请到「工具 → 核心管理」下载 $label，或在「设置 → 基础代理配置 → 代理核心」换用 Mihomo。",
+    )
+}
 
 internal class ProxyComposeController(context: Context) {
     private val app = context.applicationContext
@@ -163,7 +194,7 @@ internal class ProxyComposeController(context: Context) {
             return@withContext emptyList()
         val profile = ProxyRuntimeProfile.load(prefs)
         val iconMap = try {
-            configs.selected(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
+            configs.source(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
         } catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) { emptyMap() }
         val snapshot = controllerSnapshotOperation {
@@ -176,7 +207,8 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val selected = configs.selected(profile.core)
+        // An unedited built-in template follows Mihomo's built-in, whose groups carry the icons.
+        val selected = configs.source(profile.core)
         val iconMap = try {
             if (selected == null) emptyMap() else groupIconsFor(selected)
         } catch (cancel: CancellationException) { throw cancel }
@@ -231,6 +263,16 @@ internal class ProxyComposeController(context: Context) {
                     val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                         else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                     if (observedPid > 0) live.put("pid", observedPid)
+                    // CNIP kernel bypass as the running session reports it (ipset / iptables / degraded / off).
+                    if (live.has("cnip")) {
+                        val cnip = if (live.optBoolean("running", false)) live.optString("cnip", "off") else "off"
+                        val reason = live.optString("cnipReason", "")
+                        val v4 = live.optInt("cnipV4Entries", 0); val v6 = live.optInt("cnipV6Entries", 0)
+                        if (prefs.getString("proxyCnIpKernelStatus", "") != cnip || prefs.getString("proxyCnIpKernelReason", "") != reason ||
+                            prefs.getInt("proxyCnIpKernelV4Entries", -1) != v4 || prefs.getInt("proxyCnIpKernelV6Entries", -1) != v6)
+                            prefs.edit().putString("proxyCnIpKernelStatus", cnip).putString("proxyCnIpKernelReason", reason)
+                                .putInt("proxyCnIpKernelV4Entries", v4).putInt("proxyCnIpKernelV6Entries", v6).apply()
+                    }
                     freshStatus = true
                 }
             } catch (cancel: CancellationException) { throw cancel }
@@ -252,6 +294,7 @@ internal class ProxyComposeController(context: Context) {
                     .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                     .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                     .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
+                    .put("egress", prefs.getString("proxyRootEgressVerdict", "") ?: "")
                 else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
             }
         } else {
@@ -270,6 +313,7 @@ internal class ProxyComposeController(context: Context) {
                 .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                 .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                 .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
+                .put("egress", prefs.getString("proxyRootEgressVerdict", "") ?: "")
         }
         // A completed status observation supersedes the cached fast hint, including
         // a confirmed stopped core. Missing/failed observations keep only the hint.
@@ -298,15 +342,22 @@ internal class ProxyComposeController(context: Context) {
                     .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
                     .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
                     .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
+                    .putString("proxyRootEgressVerdict", status.optString("egress", ""))
                     // What 高级代理配置 shows under its switches: how DNS is really captured,
                     // and what the last vendor-firewall pass and resource tuning did.
                     .putString("proxyRootSystemDns", status.optString("systemDns", ""))
                     .putString("proxyRootCoreGroup", status.optString("coreGroup", ""))
                     .putBoolean("proxyRootDotGuard", status.optBoolean("dotGuard", false))
                     .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
+                    .putString("proxyRootIpv6DnsPolicy", status.optString("ipv6DnsPolicy", ""))
+                    .putBoolean("proxyCnIpKernelTcpOnlyActive", status.optBoolean("cnipTcpOnly", false))
+                    .putBoolean("proxyCnIpKernelUdpOnlyActive", status.optBoolean("cnipUdpOnly", false))
                     .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
                     .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
                     .putString("proxyRootTuning", status.optString("tuning", ""))
+                    // eBPF 规则匹配: off | active | fallback and the fallback reason (blank before phase-2 scripts).
+                    .putString(EbpfMatcher.PREF_STATE, status.optString("ebpf", ""))
+                    .putString(EbpfMatcher.PREF_REASON, status.optString("ebpfReason", ""))
                     .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
                 val livePort = status.optInt("controllerPort", 0)
                 if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
@@ -322,8 +373,10 @@ internal class ProxyComposeController(context: Context) {
         var trafficMode = ""
         var controllerReadFailed = false
         var controllerError = ""
+        val controllerSupported = prefs.getBoolean("proxyCustomApiEnabled", false) ||
+            ProxyCoreSupport.clashApi(ProxyCoreSupport.running(prefs))
 
-        if (running) {
+        if (running && controllerSupported) {
             try {
                 // Independent reads overlap, but publication still requires every
                 // response and the original runtime observation ownership below.
@@ -384,7 +437,8 @@ internal class ProxyComposeController(context: Context) {
         }
         val observed = ProxyComposeState(
             running = running,
-            core = profile.core.label,
+            // The core that runs, not a pick that applies on the next start.
+            core = if (running) ProxyCoreSupport.running(prefs).label else profile.core.label,
             mode = profile.mode.label,
             ipv6 = profile.ipv6.id,
             effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
@@ -409,6 +463,7 @@ internal class ProxyComposeController(context: Context) {
                 else -> ""
             },
             panelReady = panelReady,
+            controllerSupported = controllerSupported,
             controllerReadFailed = controllerReadFailed,
             controllerError = controllerError,
             groups = groups,
@@ -431,6 +486,7 @@ internal class ProxyComposeController(context: Context) {
             watchdog = status.optBoolean("watchdog", false),
             dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
             healthObserved = healthObserved,
+            egressVerdict = if (running) status.optString("egress", "") else "",
             trafficMode = trafficMode,
             continuityRootObserved = continuityRootObserved,
             continuityAutomationOnly = continuityAutomationOnly,
@@ -457,8 +513,12 @@ internal class ProxyComposeController(context: Context) {
         LegacyAppMigrator.migrateIfNeeded(app)
         var profile = ProxyRuntimeProfile.load(prefs)
         if (!profile.capability().available) {
-            onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")
-            prefs.edit().putString("proxyBaseCore", "mihomo").putString("proxyBaseMode", "tproxy").apply()
+            // 5.1.0: keep the chosen core and change only the mode (sing-box / Xray / V2Fly / Hysteria run in TPROXY and
+            // Redirect). 5.0.0 switched the core back to Mihomo here, so after Mihomo had used TUN / Enhance / eBPF
+            // every other core "started" as Mihomo.
+            val mode = ProxyRuntimeProfile.runnableMode(profile.core, profile.mode)
+            onProgress("${profile.core.label} 不支持 ${profile.mode.label} 模式，改用 ${mode.label} 启动…")
+            prefs.edit().putString("proxyBaseMode", mode.id).apply()
             profile = ProxyRuntimeProfile.load(prefs)
         }
         if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
@@ -466,13 +526,47 @@ internal class ProxyComposeController(context: Context) {
             prefs.edit().putString("proxyBaseCore", "mihomo").apply()
             profile = ProxyRuntimeProfile.load(prefs)
         }
-        val selected = configs.selected(profile.core) ?: error("尚未选择配置")
-        if (!configs.hasConfiguredSubscription(selected)) {
-            error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
+        requireInstalled(profile.core)
+        configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
+        // The subscription is checked where the start reads it: an unedited built-in template follows Mihomo's built-in.
+        val source = configs.source(profile.core) ?: throw ProxyStartProblem.NoConfig()
+        if (!configs.hasConfiguredSubscription(source)) throw ProxyStartProblem.PlaceholderConfig()
+        // The pre-start hook runs inside the single Root start invocation (no extra su when
+        // no hook exists); a failing hook still refuses the start before the network changes.
+        // Audit G1: a completed start also keeps its effective source as 「上次可启动」 (never fails the start).
+        root.armLastGood()
+        try {
+            root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true).also { root.rememberLastGood(it) }
+        } catch (scope: RootProxyManager.AppScopeException) {
+            throw ProxyStartProblem.AppScope(scope)
+        } finally {
+            root.disarmLastGood()
         }
-        onProgress("执行服务启动前脚本…")
-        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected.name)
-        root.startManual(profile) { onProgress(it) }
+    }
+
+    /**
+     * Audit G1: the failure sheet's 「用上次可启动的版本启动」. Starts the current core and mode from the
+     * copy [LastGoodConfig] kept after the core's last successful start; the selected config file is
+     * read by nothing and changed by nothing. Settings are the current ones.
+     */
+    suspend fun startLastGood(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        LegacyAppMigrator.migrateIfNeeded(app)
+        val profile = ProxyRuntimeProfile.load(prefs)
+        requireInstalled(profile.core)
+        LastGoodConfig.info(prefs, profile.core.id)
+            ?: throw IOException("${profile.core.label} 还没有上次可启动的配置")
+        val source = LastGoodConfig.read(app, profile.core.id)
+            ?: throw IOException("上次可启动的配置副本已丢失或损坏")
+        try {
+            root.startManualLastGood(profile, RootProxyManager.Progress { onProgress(it) }, source)
+        } catch (scope: RootProxyManager.AppScopeException) {
+            throw ProxyStartProblem.AppScope(scope)
+        }
+    }
+
+    /** Mihomo ships in the App; every other core must have been downloaded (ProxyCoreStore). */
+    private fun requireInstalled(core: ProxyRuntimeProfile.Core) {
+        if (core != ProxyRuntimeProfile.Core.MIHOMO && !ProxyCoreStore(app).installed(core)) throw ProxyStartProblem.CoreMissing(core.label)
     }
 
     suspend fun reload(): String = withContext(Dispatchers.IO) {
@@ -482,10 +576,22 @@ internal class ProxyComposeController(context: Context) {
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
+        // Only the app list / DIRECT apps / bypass CIDRs changed and the session matches with eBPF:
+        // rewrite its maps in place. Anything else (or updated:false) takes the normal restart.
+        root.ebpfHotUpdate(profile)?.let { hot ->
+            onProgress("已通过 eBPF 热更新名单…")
+            check(ProxyRuntimeSettings.acknowledgeApplied(prefs, true)) { "名单已热更新，但应用状态未能保存" }
+            return@withContext hot
+        }
         val selected = configs.selected(profile.core)
         onProgress("执行服务启动前脚本…")
         ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected?.name ?: "")
-        val result = root.replaceRunningManually(profile, onProgress)
+        root.armLastGood()
+        val result = try {
+            root.replaceRunningManually(profile, onProgress).also { root.rememberLastGood(it) }
+        } finally {
+            root.disarmLastGood()
+        }
         val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
         check(replaced) { "重启未完成，请等待当前操作结束后重试" }
         check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
@@ -495,7 +601,8 @@ internal class ProxyComposeController(context: Context) {
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val selected = configs.selected(profile.core)
-        val result = root.stop { onProgress(it) }
+        // 7.0.0: always ends stopped; a stop that hangs or fails falls back to the bounded force-stop.
+        val result = root.stopOrForce { onProgress(it) }
         onProgress("执行服务停止后脚本…")
         ProxyScriptHooks.run(app, "post-stop", profile.mode.id, selected?.name ?: "")
         result
@@ -528,7 +635,7 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: return@withContext 0
+        val entry = configs.source(profile.core) ?: return@withContext 0
         val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
         var downloaded = 0
         for (chunk in urls.chunked(6)) {
@@ -562,7 +669,12 @@ internal class ProxyComposeController(context: Context) {
         "disable" to "禁用本机 IPv6",
     )
 
-    fun setCore(id: String) { prefs.edit().putString("proxyBaseCore", id).apply() }
+    fun setCore(id: String) {
+        val core = ProxyRuntimeProfile.Core.from(id)
+        configs.adoptTemplateOnCoreSelect(core)
+        val mode = ProxyRuntimeProfile.modeForPick(prefs, core, ProxyRuntimeProfile.load(prefs).mode)
+        prefs.edit().putString("proxyBaseCore", id).putString("proxyBaseMode", mode.id).apply()
+    }
     fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
     fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
     fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
@@ -579,13 +691,20 @@ internal class ProxyComposeController(context: Context) {
             ProxyConfigUi(
                 name = it.name,
                 selected = it.name == selected,
-                bundled = it.name == ProxyConfigLibrary.BUNDLED_NAME,
+                bundled = ProxyConfigLibrary.isBundled(it.name),
             )
         }
     }
 
     suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
-        configs.select(ProxyRuntimeProfile.load(prefs).core, name)
+        val core = ProxyRuntimeProfile.load(prefs).core
+        if (ProxyCoreConfig.kind(core) != ProxyCoreConfig.Kind.MIHOMO) {
+            // A sing-box / Xray / V2Fly / Hysteria config is checked by that core's own CLI
+            // (sing-box check, xray run -test, v2ray test, Hysteria YAML) before it becomes current.
+            val entry = configs.list(core).firstOrNull { it.name == name } ?: error("配置不存在")
+            root.validateConfigText(configs.read(entry))
+        }
+        configs.select(core, name)
     }
 
     suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
@@ -598,8 +717,10 @@ internal class ProxyComposeController(context: Context) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core)
         val name = entry?.name ?: "尚未选择配置"
-        val items = if (entry == null) emptyList() else
-            configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+        // A built-in template that follows Mihomo's built-in lists (and edits) that file's subscriptions.
+        val source = configs.source(profile.core)
+        val items = if (source == null) emptyList() else
+            configs.subscriptions(source).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
         name to items
     }
 
@@ -610,25 +731,25 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: return@withContext emptyList()
+        val entry = configs.source(profile.core) ?: return@withContext emptyList()
         configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
     }
 
     suspend fun updateSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        val entry = configs.source(profile.core) ?: error("尚未选择配置")
         configs.updateSubscription(entry, name, url)
     }
 
     suspend fun addSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        val entry = configs.source(profile.core) ?: error("尚未选择配置")
         configs.addSubscription(entry, name, url)
     }
 
     suspend fun deleteSubscription(name: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        val entry = configs.source(profile.core) ?: error("尚未选择配置")
         configs.deleteSubscription(entry, name)
     }
 
@@ -683,6 +804,8 @@ internal class ProxyComposeController(context: Context) {
                 iconUrl = iconUrl,
                 iconPath = icons.diskPath(iconUrl),
                 hidden = group.optBoolean("hidden", false),
+                fixed = group.optString("fixed", ""),
+                testUrl = group.optString("testUrl", ""),
             )
         }
         // GLOBAL.all carries configuration order; JSON object key order does not.
@@ -840,6 +963,7 @@ internal class ProxyComposeController(context: Context) {
                 size = r.optInt("size", -1),
                 disabled = extra?.optBoolean("disabled", false) ?: false,
                 hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
+                missCount = extra?.optLong("missCount", 0L) ?: 0L,
             )
         }
         return out
@@ -887,19 +1011,4 @@ internal class ProxyComposeController(context: Context) {
         return parsed
     }
 
-    private fun yamlScalar(value: String): String {
-        val s = value.trim()
-        if (s.isEmpty()) return ""
-        var quote = '\u0000'
-        var cut = s.length
-        for (i in s.indices) {
-            val c = s[i]
-            if (c == '\'' || c == '"') {
-                if (quote == '\u0000') quote = c else if (quote == c) quote = '\u0000'
-            } else if (c == '#' && quote == '\u0000') { cut = i; break }
-        }
-        var out = s.substring(0, cut).trim()
-        if (out.length >= 2 && ((out.first() == '\'' && out.last() == '\'') || (out.first() == '"' && out.last() == '"'))) out = out.substring(1, out.length - 1)
-        return out.replace("''", "'")
-    }
 }

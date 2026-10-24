@@ -105,8 +105,9 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.badText
+import io.github.xgl34222220.hetu.home.delayBase
+import io.github.xgl34222220.hetu.home.delayColor
 import io.github.xgl34222220.hetu.home.homeTap
-import io.github.xgl34222220.hetu.home.warnText
 import io.github.xgl34222220.hetu.ui.ht
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -221,6 +222,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
         modifier
             .fillMaxWidth()
             .onSizeChanged { viewport = it.width }
+            .panelHorizontalEdgeFade(scroll)
             .horizontalScroll(scroll)
             .panelGutter()
             .drawBehind {
@@ -245,7 +247,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
                     .padding(horizontal = 13.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(ht(tab.label), color = text, style = if (active) PanelType.tab.copy(fontWeight = FontWeight.Bold) else PanelType.tab, maxLines = 1)
+                Text(ht(tab.label), color = text, style = if (active) PanelType.tab.copy(fontWeight = FontWeight.Bold) else PanelType.tab, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -273,7 +275,7 @@ internal fun PanelSearchField(value: String, onValueChange: (String) -> Unit, pl
                 Icon(PanelIcons.Search, null, Modifier.size(22.dp), tint = c.t1)
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body.copy(fontSize = 17.sp), maxLines = 1)
+                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body.copy(fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
                 if (value.isNotEmpty()) {
@@ -319,7 +321,7 @@ internal fun PanelChip(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         if (leading != null) leading()
-        Text(ht(text), color = tint, style = if (selected) PanelType.chip.copy(fontWeight = FontWeight.SemiBold) else PanelType.chip, maxLines = 1)
+        Text(ht(text), color = tint, style = if (selected) PanelType.chip.copy(fontWeight = FontWeight.SemiBold) else PanelType.chip, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailingIcon != null) Icon(trailingIcon, null, Modifier.size(16.dp), tint = tint)
     }
 }
@@ -417,12 +419,12 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
 }
 
 /**
- * Latency capsule. Healthy figures use the accent, slow ones amber, very slow ones and timeouts
- * red; an unknown value is a quiet grey capsule. With [onClick] the capsule re-tests that node
+ * Latency capsule. Healthy figures use the accent (green under a red–amber accent), slow ones
+ * amber, very slow ones and timeouts red; an unknown value is a quiet grey capsule. With [onClick] the capsule re-tests that node
  * only and gets a comfortable touch box that grows up and to the left of it.
  */
 @Composable
-internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速") {
+internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速", compact: Boolean = false) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val motion = LocalHomeMotionEnabled.current
@@ -430,14 +432,10 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
     // Text colour and the colour the capsule fill is mixed from.
     val look: Pair<Color, Color> = when (delay) {
         PanelDelay.Unknown -> c.t2 to c.t3
-        PanelDelay.Testing -> c.accent to c.accent
+        PanelDelay.Testing -> c.accentText to c.accent
         PanelDelay.Timeout -> c.badText to c.bad
         PanelDelay.Failed -> c.badText to c.bad
-        is PanelDelay.Ms -> when {
-            delay.value < 300L -> c.accent to c.accent
-            delay.value < 800L -> c.warnText to c.warn
-            else -> c.badText to c.bad
-        }
+        is PanelDelay.Ms -> c.delayColor(delay.value) to c.delayBase(delay.value)
     }
     val content = look.first
     val base = look.second
@@ -455,12 +453,12 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
                 PanelDelay.Failed -> ht("失败")
                 is PanelDelay.Ms -> "${shown.value} ms"
             }
-            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
     val capsule: @Composable () -> Unit = {
         Row(
-            Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = 10.dp),
+            Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = if (compact) 7.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
@@ -492,18 +490,18 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
 internal fun RowScope.PanelStat(value: String, unit: String?, label: String, valueColor: Color = LocalHomeColors.current.t1, style: TextStyle = PanelType.stat) {
     val c = LocalHomeColors.current
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(if (unit == null) value else "$value $unit", color = valueColor, style = style, maxLines = 1)
-        Text(ht(label), Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note, maxLines = 1)
+        Text(if (unit == null) value else "$value $unit", color = valueColor, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht(label), Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
+internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, titleColor: Color? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
     val c = LocalHomeColors.current
     Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht(title), color = titleColor ?: c.accentText, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
-        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailing != null) trailing()
     }
 }
@@ -653,8 +651,18 @@ internal class PanelTrendSeries(val values: List<Float>, val color: Color, val f
  * the baseline; every series draws itself in from the left once per [reveal] run.
  */
 @Composable
-internal fun PanelTrendChart(series: List<PanelTrendSeries>, modifier: Modifier = Modifier, height: Dp = 148.dp, reveal: () -> Float = { 1f }) {
+internal fun PanelTrendChart(series: List<PanelTrendSeries>, modifier: Modifier = Modifier, height: Dp = 148.dp, reveal: () -> Float = { 1f }, emptyLabel: String? = null) {
     val base = LocalHomeColors.current.line2
+    // No curve to draw: say why (series hidden / nothing sampled yet) instead of a blank area.
+    if (emptyLabel != null) {
+        val c = LocalHomeColors.current
+        Box(modifier.fillMaxWidth().height(height).drawBehind {
+            drawLine(base, Offset(0f, size.height - .5f), Offset(size.width, size.height - .5f), strokeWidth = 1.dp.toPx())
+        }, contentAlignment = Alignment.Center) {
+            Text(ht(emptyLabel), color = c.t3, style = HomeType.note, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        return
+    }
     Canvas(modifier.fillMaxWidth().height(height)) {
         val w = size.width
         val h = size.height

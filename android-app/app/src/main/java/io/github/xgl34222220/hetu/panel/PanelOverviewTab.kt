@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.panel
 
+import io.github.xgl34222220.hetu.hxTrendEmptyLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,7 +84,7 @@ internal fun LazyListScope.panelOverviewTab(
             Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 16.dp, bottom = 16.dp)) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(ht("订阅"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle)
-                    if (sub.expire != null) Text(ht("到期 %s").fill(sub.expire), color = c.t2, style = HomeType.rowSub, maxLines = 1)
+                    if (sub.expire != null) Text(ht("到期 %s").fill(sub.expire), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(Modifier.fillMaxWidth()) {
                     val (used, usedUnit) = split(HomeFormat.bytes(sub.usedBytes))
@@ -95,8 +96,8 @@ internal fun LazyListScope.panelOverviewTab(
                 }
                 HomeProgressBar(sub.usedFraction, Modifier.padding(top = 16.dp, bottom = 12.dp))
                 Row(Modifier.fillMaxWidth()) {
-                    Text(ht("%d 个订阅").fill(sub.subscriptionCount), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub, maxLines = 1)
-                    Text(ht("%d 个节点").fill(sub.nodeCount), color = c.t2, style = HomeType.rowSub, maxLines = 1)
+                    Text(ht("%d 个订阅").fill(sub.subscriptionCount), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(ht("%d 个节点").fill(sub.nodeCount), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -112,10 +113,10 @@ internal fun LazyListScope.panelOverviewTab(
         val c = LocalHomeColors.current
         HomeCard(card.homeEnter(stagger, 3)) {
             Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = HomeDims.cardPadding), verticalAlignment = Alignment.CenterVertically) {
-                Text(ht("总流量"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
-                Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1)
+                Text(ht("总流量"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("/", Modifier.padding(horizontal = 9.dp), color = c.t2, style = HomeType.value)
-                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1)
+                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accentText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -136,12 +137,14 @@ internal fun LazyListScope.panelOverviewTab(
                             height = 32.dp, leading = { HomeStatusDot(if (view.showDownloadTrend) c.accent else c.t3, size = 7.dp) })
                     }
                 }
+                val trend = buildList {
+                    if (view.showDownloadTrend) add(PanelTrendSeries(overview.downloadTrend, c.accent, fill = true))
+                    if (view.showUploadTrend) add(PanelTrendSeries(overview.uploadTrend, c.good, fill = false))
+                }
                 PanelTrendChart(
-                    buildList {
-                        if (view.showDownloadTrend) add(PanelTrendSeries(overview.downloadTrend, c.accent, fill = true))
-                        if (view.showUploadTrend) add(PanelTrendSeries(overview.uploadTrend, c.good, fill = false))
-                    },
+                    trend,
                     reveal = reveal,
+                    emptyLabel = hxTrendEmptyLabel(trend.size, trend.maxOfOrNull { s -> s.values.maxOrNull() ?: 0f } ?: 0f),
                 )
             }
         }
@@ -179,7 +182,7 @@ internal fun LazyListScope.panelOverviewTab(
                     }
                     Text(
                         if (view.rankMode == PanelRankMode.Connections) ht("%d 条连接").fill(rank.connections) else HomeFormat.bytes(rank.totalBytes),
-                        color = c.t2, style = HomeType.rowSub, maxLines = 1,
+                        color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -204,7 +207,7 @@ private fun SpeedCard(label: String, value: String, icon: ImageVector, tint: Col
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(ht(label), color = c.t2, style = HomeType.note, maxLines = 1)
+                Text(ht(label), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 HomeRollingText(value, tint, HomeType.metric, alignment = Alignment.CenterStart)
             }
         }

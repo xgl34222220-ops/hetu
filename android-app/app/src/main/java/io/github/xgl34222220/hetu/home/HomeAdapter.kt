@@ -94,6 +94,15 @@ internal fun HetuHomeV2(
     wanExtras: HomeWanExtras? = null,
     operationText: String? = null,
     connection: HomeConnectionObservation = HomeConnectionObservation(),
+    onUpdateProviders: () -> Unit = {},
+    lastGood: HomeLastGood? = null,
+    lastGoodRunning: String? = null,
+    onStartLastGood: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 设置密钥 / 诊断工具; both fall back to [onOpenNode] when the host has no deeper link. */
+    onOpenControllerKey: () -> Unit = onOpenNode,
+    onOpenDiagnostics: () -> Unit = onOpenNode,
+    /** Results of a direct 网络延迟 measurement made while the proxy is stopped (the device's own route). */
+    directProbes: Map<String, Long> = emptyMap(),
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -126,8 +135,16 @@ internal fun HetuHomeV2(
             memoryHistoryMb = resourceSamples?.map { it.memoryBytes?.div(1024f * 1024f) } ?: history.second,
         ),
     )
+    val speedHistory = rememberSpeedHistory(sampling, speedSource, mapped.uploadBytesPerSecond, mapped.downloadBytesPerSecond)
     val state = mapped.copy(
+        speedHistory = speedHistory,
         connection = connection,
+        lastGood = lastGood,
+        lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
+        // Stopped, only a direct measurement of the device's own route is shown; the proxy path's
+        // last numbers are never carried over (they described a path that no longer exists).
+        probes = if (!status.isLive) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]?.let { if (it > 0L) it else HomeDelay.Timeout }) } else mapped.probes,
+        probeSource = if (status.isLive) HomeProbeSource.Live else HomeProbeSource.Direct,
         statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
         wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
             city = wanExtras.city.known(),
@@ -137,19 +154,38 @@ internal fun HetuHomeV2(
             coordinates = wanExtras.coordinates.known(),
             state = HomeWanState.fromId(wanExtras.state),
             error = wanExtras.error.known(),
+            checkedAt = wanExtras.checkedAt,
         ),
     )
 
-    // Rebuilt on every recomposition on purpose: the lambdas close over the caller's latest callbacks.
-    val actions = run {
+    // One instance for the life of the page. Each lambda reads the caller's latest callback,
+    // so a 1 s traffic sample or 2 s poll never hands every card a new actions object (which
+    // recomposed the whole home tree, scrolling included).
+    val toggle by rememberUpdatedState(onToggle)
+    val reload by rememberUpdatedState(onReload)
+    val restart by rememberUpdatedState(onRestart)
+    val trafficModeChange by rememberUpdatedState(onTrafficMode)
+    val openNode by rememberUpdatedState(onOpenNode)
+    val probe by rememberUpdatedState(onDelay)
+    val refreshIp by rememberUpdatedState(onRefresh)
+    val openSubscription by rememberUpdatedState(onOpenSubscription)
+    val openBasicSettings by rememberUpdatedState(onOpenBasicSettings)
+    val openConfigs by rememberUpdatedState(onOpenConfigs)
+    val viewConfig by rememberUpdatedState(onViewConfig)
+    val dismissStartupError by rememberUpdatedState(onDismissStartupError)
+    val updateProviders by rememberUpdatedState(onUpdateProviders)
+    val startLastGood by rememberUpdatedState(onStartLastGood)
+    val openControllerKey by rememberUpdatedState(onOpenControllerKey)
+    val openDiagnostics by rememberUpdatedState(onOpenDiagnostics)
+    val actions = remember(context, prefs) {
         HomeActions(
-            onStart = onToggle,
-            onStop = onToggle,
-            onReload = onReload,
-            onRestart = onRestart,
-            onProxyModeChange = { onTrafficMode(it.id) },
-            onOpenNode = onOpenNode,
-            onProbe = onDelay,
+            onStart = { toggle() },
+            onStop = { toggle() },
+            onReload = { reload() },
+            onRestart = { restart() },
+            onProxyModeChange = { trafficModeChange(it.id) },
+            onOpenNode = { openNode() },
+            onProbe = { probe() },
             onNetSideChange = { side ->
                 netSide = side
                 prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
@@ -158,31 +194,37 @@ internal fun HetuHomeV2(
                 speedSource = source
                 prefs.edit().putString(PrefSpeedSource, source.id).apply()
             },
-            onRefreshIp = onRefresh,
-            onOpenSubscription = onOpenSubscription,
-            onOpenBasicSettings = onOpenBasicSettings,
-            onOpenConfigs = onOpenConfigs,
-            onViewConfig = onViewConfig,
-            onDismissStartFailure = onDismissStartupError,
+            onRefreshIp = { refreshIp() },
+            onOpenSubscription = { openSubscription() },
+            onOpenBasicSettings = { openBasicSettings() },
+            onOpenConfigs = { openConfigs() },
+            onViewConfig = { viewConfig() },
+            onOpenWebUi = {
+                // Straight to the default dashboard (河图本地面板 per 本地面板模式, or the panel marked 默认);
+                // its own screen shows the controller error when the core is not running.
+                io.github.xgl34222220.hetu.HetuWebPanels.openSelected(context)
+            },
+            onOpenLogs = {
+                context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyLogViewerActivity::class.java))
+            },
+            onDismissStartFailure = { dismissStartupError() },
             onCopy = { label, text -> copyToClipboard(context, label, text) },
             loadTargets = { loadTargets(prefs) },
             saveTargets = { config -> saveTargets(prefs, config) },
             resetTargets = { ProxyLatencyTargets.reset(prefs); loadTargets(prefs) },
+            onUpdateProviders = { updateProviders() },
+            onStartLastGood = { startLastGood() },
+            onOpenControllerKey = { openControllerKey() },
+            onOpenDiagnostics = { openDiagnostics() },
+            onRetryController = { refreshIp() },
         )
     }
 
+    // Static local: a fresh lambda on every poll would invalidate the whole home tree.
+    val homeHaptics = remember(hetuHaptics) { hetuHaptics.asHomeHaptics() }
     HetuHomeThemeFromPrefs(prefs) {
         CompositionLocalProvider(
-            LocalHomeHaptics provides { kind ->
-                hetuHaptics.perform(
-                    when (kind) {
-                        HomeHaptic.Tap -> HetuHaptic.Tap
-                        HomeHaptic.Tick -> HetuHaptic.Tick
-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
-                        HomeHaptic.Reject -> HetuHaptic.Reject
-                    },
-                )
-            },
+            LocalHomeHaptics provides homeHaptics,
         ) {
             HomeRoute(
                 state = state.copy(ipRefreshing = data.refreshing),
@@ -210,6 +252,8 @@ internal data class HomeWanExtras(
     /** `ProxyRuntimeSnapshot.wanState`: idle, loading, success, stale or failed. */
     val state: String = "",
     val error: String = "",
+    /** `ProxyRuntimeSnapshot.wanCheckedAt` (wall-clock ms; 0 = unknown). */
+    val checkedAt: Long = 0L,
 )
 
 internal fun homeStatusOf(data: CompactHomeData, startupError: String?): HomeStatus = when {
@@ -339,6 +383,32 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes: 
     return cpuPoints.toList() to memoryPoints.toList()
 }
 
+/**
+ * Rolling window (30 points, one a second) of the figures the 网速 card shows, for its faint
+ * backdrop curve. Switching the source starts a fresh window, so API and local rates never mix.
+ */
+@Composable
+private fun rememberSpeedHistory(sampling: Boolean, source: HomeSpeedSource, up: Long?, down: Long?): HomeSpeedHistory {
+    val upPoints = remember { mutableStateListOf<Long?>() }
+    val downPoints = remember { mutableStateListOf<Long?>() }
+    val latestUp by rememberUpdatedState(up)
+    val latestDown by rememberUpdatedState(down)
+    val visible = rememberScreenVisible()
+    LaunchedEffect(source) { upPoints.clear(); downPoints.clear() }
+    LaunchedEffect(sampling, visible) {
+        if (!sampling) { upPoints.clear(); downPoints.clear(); return@LaunchedEffect }
+        // Keep the window while the screen is off, but do not wake every second to extend it.
+        if (!visible) return@LaunchedEffect
+        while (true) {
+            upPoints.add(latestUp)
+            downPoints.add(latestDown)
+            while (upPoints.size > 30) { upPoints.removeAt(0); downPoints.removeAt(0) }
+            delay(1000L)
+        }
+    }
+    return HomeSpeedHistory(upPoints.toList(), downPoints.toList())
+}
+
 private fun loadTargets(prefs: SharedPreferences): HomeTargetsConfig = HomeTargetsConfig(
     targets = ProxyLatencyTargets.load(prefs).map { HomeTarget(it.name, it.url) },
     autoRefreshSeconds = prefs.getInt(PrefAutoRefresh, 0).takeIf { it == 30 || it == 60 } ?: 0,
@@ -424,3 +494,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
 }
 
 private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
+
+/** One stable [HomeHaptic] sink per [HetuHaptics]; callers remember it so static locals stay put. */
+internal fun io.github.xgl34222220.hetu.ui.HetuHaptics.asHomeHaptics(): (HomeHaptic) -> Unit = { kind ->
+    perform(
+        when (kind) {
+            HomeHaptic.Tap -> HetuHaptic.Tap
+            HomeHaptic.Tick -> HetuHaptic.Tick
+            HomeHaptic.Confirm -> HetuHaptic.Confirm
+            HomeHaptic.Reject -> HetuHaptic.Reject
+        },
+    )
+}

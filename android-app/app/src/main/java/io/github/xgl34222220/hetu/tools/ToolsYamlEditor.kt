@@ -294,9 +294,12 @@ internal fun ToolsYamlEditor(
     val gutter = remember(lines) { ToolsYaml.gutter(lines) }
     val focusLine = state.focusLine
 
+    val jumpMotion = io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled.current
     LaunchedEffect(state.jumpTick) {
         val line = state.focusLine ?: return@LaunchedEffect
-        vertical.animateScrollTo(((line - 4).coerceAtLeast(0) * lineHeightPx).toInt())
+        val target = ((line - 4).coerceAtLeast(0) * lineHeightPx).toInt()
+        // Audit5 R1: a go-to-line jump is instant when motion is off.
+        if (jumpMotion) vertical.animateScrollTo(target) else vertical.scrollTo(target)
     }
 
     BoxWithConstraints(modifier) {

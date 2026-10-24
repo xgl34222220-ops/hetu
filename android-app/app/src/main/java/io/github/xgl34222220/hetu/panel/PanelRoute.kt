@@ -8,6 +8,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.github.xgl34222220.hetu.home.HomeDims
@@ -31,6 +33,9 @@ internal fun PanelRoute(
     onViewChange: (PanelViewState) -> Unit = {},
     expandGroup: String? = null,
     contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
+    /** Audit4 U3: true once to open 测速与 API on entry (首页 › 控制接口异常 › 设置密钥). */
+    apiRequest: Boolean = false,
+    onApiRequestConsumed: () -> Unit = {},
 ) {
     var view by remember { mutableStateOf(initialView.copy(tab = tab)) }
     var overlay by remember { mutableStateOf<PanelOverlay?>(null) }
@@ -44,6 +49,16 @@ internal fun PanelRoute(
     // A new tab starts at the top; overlays never survive a tab change or the proxy stopping.
     LaunchedEffect(view.tab) { listState.scrollToItem(0); overlay = null }
     LaunchedEffect(data.running) { if (!data.running) overlay = null }
+    val running by rememberUpdatedState(data.running)
+    val consumeApiRequest by rememberUpdatedState(onApiRequestConsumed)
+    LaunchedEffect(apiRequest) {
+        if (!apiRequest) return@LaunchedEffect
+        // Two frames: the entry effects above have reset overlays for the deep-linked tab by then.
+        withFrameNanos { }
+        withFrameNanos { }
+        if (running) overlay = PanelOverlay.ApiReadErrorSheet
+        consumeApiRequest()
+    }
 
     BackHandler(enabled = view.searching) { view = view.toggleSearch() }
 

@@ -1,7 +1,7 @@
 package io.github.xgl34222220.hetu;
 
 import java.io.IOException;
-import java.io.StringReader;
+import java.io.Reader;
 import java.util.*;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -25,6 +25,28 @@ final class RuntimeYaml15 {
     static final int MAX_NESTING_DEPTH = 50;
     private RuntimeYaml15() {}
 
+    /**
+     * The text for SnakeYAML. SnakeYAML 2.3 (StreamReader.update) reads 1024 chars into a full char[1024]
+     * and, when the last one is a high surrogate (an emoji split at that edge), reads one more char into the
+     * same buffer: IndexOutOfBoundsException, for about one in thirty lengths of an emoji-rich file such as
+     * the built-in profile. This reader never ends a chunk on a high surrogate, so that read never happens.
+     */
+    static Reader reader(String text) {
+        return new Reader() {
+            private int at;
+            @Override public int read(char[] buffer, int offset, int length) {
+                if (length == 0) return 0;
+                if (at >= text.length()) return -1;
+                int n = Math.min(length, text.length() - at);
+                if (n > 1 && Character.isHighSurrogate(text.charAt(at + n - 1))) n--;
+                text.getChars(at, at + n, buffer, offset);
+                at += n;
+                return n;
+            }
+            @Override public void close() {}
+        };
+    }
+
     static Node compose(String source) throws IOException {
         if (source == null || source.trim().isEmpty())
             throw failure("YAML_EMPTY", "启动配置为空", null);
@@ -34,7 +56,7 @@ final class RuntimeYaml15 {
             options.setNestingDepthLimit(MAX_NESTING_DEPTH);
             options.setMaxAliasesForCollections(MAX_COLLECTION_ALIASES);
             options.setAllowDuplicateKeys(false);
-            Node root = new Yaml(new SafeConstructor(options)).compose(new StringReader(source));
+            Node root = new Yaml(new SafeConstructor(options)).compose(reader(source));
             if (!(root instanceof MappingNode))
                 throw failure("YAML_ROOT", "启动配置根节点应为键值映射", root == null ? null : root.getStartMark());
             return root;

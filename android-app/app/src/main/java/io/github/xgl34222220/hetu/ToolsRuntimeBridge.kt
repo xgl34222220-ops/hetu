@@ -17,7 +17,41 @@ internal class ToolsAdblockChain(
     val controllerLoaded: Boolean,
     val hits: Long,
     val recent: List<String>,
-)
+    /** Connections the REJECT rule was checked against without matching (controller missCount). */
+    val missCount: Long = 0L,
+    /** True when [hits] is the controller's in-memory hitCount (no log level, no su). */
+    val hitsFromController: Boolean = false,
+    /** Strict controller reading of the chain; null when the core is not running or silent. */
+    val report: AdblockChainReport? = null,
+    /** The running copy answers the DNS block set empty from nameserver-policy. */
+    val dnsLayer: Boolean = false,
+    /** dns.enhanced-mode of the running copy (fake-ip / redir-host; blank without a dns block). */
+    val enhancedMode: String = "",
+    /** none / enabled / disabled / pure-ip-off / inline: the running copy's sniffer. */
+    val snifferState: String = "none",
+    /** System Private DNS: off / opportunistic / hostname, and the hostname when set. */
+    val privateDnsMode: String = "",
+    val privateDnsHost: String = "",
+    /** What the running session reports (status JSON, cached by the controller read). */
+    val systemDns: String = "",
+    val dnsHijackMode: String = "",
+    val dotGuard: Boolean = false,
+    val dnsIpv6Rule: Boolean = false,
+    val ipv6DnsPolicy: String = "",
+    val cnip: String = "",
+    val cnipTcpOnly: Boolean = false,
+    /** 6.0.0: the session bypasses only UDP to CN addresses (the default 国内 UDP 内核直连). */
+    val cnipUdpOnly: Boolean = false,
+    /** The selected subscription has its own dns: block. */
+    val sourceHasDns: Boolean = true,
+    val recommendedDns: Boolean = false,
+    /** blacklist / whitelist / core and the selected package count of that scope. */
+    val appScope: String = "core",
+    val scopedApps: Int = 0,
+) {
+    /** Apps whose traffic never reaches the core (blacklist entries); -1: all but the whitelist. */
+    val appsOutside: Int get() = when (appScope) { "blacklist" -> scopedApps; "whitelist" -> -1; else -> 0 }
+}
 
 /**
  * Root-package access for pages 28–49 of the 工具 module. Like `ToolsConfigBridge`, it exists
@@ -86,6 +120,18 @@ internal object ToolsRuntimeBridge {
 
     /* ------------------------------ 广告过滤 ------------------------------ */
 
+    /** The hostname of a Private DNS set to "hostname" mode; null otherwise. Never changes the setting. */
+    fun privateDnsHostname(context: Context): String? = try {
+        val resolver = context.applicationContext.contentResolver
+        if (android.provider.Settings.Global.getString(resolver, "private_dns_mode") == "hostname")
+            android.provider.Settings.Global.getString(resolver, "private_dns_specifier")?.trim()?.ifBlank { null } ?: "未知主机名"
+        else null
+    } catch (_: Exception) { null }
+
+    private fun privateDnsMode(context: Context): String = try {
+        android.provider.Settings.Global.getString(context.applicationContext.contentResolver, "private_dns_mode").orEmpty()
+    } catch (_: Exception) { "" }
+
     /**
      * The checks `ProxyAdblockChainActivity` runs for its 运行链验证 card, in the same order and
      * from the same sources: startup copy, live rules, runtime log, session counters.
@@ -96,21 +142,49 @@ internal object ToolsRuntimeBridge {
         val controller = ProxyComposeController(app)
         val running = quietly(false) { controller.state().running }
         val startup = quietly("") { RootProxyManager(app).startupConfig() }
-        val rules = if (running) quietly(emptyList()) { controller.rules() } else emptyList()
-        val adRule = rules.firstOrNull {
+        val rules = if (running) quietly<List<ProxyRuleUi>?>(null) { controller.rules() } else null
+        val adRule = rules?.firstOrNull {
             it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
         }
-        val stats = if (running) quietly(AdblockRuntimeStats()) { ProxyRuntimeInspector(app).adblockRuntimeStats() } else AdblockRuntimeStats()
         val mode = if (running) quietly("") { MihomoControllerClient(app).configs().optString("mode", "") } else ""
+        val providers = if (running && rules != null) quietly<List<ProxyRuleProviderUi>?>(null) { controller.ruleProviders() } else null
+        val report = if (rules != null && providers != null) AdblockVerification.inspect(mode, rules, providers) else null
+        val counted = report?.takeIf { it.loaded }
+        // Recent domains only: the counter itself comes from the controller below.
+        val stats = if (running) quietly(AdblockRuntimeStats()) { ProxyRuntimeInspector(app).adblockRuntimeStats() } else AdblockRuntimeStats()
         val cachedRecent = prefs.getString("proxyAdblockRecentDomains", "").orEmpty().lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(8).toList()
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val source = quietly<String?>(null) { ProxyConfigLibrary(app).let { lib -> lib.source(profile.core)?.let { lib.read(it) } } }
         ToolsAdblockChain(
             running = running,
             mode = mode,
             ruleMode = mode.isNotBlank() && AdblockRuleInspection.isRuleMode(mode),
             startupInjected = AdblockRuleInspection.isInjected(startup),
             controllerLoaded = adRule != null,
-            hits = maxOf(prefs.getLong("proxyAdblockSessionHits", 0L), adRule?.hitCount ?: 0L, stats.count),
+            // Controller hitCount is authoritative while the core answers (in-memory RuleWrapper
+            // counter, independent of the log level); the log-derived session count is the fallback.
+            hits = counted?.hitCount ?: maxOf(prefs.getLong("proxyAdblockSessionHits", 0L), adRule?.hitCount ?: 0L, stats.count),
             recent = stats.recentDomains.ifEmpty { cachedRecent },
+            missCount = counted?.missCount ?: 0L,
+            hitsFromController = counted != null,
+            report = report,
+            dnsLayer = AdblockDnsPolicy.isInjected(startup),
+            enhancedMode = AdblockDnsPolicy.enhancedMode(startup),
+            snifferState = AdblockDnsPolicy.snifferState(startup),
+            privateDnsMode = privateDnsMode(app),
+            privateDnsHost = privateDnsHostname(app).orEmpty(),
+            systemDns = prefs.getString("proxyRootSystemDns", "").orEmpty(),
+            dnsHijackMode = prefs.getString("proxyRootDnsMode", "").orEmpty(),
+            dotGuard = prefs.getBoolean("proxyRootDotGuard", false),
+            dnsIpv6Rule = prefs.getBoolean("proxyRootDnsIpv6Rule", false),
+            ipv6DnsPolicy = prefs.getString("proxyRootIpv6DnsPolicy", "").orEmpty(),
+            cnip = if (running) prefs.getString("proxyCnIpKernelStatus", "").orEmpty() else "",
+            cnipTcpOnly = prefs.getBoolean("proxyCnIpKernelTcpOnlyActive", false),
+            cnipUdpOnly = prefs.getBoolean("proxyCnIpKernelUdpOnlyActive", false),
+            sourceHasDns = source == null || MihomoStartupConfig.sourceHasDns(source),
+            recommendedDns = prefs.getBoolean("proxyRecommendedDns", false),
+            appScope = profile.appScope.id,
+            scopedApps = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().size,
         )
     }
 

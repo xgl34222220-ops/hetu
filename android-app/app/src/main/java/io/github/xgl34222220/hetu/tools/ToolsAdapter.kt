@@ -18,29 +18,23 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import io.github.xgl34222220.hetu.ProxyAdblockChainActivity
-import io.github.xgl34222220.hetu.ProxyAppSelectionActivity
-import io.github.xgl34222220.hetu.ProxyBypassRulesActivity
-import io.github.xgl34222220.hetu.ProxyCnIpSettingsActivity
 import io.github.xgl34222220.hetu.ProxyComposeController
-import io.github.xgl34222220.hetu.ProxyCoreActivity
 import io.github.xgl34222220.hetu.ProxyLogViewerActivity
 import io.github.xgl34222220.hetu.ProxyNetworkAutomationActivity
 import io.github.xgl34222220.hetu.ProxyScriptsActivity
-import io.github.xgl34222220.hetu.ProxySharedNetworkSettingsActivity
 import io.github.xgl34222220.hetu.ProxySubStoreActivity
 import io.github.xgl34222220.hetu.ProxyWebPanelsActivity
 import io.github.xgl34222220.hetu.ReferenceFileManagerActivity
 import io.github.xgl34222220.hetu.ToolsConfigBridge
+import io.github.xgl34222220.hetu.HxConfigTransaction
 import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.asHomeHaptics
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +55,7 @@ import kotlinx.coroutines.withContext
  * @param onLog receives the diagnostics text for 诊断工具, as `RefTools` does today.
  * @param onSubPageVisibleChanged true while a pushed page covers the tab: hide the dock.
  * @param onConfigChanged the config library or the current config changed: refresh the shell state.
+ * @param onConfigSelected the user made another config current: the host applies it to a running proxy and says so.
  */
 @Composable
 internal fun HetuToolsV2(
@@ -69,9 +64,13 @@ internal fun HetuToolsV2(
     contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
     onSubPageVisibleChanged: (Boolean) -> Unit = {},
     onConfigChanged: () -> Unit = {},
+    onConfigSelected: ((String) -> Unit)? = null,
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
     onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
     onOpenConfigEditor: (() -> Unit)? = null,
+    requestedEntry: ToolsEntry? = null,
+    onRequestConsumed: () -> Unit = {},
+    requestedImport: Boolean = false,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext
@@ -81,6 +80,7 @@ internal fun HetuToolsV2(
     val haptics = rememberHetuHaptics()
     val log by rememberUpdatedState(onLog)
     val changed by rememberUpdatedState(onConfigChanged)
+    val selected by rememberUpdatedState(onConfigSelected)
     val openExternal by rememberUpdatedState(onOpenExternalEntry)
     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
     val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
@@ -110,7 +110,7 @@ internal fun HetuToolsV2(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
-                    toast(error.message ?: "导出失败")
+                    toast(io.github.xgl34222220.hetu.hxErrorMessage(error, "导出失败"))
                 }
             }
         }
@@ -120,34 +120,18 @@ internal fun HetuToolsV2(
         ToolsActions(
             onOpenEntry = openEntry@{ entry ->
                 if (openExternal(entry)) return@openEntry
+                // Apps / Cores / Bypass / Share / CnIp / Diag / Adblock always open their in-module page
+                // (rememberToolsFeatureHost supplies every loader), so only entries without one leave here.
                 val target = when (entry) {
                     ToolsEntry.Files -> ReferenceFileManagerActivity::class.java
                     ToolsEntry.Scripts -> ProxyScriptsActivity::class.java
                     ToolsEntry.Logs -> ProxyLogViewerActivity::class.java
-                    ToolsEntry.Apps -> ProxyAppSelectionActivity::class.java
                     ToolsEntry.NetMatch -> ProxyNetworkAutomationActivity::class.java
-                    ToolsEntry.Share -> ProxySharedNetworkSettingsActivity::class.java
-                    ToolsEntry.Bypass -> ProxyBypassRulesActivity::class.java
                     ToolsEntry.SubStore -> ProxySubStoreActivity::class.java
-                    ToolsEntry.CnIp -> ProxyCnIpSettingsActivity::class.java
-                    ToolsEntry.Cores -> ProxyCoreActivity::class.java
-                    ToolsEntry.Adblock -> ProxyAdblockChainActivity::class.java
                     ToolsEntry.WebUi -> ProxyWebPanelsActivity::class.java
-                    ToolsEntry.Diag, ToolsEntry.Configs -> null
+                    else -> null
                 }
-                if (target != null) {
-                    context.startActivity(Intent(context, target))
-                } else if (entry == ToolsEntry.Diag) {
-                    scope.launch {
-                        try {
-                            log(controller.diagnostics())
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (error: Exception) {
-                            log(error.message ?: "诊断读取失败")
-                        }
-                    }
-                }
+                if (target != null) context.startActivity(Intent(context, target))
             },
             onOpenEditor = if (onOpenConfigEditor == null) null else { { openConfigEditor?.invoke() } },
             loadConfigs = {
@@ -160,19 +144,39 @@ internal fun HetuToolsV2(
                     subscriptions = subscriptions.map { ToolsSubscription(it.name, it.url, it.placeholder) },
                 )
             },
-            selectConfig = { name -> controller.selectConfig(name); changed() },
-            exportConfig = { name -> exporting = name; exporter.launch(name) },
+            selectConfig = { name -> controller.selectConfig(name); changed(); selected?.invoke(name) },
+            selectionAnnounced = onConfigSelected != null,
+            exportConfig = { name ->
+                exporting = name
+                // A disabled DocumentsUI is a message, not a crash (DocumentPickerSafety).
+                if (!io.github.xgl34222220.hetu.launchDocumentPicker(::toast) { exporter.launch(name) }) exporting = null
+            },
             renameConfig = { from, to -> withContext(Dispatchers.IO) { ToolsConfigBridge.rename(app, from, to) }; changed() },
             deleteConfig = { name -> controller.deleteConfig(name); changed() },
             addSubscription = { name, url -> controller.addSubscription(name, url); changed() },
             updateSubscription = { name, url -> controller.updateSubscription(name, url); changed() },
             deleteSubscription = { name -> controller.deleteSubscription(name); changed() },
-            importFromUrl = { url, name -> download(app, url, name).also { changed() } },
-            onPickImportFile = { picker.launch(arrayOf("*/*")) },
+            importFromUrl = { url, name ->
+                // Validated by Mihomo before it is stored, like 设置 › 导入配置.
+                val text = HxConfigTransaction.decode(HxConfigTransaction.download(url).first)
+                toolsImportCheck { controller.validateConfigText(text) }
+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }
+                    .also { changed(); selected?.invoke(it) }
+            },
+            onPickImportFile = { io.github.xgl34222220.hetu.launchDocumentPicker(::toast) { picker.launch(arrayOf("*/*")) } },
             onClearPickedFile = { pickedFile = null },
             importFile = { file ->
                 val uri = file.token as? Uri ?: throw IOException("无法读取配置文件")
-                controller.importConfig(uri, file.name).also { changed() }
+                val bytes = try {
+                    HxConfigTransaction.readUri(app, uri)
+                } catch (denied: SecurityException) {
+                    throw IOException("无法读取所选文件，请重新选择文件", denied)
+                }
+                val text = HxConfigTransaction.decode(bytes)
+                toolsImportCheck { controller.validateConfigText(text) }
+                // A picker name without .yaml/.yml (some providers drop it) would be refused by the library.
+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, toolsImportFileName(file.name), text.toByteArray(Charsets.UTF_8).inputStream()) }
+                    .also { changed(); selected?.invoke(it) }
             },
             readConfig = { withContext(Dispatchers.IO) { ToolsConfigBridge.document(app) } },
             validateConfig = { text -> controller.validateConfigText(text) },
@@ -185,19 +189,11 @@ internal fun HetuToolsV2(
         )
     }
 
+    val homeHaptics = remember(haptics) { haptics.asHomeHaptics() }
     HetuHomeThemeFromPrefs(prefs) {
       ToolsConceptTheme {
         CompositionLocalProvider(
-            LocalHomeHaptics provides { kind ->
-                haptics.perform(
-                    when (kind) {
-                        HomeHaptic.Tap -> HetuHaptic.Tap
-                        HomeHaptic.Tick -> HetuHaptic.Tick
-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
-                        HomeHaptic.Reject -> HetuHaptic.Reject
-                    },
-                )
-            },
+            LocalHomeHaptics provides homeHaptics,
         ) {
             ToolsRoute(
                 actions = actions,
@@ -208,6 +204,9 @@ internal fun HetuToolsV2(
                 features = features.actions,
                 appIcon = features.appIcon,
                 onDestinationChanged = { destination = it },
+                requestedEntry = requestedEntry,
+                onRequestConsumed = onRequestConsumed,
+                requestedImport = requestedImport,
             )
         }
       }
@@ -240,18 +239,37 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
     return ToolsPickedFile(name, detail, uri)
 }
 
-/** Fetches [url] and hands the body to the config library under [name]; returns the stored name. */
-private suspend fun download(context: Context, url: String, name: String): String = withContext(Dispatchers.IO) {
-    val connection = URL(url).openConnection() as? HttpURLConnection ?: throw IOException("请输入有效的 http/https 链接")
+/**
+ * 7.0.0: the core's `-t` answer is many log lines; a toast shows two, so the reason was cut off and an
+ * import seemed to do nothing. Keeps the core's own error line, in a Chinese sentence.
+ */
+private suspend fun toolsImportCheck(check: suspend () -> Unit) {
     try {
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "clash.meta")
-        val code = connection.responseCode
-        if (code !in 200..299) throw IOException("下载失败：HTTP $code")
-        ToolsConfigBridge.importStream(context, name, connection.inputStream)
-    } finally {
-        connection.disconnect()
+        check()
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (error: Exception) {
+        throw IOException("配置校验未通过：" + toolsCoreCheckReason(error.message.orEmpty()), error)
     }
+}
+
+/** The `level=error msg="…"` (or `level=fatal`) text of a core check, else its last meaningful line. */
+internal fun toolsCoreCheckReason(message: String): String {
+    val body = message.substringAfter("YAML 校验失败：", message).trim()
+    val logged = Regex("""level=(?:error|fatal)\s+msg="((?:[^"\\]|\\.)*)"""").findAll(body).lastOrNull()?.groupValues?.get(1)
+        ?.replace("\\\"", "\"")?.trim()
+    val reason = logged?.takeIf { it.isNotEmpty() } ?: body.lineSequence().map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("configuration file") && !it.contains("level=info") && !it.contains("level=warning") }
+        .lastOrNull().orEmpty()
+    return reason.ifEmpty { body.ifEmpty { "未知原因" } }.take(300)
+}
+
+/** A picked document's name as a library file name: keeps .yaml/.yml, otherwise appends .yaml; at most 120 characters. */
+internal fun toolsImportFileName(raw: String): String {
+    val base = raw.trim().replace('/', '_').replace('\\', '_').ifEmpty { "config.yaml" }
+    val named = if (base.endsWith(".yaml", ignoreCase = true) || base.endsWith(".yml", ignoreCase = true)) base else "$base.yaml"
+    if (named.substringBeforeLast('.').isBlank()) return "config.yaml"
+    if (named.length <= 120) return named
+    val ext = named.substring(named.lastIndexOf('.'))
+    return named.substring(0, 120 - ext.length) + ext
 }

@@ -1,0 +1,92 @@
+# Golden input: a Clash/Mihomo profile with every node type Hetu converts.
+mixed-port: 7890
+allow-lan: false
+mode: rule
+dns:
+  enable: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '+.lan'
+    - 'time.android.com'
+  default-nameserver:
+    - 223.5.5.5
+  nameserver:
+    - https://1.1.1.1/dns-query
+proxies:
+  - {name: "HK SS", type: ss, server: ss.example.com, port: 8388, cipher: aes-128-gcm, password: "pw1"}
+  - {name: "HK SS2022", type: ss, server: 203.0.113.10, port: 8389, cipher: 2022-blake3-aes-128-gcm, password: "AAAAAAAAAAAAAAAAAAAAAA=="}
+  - {name: "HK SS obfs", type: ss, server: obfs.example.com, port: 8390, cipher: chacha20-ietf-poly1305, password: pw, plugin: obfs, plugin-opts: {mode: http, host: bing.com}}
+  - name: "JP VMess WS"
+    type: vmess
+    server: vmess.example.com
+    port: 443
+    uuid: 2b4a8a52-6f1e-4c4f-9b8a-1d3a2b4c5d6e
+    alterId: 0
+    cipher: auto
+    tls: true
+    servername: vmess.example.com
+    network: ws
+    ws-opts:
+      path: /ws
+      headers:
+        Host: vmess.example.com
+  - name: "US VLESS Reality"
+    type: vless
+    server: 198.51.100.7
+    port: 443
+    uuid: 6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.microsoft.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: iGs2kqIGPj4a8Qw0bJ7XyKm6E3p0vN5rT9uS1cD4fHg
+      short-id: 6ba85179e30d4fc2
+  - name: "SG VLESS gRPC"
+    type: vless
+    server: grpc.example.com
+    port: 443
+    uuid: 6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b4
+    tls: true
+    servername: grpc.example.com
+    network: grpc
+    grpc-opts:
+      grpc-service-name: gun
+  - {name: "TW Trojan", type: trojan, server: trojan.example.com, port: 443, password: tpw, sni: trojan.example.com, skip-cert-verify: false}
+  - {name: "KR Hy2", type: hysteria2, server: hy2.example.com, port: 8443, password: hpw, sni: hy2.example.com, up: "50 Mbps", down: "200 Mbps", obfs: salamander, obfs-password: opw}
+  - {name: "DE TUIC", type: tuic, server: tuic.example.com, port: 8443, uuid: 6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b5, password: tupw, congestion-controller: bbr, udp-relay-mode: native, alpn: [h3], sni: tuic.example.com}
+  - {name: "Snell", type: snell, server: snell.example.com, port: 443, psk: x}
+proxy-groups:
+  - {name: "Proxy", type: select, proxies: ["Auto", "HK SS", "JP VMess WS", "US VLESS Reality", "SG VLESS gRPC", "TW Trojan", "KR Hy2", "DE TUIC", "DIRECT"]}
+  - {name: "Auto", type: url-test, proxies: ["HK SS", "JP VMess WS", "TW Trojan"], url: "https://www.gstatic.com/generate_204", interval: 300}
+  - {name: "Streaming", type: select, proxies: ["Proxy", "DIRECT"]}
+rule-providers:
+  ads:
+    type: inline
+    behavior: domain
+    payload:
+      - '+.doubleclick.net'
+      - 'ads.example.org'
+  lan-ips:
+    type: inline
+    behavior: ipcidr
+    payload:
+      - 192.168.0.0/16
+rules:
+  - RULE-SET,ads,REJECT
+  - DOMAIN,api.example.com,Proxy
+  - DOMAIN-SUFFIX,google.com,Proxy
+  - DOMAIN-KEYWORD,youtube,Streaming
+  - DOMAIN-REGEX,^.*\.netflix\.com$,Streaming
+  - GEOSITE,cn,DIRECT
+  - RULE-SET,lan-ips,DIRECT
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR6,fd00::/8,DIRECT,no-resolve
+  - DST-PORT,123,DIRECT
+  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
+  - PROCESS-NAME,com.tencent.mm,DIRECT
+  - GEOIP,LAN,DIRECT,no-resolve
+  - GEOIP,CN,DIRECT
+  - SRC-IP-CIDR,192.168.50.0/24,DIRECT
+  - MATCH,Proxy

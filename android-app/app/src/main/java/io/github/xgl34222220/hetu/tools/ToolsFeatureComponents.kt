@@ -132,7 +132,7 @@ internal fun ToolsBarTextButton(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (loading) HomeSpinner(size = 18.dp, color = tint) else Icon(icon, null, Modifier.size(20.dp), tint = tint)
-        Text(ht(text), color = tint, style = HomeType.button.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+        Text(ht(text), color = tint, style = HomeType.button.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -317,7 +317,7 @@ internal fun ColumnScope.ToolsListEditor(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
             Icon(ToolsIcons.Plus, null, Modifier.size(20.dp), tint = c.accent)
-            Text(ht("添加一项"), color = c.accent, style = HomeType.button)
+            Text(ht("添加一项"), color = c.accentText, style = HomeType.button)
         }
     }
 }

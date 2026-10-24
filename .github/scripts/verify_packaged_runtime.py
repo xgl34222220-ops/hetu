@@ -6,6 +6,17 @@ import json
 from pathlib import Path
 import zipfile
 
+# 2026-10-13 eBPF matcher authorization: three payloads added next to (never replacing) the original
+# 23. Each is built reproducibly from in-repo source under native/ebpf (native/ebpf/build.sh) and is
+# pinned here; any other added payload, or any other byte, is rejected.
+EBPF_PAYLOADS = {
+    'assets/hetu-bpf/hetu_match.o': '096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de',
+    'assets/hetu-bpf/arm64-v8a/hetu-bpf': 'dc671038dc008f468ff69a68c83fffc925207c8565f319ca9ce23891d166fa08',
+    'assets/hetu-bpf/x86_64/hetu-bpf': 'ed3f241d2d8ad9b4867325083090d6b580c15d36b3873e44a61a389e887ae779',
+}
+AUTOSTART = 'assets/hetu-autostart.sh'
+ALLOWED_ADDED = ([], [AUTOSTART], sorted(EBPF_PAYLOADS), [AUTOSTART, *sorted(EBPF_PAYLOADS)])
+
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
@@ -24,6 +35,7 @@ def main():
     parser.add_argument('mode', choices=['snapshot', 'verify'])
     parser.add_argument('--script-sha256')
     parser.add_argument('--autostart-sha256')
+    parser.add_argument('--ebpf', action='store_true', help='Include the three pinned eBPF payloads')
     parser.add_argument('--apk', default='android-app/app/build/outputs/apk/debug/app-debug.apk')
     parser.add_argument('--manifest', default='out/verification/packaged-runtime.json')
     args = parser.parse_args()
@@ -38,18 +50,26 @@ def main():
         added = []
         if args.autostart_sha256:
             assert len(args.autostart_sha256) == 64
-            expected['assets/hetu-autostart.sh'] = args.autostart_sha256
-            added = ['assets/hetu-autostart.sh']
+            expected[AUTOSTART] = args.autostart_sha256
+            added = [AUTOSTART]
+        if args.ebpf:
+            assert not set(EBPF_PAYLOADS) & set(expected), 'eBPF payload collides with an original payload'
+            expected.update(EBPF_PAYLOADS)
+            added += sorted(EBPF_PAYLOADS)
         for name, digest in expected.items():
             assert sha(source_path(name).read_bytes()) == digest, f'Source runtime hash mismatch: {name}'
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps({'expected': expected, 'originalPayloadCount': len(original),
-                                     'editedPayloads': [script], 'addedPayloads': added, 'apkVerified': False}, indent=2) + '\n')
-        print(f'Snapshot verified: {len(original)-1} unchanged runtime payloads + tested shell + {len(added)} added boot script')
+                                     'editedPayloads': [script], 'addedPayloads': added,
+                                     'ebpfPayloadsFromSource': bool(args.ebpf), 'apkVerified': False}, indent=2) + '\n')
+        print(f'Snapshot verified: {len(original)-1} unchanged runtime payloads + tested shell + {len(added)} added payloads')
     else:
         record = json.loads(output.read_text())
         added = record.get('addedPayloads', [])
-        assert added in [[], ['assets/hetu-autostart.sh']], 'Unexpected additional payload'
+        assert added in ALLOWED_ADDED, 'Unexpected additional payload'
+        for name in set(added) & set(EBPF_PAYLOADS):
+            assert record['expected'][name] == EBPF_PAYLOADS[name], f'eBPF payload differs from pinned source build: {name}'
+        assert record.get('ebpfPayloadsFromSource', False) is bool(set(added) & set(EBPF_PAYLOADS)), 'eBPF flag mismatch'
         assert set(record['expected']) == set(original) | set(added), 'Runtime manifest is incomplete'
         assert record['editedPayloads'] == [script], 'Unexpected runtime payload change'
         for name, digest in original.items():

@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.ui
 
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -154,7 +155,7 @@ internal fun HetuScrollTabs(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            label, color = text, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 1,
+                            label, color = text, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                         )
                     }

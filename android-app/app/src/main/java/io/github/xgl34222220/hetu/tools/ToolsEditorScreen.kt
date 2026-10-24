@@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeNotice
 import io.github.xgl34222220.hetu.home.HomeReveal
-import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.HomeVerticalDivider
@@ -106,7 +105,8 @@ internal fun ToolsEditorScreen(
                 }
                 HomeCard(Modifier.fillMaxWidth().weight(1f)) {
                     when (val load = state.load) {
-                        ToolsLoad.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HomeSpinner(size = 22.dp, color = c.t3) }
+                        // Audit5 E1: code-line placeholders while the file is read (static with motion off), like the config editor.
+                        ToolsLoad.Loading -> Box(Modifier.fillMaxSize()) { io.github.xgl34222220.hetu.HxSkeletonLines(count = 8, modifier = Modifier.padding(top = 8.dp), rowHeight = 44.dp, icon = false) }
                         is ToolsLoad.Failed -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
                             ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message, topPadding = 24.dp) {
                                 ToolsButton("重新读取", onReload, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
@@ -178,7 +178,7 @@ private fun SymbolBar(enabled: Boolean, onInsert: (String) -> Unit) {
                         .background(if (c.dark) c.sunken else c.bg)
                         .semantics { contentDescription = spoken },
                     contentAlignment = Alignment.Center,
-                ) { Text(label, color = c.t1, style = ToolsTypography.mono.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1) }
+                ) { Text(label, color = c.t1, style = ToolsTypography.mono.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }
@@ -210,7 +210,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.label.copy(fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.title, Modifier.weight(1f), color = c.accentText, style = HomeType.label.copy(fontWeight = if (item.level == 0) FontWeight.Bold else FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(item.line.toString(), color = c.t2, style = HomeType.delay)
                         ToolsChevron()
                     }

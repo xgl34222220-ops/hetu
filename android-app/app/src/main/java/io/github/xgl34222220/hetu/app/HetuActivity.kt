@@ -23,6 +23,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CancellationException
@@ -101,9 +104,12 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.flow.collectLatest
@@ -121,6 +127,14 @@ class HetuActivity : ComponentActivity() {
         enableEdgeToEdge()
         vm = ViewModelProvider(this)[HetuViewModel::class.java]
         if (savedInstanceState == null) applyStartPage(intent)
+        if (savedInstanceState == null) applyShortcut(intent)
+        // Audit4 G8: (re)publish the launcher shortcuts in the app language; binder work off the main thread.
+        Thread({
+            HxLauncherShortcuts.publish(applicationContext)
+            // Audit5 G7: re-arm the background subscription check after an update or a restore.
+            HxSubscriptionAlerts.syncSchedule(applicationContext)
+        }, "hetu-shortcuts").start()
+        val launchArt = savedInstanceState == null
         setContent {
             HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
                 val revision = vm.settingsRevision
@@ -130,6 +144,7 @@ class HetuActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalDensity provides scaledDensity) {
                     HetuRoot(vm, requestedRoute) { requestedRoute = null }
                 }
+                if (launchArt) HetuLaunchArt()
             }
         }
     }
@@ -138,6 +153,7 @@ class HetuActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         applyStartPage(intent)
+        applyShortcut(intent)
     }
 
     override fun onStart() {
@@ -161,18 +177,56 @@ class HetuActivity : ComponentActivity() {
             "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
             "connections" -> vm.openPanel("conn")
             "providers", "subscriptions" -> vm.openPanel("providers")
-            "configs" -> {
-                vm.tab = HxTab.Tools
-                requestedRoute = HxRoute.Configs
-            }
+            // One config page: 工具 › 配置管理.
+            "configs" -> vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
             "rules" -> vm.openPanel("rules")
             "home" -> vm.tab = HxTab.Home
+        }
+    }
+
+    /** Audit4 G8: a launcher shortcut. Consumed once, so a recreation never repeats a start or stop. */
+    private fun applyShortcut(intent: Intent?) {
+        val action = intent?.getStringExtra(HxLauncherShortcuts.EXTRA) ?: return
+        intent.removeExtra(HxLauncherShortcuts.EXTRA)
+        when (action) {
+            HxLauncherShortcuts.START, HxLauncherShortcuts.STOP -> {
+                requestedRoute = HxRoute.Main
+                vm.tab = HxTab.Home
+                vm.shortcutRun(start = action == HxLauncherShortcuts.START)
+            }
+            HxLauncherShortcuts.NET_TEST -> requestedRoute = HxRoute.NetTest
         }
     }
 
     companion object {
         const val EXTRA_START_PAGE = "io.github.xgl34222220.hetu.START_PAGE"
     }
+}
+
+/**
+ * Cold-start hand-off from the system splash: the first frame shows the full mesh art
+ * (hetu_splash_art, -night variant in dark mode) centre-cropped over the already-composed app,
+ * then fades it out (~360 ms total). It draws only — no pointer input — and never delays the
+ * app content composed beneath it.
+ */
+@Composable
+private fun HetuLaunchArt() {
+    var visible by remember { mutableStateOf(true) }
+    if (!visible) return
+    val alpha = remember { Animatable(1f) }
+    // Audit5 R1: with motion off the art leaves after the first frames instead of fading.
+    val artMotion = LocalHetuMotionEnabled.current
+    LaunchedEffect(Unit) {
+        delay(60)
+        if (artMotion) alpha.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 300, easing = HxMotion.Emphasized))
+        visible = false
+    }
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(R.drawable.hetu_splash_art),
+        contentDescription = null,
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.value },
+    )
 }
 
 /* ------------------------------------------------------------------ */
@@ -186,16 +240,10 @@ internal sealed class HxRoute(val key: String) {
     data object Providers : HxRoute("providers")
     data object Adblock : HxRoute("adblock")
     data object Network : HxRoute("network")
-    data object Apps : HxRoute("apps")
-    data object Cores : HxRoute("cores")
     data object About : HxRoute("about")
-    data object Bypass : HxRoute("bypass")
     data object Files : HxRoute("files")
-    data object SharedNet : HxRoute("shared-net")
-    data object CnIp : HxRoute("cnip")
     data object Logs : HxRoute("logs")
     data object NetMatch : HxRoute("net-match")
-    data object Diagnostics : HxRoute("diagnostics")
     data object Notifications : HxRoute("notifications")
     data object Theme : HxRoute("theme")
     data object DefaultPanelSettings : HxRoute("default-panel-settings")
@@ -203,6 +251,7 @@ internal sealed class HxRoute(val key: String) {
     data object StartupDownloadSettings : HxRoute("startup-download-settings")
     data object PublicIp : HxRoute("public-ip")
     data object Resources : HxRoute("resources")
+    data object NetTest : HxRoute("net-test")
 }
 
 internal class HxNav {
@@ -341,16 +390,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             HxRoute.Providers -> ProvidersScreen(vm)
                             HxRoute.Adblock -> AdblockScreen(vm)
                             HxRoute.Network -> NetworkSettingsScreen(vm)
-                            HxRoute.Apps -> AppListScreen(vm)
-                            HxRoute.Cores -> CoresScreen(vm)
                             HxRoute.About -> AboutScreen(vm)
-                            HxRoute.Bypass -> BypassRulesScreen(vm) { nav.pop() }
                             HxRoute.Files -> FileManagerScreen(vm) { nav.pop() }
-                            HxRoute.SharedNet -> SharedNetworkScreen(vm) { nav.pop() }
-                            HxRoute.CnIp -> CnIpScreen(vm) { nav.pop() }
                             HxRoute.Logs -> HxLogFilesScreen(vm) { nav.pop() }
                             HxRoute.NetMatch -> HxNetworkMatchScreen(vm) { nav.pop() }
-                            HxRoute.Diagnostics -> DiagnosticsScreen(vm) { nav.pop() }
                             HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                             HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                             HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
@@ -358,6 +401,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                             HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                             HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
+                            HxRoute.NetTest -> NetworkTestScreen { nav.pop() }
                         }
                     }
                 }
@@ -367,6 +411,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             HxToastHost(vm, extraBottom = if (nav.stack.size == 1 && dockOccupiedHeight > 0.dp)
                 (dockOccupiedHeight - navBottom).coerceAtLeast(0.dp) + 12.dp else 24.dp)
+            HxCoreNoticeHost(vm)
         }
 
         vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
@@ -416,13 +461,17 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
         }
     }
     // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
-    val items = dockTabs.map { tab ->
-        val label = ht(tab.label)
-        when (tab) {
-            HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
-            HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
-            HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
-            HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+    // One list instance per tab set/language: the dock skips recomposition while pages scroll.
+    val labels = dockTabs.map { ht(it.label) }
+    val items = remember(dockTabs, labels) {
+        dockTabs.mapIndexed { index, tab ->
+            val label = labels[index]
+            when (tab) {
+                HxTab.Home -> DockItem(label, io.github.xgl34222220.hetu.ui.HetuLucideIcons.House, 1f) // monochrome outline, like the other three
+                HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
+                HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
+                HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+            }
         }
     }
     val floatingDock = remember(settingsTick) { vm.prefs.getBoolean("floatingBottomBar", true) }
@@ -447,11 +496,13 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             }
         }
     }
-    Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
+    // Every tab page paints its own opaque canvas and HetuRoot keeps one beneath them for
+    // transitions, so this host adds no third full-screen gradient (overdraw per frame).
+    Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (glassEnabled && !runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
+                // The dock's glass is static (no backdrop blur), so the tab page is not recorded
+                // into an offscreen layer on every scroll frame.
                 .nestedScroll(dockScroll),
         ) {
             AnimatedContent(
@@ -484,25 +535,66 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             }
         }
         val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
-        val dockShift by animateDpAsState(
+        // Read only in the placement lambda: hiding/showing the dock never recomposes the shell.
+        val dockShift = animateDpAsState(
             if (dockVisible) 0.dp else dockHeight + 16.dp,
             if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(),
             label = "dockShift",
         )
         val detailVisible = (vm.tab == HxTab.Home && homeDetail) || (vm.tab == HxTab.Tools && toolsDetail)
         androidx.compose.runtime.SideEffect { onDockOccupancyChanged(if (detailVisible || !dockVisible) 0.dp else dockHeight) }
-        if (!detailVisible) HetuGlassDock(
-            items = items,
-            selected = selectedIndex,
-            onSelect = { index ->
-                val next = dockTabs[index.coerceIn(0, dockTabs.lastIndex)]
-                if (next == vm.tab) vm.reselect++ else vm.tab = next
-            },
-            hazeState = dockHaze,
-            backdrop = liquidBackdrop.takeIf { runtimeLiquid },
-            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
-            onHeightChanged = { measuredDockHeight = it },
-        )
+        val dock: @Composable (Modifier) -> Unit = { placement ->
+            HetuGlassDock(
+                items = items,
+                selected = selectedIndex,
+                onSelect = { index ->
+                    val next = dockTabs[index.coerceIn(0, dockTabs.lastIndex)]
+                    if (next == vm.tab) vm.reselect++ else vm.tab = next
+                },
+                hazeState = dockHaze,
+                backdrop = null,
+                modifier = placement.offset { IntOffset(0, dockShift.value.roundToPx()) },
+                onHeightChanged = { measuredDockHeight = it },
+            )
+        }
+        // A detail page owns the bottom edge: the dock slides down out of its way and back up on
+        // return instead of vanishing. With reduced motion it simply hides, as before.
+        if (motion) AnimatedVisibility(
+            visible = !detailVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(spring(dampingRatio = .88f, stiffness = 420f)) { it } + fadeIn(tween(160)),
+            exit = slideOutVertically(tween(220, easing = HxMotion.Exit)) { it } + fadeOut(tween(180)),
+            label = "dock-detail",
+        ) { dock(Modifier) }
+        else if (!detailVisible) dock(Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/**
+ * 「当前核心（X）不支持此功能」 for an action the running core lacks (热重载, 流量模式, 测速):
+ * the same glass card as the panel's degraded tabs, in a dialog, instead of an error toast.
+ */
+@Composable
+internal fun HxCoreNoticeHost(vm: HetuViewModel) {
+    val notice = vm.coreNotice ?: return
+    val dismiss = { vm.coreNotice = null }
+    io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs(vm.prefs) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
+            io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard(
+                notice.core, notice.feature, notice.detail,
+                Modifier.widthIn(max = 360.dp), raised = true,
+            ) {
+                if (notice.offerRestart && vm.state.running) {
+                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.weight(1f),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Soft)
+                    io.github.xgl34222220.hetu.home.HomeButton("重启代理", { vm.coreNotice = null; vm.restart() }, Modifier.weight(1f),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
+                } else {
+                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.fillMaxWidth(),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
+                }
+            }
+        }
     }
 }
 
@@ -512,12 +604,13 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
     val motion = LocalHetuMotionEnabled.current
     var floatingMessage by remember { mutableStateOf<String?>(null) }
     var shownMessage by remember { mutableStateOf("") }
+    var expandedMessage by remember { mutableStateOf<String?>(null) }
     val haptics = rememberHetuHaptics()
     LaunchedEffect(vm) {
         vm.messages.collectLatest { message ->
             floatingMessage = message
             shownMessage = message
-            if (hxToastTone(message) == HxTone.Bad) haptics.perform(HetuHaptic.Reject)
+            if (vm.toastTone(message) == HxTone.Bad) haptics.perform(HetuHaptic.Reject)
             // Longer messages stay a little longer so they can actually be read.
             delay((1500L + message.length * 45L).coerceAtMost(4200L))
             floatingMessage = null
@@ -534,7 +627,20 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
             fadeOut(tween(150)) +
             scaleOut(tween(180), targetScale = .9f) else ExitTransition.None,
     ) {
-        HxToast(shownMessage, onDismiss = { floatingMessage = null })
+        HxToast(shownMessage, tone = vm.toastTone(shownMessage), onDismiss = { floatingMessage = null }, onExpand = { full ->
+            floatingMessage = null
+            expandedMessage = full
+        })
+    }
+    // A message cut at two lines opens here in full, with copy.
+    expandedMessage?.let { full ->
+        val context = androidx.compose.ui.platform.LocalContext.current
+        HxSheet(onDismiss = { expandedMessage = null }, title = ht("完整信息"), showClose = true) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(ht(full), Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp), color = io.github.xgl34222220.hetu.home.LocalHomeColors.current.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 22.sp))
+            }
+            HxButton(ht("复制"), onClick = { hxCopy(context, "河图", full) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), filled = false)
+        }
     }
 }
 
@@ -551,6 +657,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
                 Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                     content(vm)
                     HxToastHost(vm)
+                    HxCoreNoticeHost(vm)
                 }
             }
         }
@@ -582,15 +689,21 @@ internal fun hxToastTone(message: String): HxTone = when {
     else -> HxTone.Neutral
 }
 
-/** Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss. */
+/**
+ * Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss.
+ * [tone] is the poster's explicit tone ([HetuViewModel.toastAs]); the keyword reading is only the fallback.
+ */
 @Composable
-private fun HxToast(message: String, onDismiss: () -> Unit) {
+private fun HxToast(message: String, tone: HxTone = hxToastTone(message), onDismiss: () -> Unit, onExpand: (String) -> Unit = {}) {
     val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
-    val tone = hxToastTone(message)
-    var drag by remember { mutableStateOf(0f) }
+    // A new message starts unflicked; a released flick that does not dismiss springs back.
+    var drag by remember(message) { mutableStateOf(0f) }
+    val toastMotion = LocalHetuMotionEnabled.current
     val shape = RoundedCornerShape(50)
+    var cut by remember(message) { mutableStateOf(false) }
     Row(
         Modifier
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .graphicsLayer {
                 translationY = drag
                 alpha = (1f - drag / 160f).coerceIn(0f, 1f)
@@ -601,12 +714,14 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
                 onDragStopped = { velocity ->
                     if (drag > 36f || velocity > 900f) {
                         onDismiss()
+                    } else if (toastMotion && drag != 0f) {
+                        androidx.compose.animation.core.animate(drag, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = 520f)) { v, _ -> drag = v }
                     } else {
                         drag = 0f
                     }
                 },
             )
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = { if (cut) onExpand(message) else onDismiss() })
             .homeGlassPanel(shape, c.raised, raised = true)
             .heightIn(min = 48.dp)
             .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
@@ -626,6 +741,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
             )
         }
         Spacer(Modifier.width(10.dp))
-        Text(message, color = c.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), maxLines = 2)
+        Text(
+            ht(message),
+            color = c.t1,
+            style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            onTextLayout = { cut = it.hasVisualOverflow },
+        )
     }
 }

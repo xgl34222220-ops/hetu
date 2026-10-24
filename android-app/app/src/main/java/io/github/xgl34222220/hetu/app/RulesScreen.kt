@@ -170,7 +170,7 @@ private fun LazyListScope.ruleSetItems(vm: HetuViewModel, query: String = "", sh
             set = set,
             task = vm.ruleSetTasks[set.name],
             onUpdate = { vm.updateRuleSet(set.name) },
-            modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null),
+            modifier = Modifier.then(hxAnimateItem()),
         )
     }
 }
@@ -204,7 +204,7 @@ private fun RuleSetCard(set: DashboardRuleSetUi, task: HxTask?, onUpdate: () -> 
                     )
                     Spacer(Modifier.width(7.dp))
                     Text(
-                        "${set.ruleCount} 条规则",
+                        if (set.ruleCount >= 0) "${set.ruleCount} 条规则" else "规则数未知",
                         style = MaterialTheme.typography.labelLarge.merge(HxNumberStyle),
                         color = c.accent,
                         maxLines = 1,
@@ -274,14 +274,14 @@ internal fun LazyListScope.providerListItems(vm: HetuViewModel, query: String = 
     if (showSearch) item(key = "providers-search") { HxSearchField(query, onQuery, "搜索订阅", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp), autoFocus = true) }
     val providers = if (query.isBlank()) vm.providers else vm.providers.filter { p -> p.name.contains(query, true) || p.nodes.any { it.contains(query, true) } }
     if (providers.isEmpty()) {
-        item(key = "providers-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (query.isBlank()) "没有在线订阅" else "没有匹配的订阅", if (query.isBlank()) "在「设置 → 配置与订阅」中添加订阅链接" else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
+        item(key = "providers-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (query.isBlank()) "没有在线订阅" else "没有匹配的订阅", if (query.isBlank()) "在「工具 → 配置管理」中添加订阅链接" else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
     }
     itemsIndexed(providers, key = { _, item -> "pv:" + item.name }) { _, p ->
         ProviderCard(
             p = p,
             task = vm.providerTasks[p.name],
             onUpdate = { vm.updateProvider(p.name) },
-            modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null),
+            modifier = Modifier.then(hxAnimateItem()),
         )
     }
 }
@@ -384,7 +384,7 @@ private fun ProviderFigure(value: String, label: String, color: Color, modifier:
             lineHeight = 21.sp,
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             color = color,
-            maxLines = 1,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Text(label, style = MaterialTheme.typography.labelSmall, color = Hx.colors.textMuted)
     }
@@ -405,7 +405,7 @@ private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, showSearch
         item(key = "rules-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (vm.rules.isEmpty()) "没有规则" else "没有匹配的规则", if (query.isBlank()) null else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
     }
     itemsIndexed(list, key = { _, rule -> "r:" + rule.index }) { index, rule ->
-        Box(Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)) {
+        Box(Modifier.then(hxAnimateItem())) {
             RuleRow(rule, first = index == 0, last = index == list.lastIndex)
         }
     }
@@ -470,48 +470,6 @@ private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
 }
 
 /* ---------------------------- shared ---------------------------- */
-
-@Composable
-private fun UpdateAllBar(summary: String, label: String, busy: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val source = remember { MutableInteractionSource() }
-    val bg by animateColorAsState(
-        when {
-            busy -> c.surfaceMuted
-            enabled -> c.accent
-            else -> c.surfaceMuted
-        },
-        tween(HxMotion.Medium),
-        label = "updateAllBg",
-    )
-    val fg by animateColorAsState(if (enabled && !busy) c.onAccent else c.textMuted, tween(HxMotion.Medium), label = "updateAllFg")
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(summary, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(8.dp))
-        Row(
-            Modifier
-                .hxPressScale(source, .95f)
-                .height(32.dp)
-                .clip(Hx.pillShape)
-                .background(bg)
-                .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy) {
-                    haptics.perform(HetuHaptic.Confirm)
-                    onClick()
-                }
-                .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HxSpinningSync(spinning = busy, tint = fg, size = 15.dp)
-            Spacer(Modifier.width(5.dp))
-            Text(if (busy) "更新中" else label, style = MaterialTheme.typography.labelMedium, color = fg)
-        }
-    }
-}
 
 /** A sync glyph that keeps turning while work is in flight and eases to rest after. */
 @Composable

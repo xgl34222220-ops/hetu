@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeButtonKind
 import io.github.xgl34222220.hetu.home.HomeCard
+import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeDivider
 import io.github.xgl34222220.hetu.home.HomeIconButton
@@ -52,6 +53,7 @@ import io.github.xgl34222220.hetu.home.HomeRollingText
 import io.github.xgl34222220.hetu.home.HomeRowDims
 import io.github.xgl34222220.hetu.home.HomeRowDivider
 import io.github.xgl34222220.hetu.home.HomeRowSubStyle
+import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.HomeVerticalDivider
 import io.github.xgl34222220.hetu.home.LocalHomeColors
@@ -61,6 +63,7 @@ import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.rememberHomeStagger
 import io.github.xgl34222220.hetu.home.warnText
 import io.github.xgl34222220.hetu.ui.HetuStaggerState
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.ui.ht
 
 /**
@@ -93,6 +96,8 @@ internal fun ToolsAdblockScreen(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     scroll: ScrollState = rememberScrollState(),
+    onProbe: (() -> Unit)? = null,
+    onRecommendedDnsChange: ((Boolean) -> Unit)? = null,
 ) {
     val ready = state.load is ToolsLoad.Ready
     val idle = ready && !state.busy
@@ -115,9 +120,23 @@ internal fun ToolsAdblockScreen(
             is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.ShieldBan, "广告过滤状态读取失败", subtitle = load.message) {
                 ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
             }
-            ToolsLoad.Ready -> {
+            ToolsLoad.Ready -> if (!state.coreRoutesAds) {
+                // A core without rule routing (Hysteria 2): ad rules cannot apply, so the page says so
+                // once instead of showing switches that do nothing. The proxy-off DNS filter still works.
+                HomeCoreUnsupportedCard(
+                    state.coreLabel, "广告过滤 · 规则拦截",
+                    "${state.coreLabel} 是单服务器客户端，所有流量直接发往同一台服务器，没有规则分流，广告规则无法生效。代理关闭时的独立 DNS 过滤不受影响。",
+                    Modifier.homeEnter(stagger, 0), icon = ToolsFeatureIcons.ShieldOff,
+                )
+                ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 1))
+            } else {
                 StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
-                ChainCard(state, Modifier.homeEnter(stagger, 1))
+                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe, idle, onRecommendedDnsChange)
+                else HomeCoreUnsupportedCard(
+                    state.coreLabel, "运行链验证 · 热更新过滤规则",
+                    "广告规则在启动时写入 ${state.coreLabel} 配置并按规则拦截；${state.coreLabel} 不提供 Mihomo 的规则读取接口，无法实时验证运行链，修改规则在重启代理后生效。",
+                    Modifier.homeEnter(stagger, 1), icon = ToolsFeatureIcons.ShieldAlert,
+                )
                 Column(Modifier.homeEnter(stagger, 2)) {
                     // 最近拦截 brings its own gap, so it can unfold without a jump.
                     HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
@@ -126,14 +145,19 @@ internal fun ToolsAdblockScreen(
                 SourcesCard(state, idle, onUpdate, onSourceChange, Modifier.homeEnter(stagger, 3))
                 DomainCard("白名单（永不拦截）", "添加白名单", state.allow, idle, stagger, 4, onAdd = { onAddDomain(true) }, onRemove = { onRemoveDomain(it, true) })
                 DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, stagger, 5, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
-                HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 6)) {
-                    ToolsCardTitle("代理关闭时")
-                    ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
-                    HomeRowDivider(start = HomeRowDims.textStart)
-                    ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
-                }
+                ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 6))
             }
         }
+    }
+}
+
+@Composable
+private fun ProxyOffCard(state: ToolsAdblockState, idle: Boolean, onStandaloneDnsChange: (Boolean) -> Unit, onCnameChange: (Boolean) -> Unit, modifier: Modifier) {
+    HomeCard(modifier.fillMaxWidth()) {
+        ToolsCardTitle("代理关闭时")
+        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
+        HomeRowDivider(start = HomeRowDims.textStart)
+        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
     }
 }
 
@@ -142,11 +166,16 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val text: Color
 @Composable
 private fun statusLook(state: ToolsAdblockState): StatusLook {
     val c = LocalHomeColors.current
+    // Applied by a core that cannot report its chain: say what is known, not 「运行链未确认」.
+    if (state.coreManaged) return StatusLook(
+        ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("已随核心启动"),
+        ht("广告域名在 %s 中按规则拦截；\n该核心不支持实时验证。").fill(state.coreLabel),
+    )
     return when (state.status) {
         ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("保护中"), ht("广告域名直接 REJECT，\n其余流量照常分流。"))
         ToolsAdStatus.WrongMode -> StatusLook(
             ToolsFeatureIcons.ShieldAlert, c.warn, c.warnText, c.warnSoft,
-            ht("当前为${state.modeLabel.ifBlank { "非规则" }}模式"), ht("广告规则只在「规则」模式下生效。"),
+            ht("当前为%s模式").fill(ht(state.modeLabel.ifBlank { "非规则" })), ht("广告规则只在「规则」模式下生效。"),
         )
         ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.t1, c.sunken, ht("已开启"), ht("启动代理后自动验证运行链。"))
         ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnText, c.warnSoft, ht("运行链未确认"), ht("尚未确认规则模式及广告规则加载；下拉刷新后重试验证。"))
@@ -207,13 +236,19 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
 private fun Metric(label: String, value: String, color: Color, modifier: Modifier) {
     val c = LocalHomeColors.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
         HomeRollingText(value, color, HomeType.metric.copy(fontSize = HomeType.sheetTitle.fontSize), alignment = Alignment.Center)
     }
 }
 
 @Composable
-private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
+private fun ChainCard(
+    state: ToolsAdblockState,
+    modifier: Modifier,
+    onProbe: (() -> Unit)? = null,
+    idle: Boolean = true,
+    onRecommendedDnsChange: ((Boolean) -> Unit)? = null,
+) {
     val running = state.enabled && state.proxyRunning
     HomeCard(modifier.fillMaxWidth()) {
         ToolsCardTitle("运行链验证")
@@ -221,21 +256,78 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
         HomeRowDivider(start = HomeRowDims.textStart)
         CheckRow(state.enabled && state.startupInjected, ht("启动配置注入"), ht(if (state.enabled && state.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider"))
         HomeRowDivider(start = HomeRowDims.textStart)
-        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
+        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), state.chainNote.takeIf { running && it.isNotBlank() }
+            ?: ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
         HomeRowDivider(start = HomeRowDims.textStart)
-        CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
+        if (running && state.dnsPath.isNotBlank()) {
+            CheckRow(state.dnsPathOk, ht("DNS 路径"), state.dnsPath, maxLines = 4)
+            HomeRowDivider(start = HomeRowDims.textStart)
+        }
+        if (onProbe != null) {
+            val probe = state.probe
+            ToolsRow(
+                AnnotatedString(ht("拦截实测")),
+                icon = if (probe?.ok == true && !state.probing) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+                iconTint = if (probe?.ok == true && !state.probing) LocalHomeColors.current.good else if (probe?.ok == false && !state.probing) LocalHomeColors.current.bad else LocalHomeColors.current.t3,
+                subtitle = when {
+                    state.probing -> ht("正在向广告域名发送一次请求…")
+                    probe != null -> probe.detail
+                    running -> ht("向已拦截域名发一次请求，读取核心的实际判定")
+                    else -> ht("代理启动后可实测")
+                },
+                compact = true,
+                trailing = {
+                    if (state.probing) HomeSpinner(size = 18.dp, color = LocalHomeColors.current.accent)
+                    else if (running) ToolsButton("实测", onProbe, kind = HomeButtonKind.Soft, height = 36.dp) else Unit
+                },
+            )
+            HomeRowDivider(start = HomeRowDims.textStart)
+            val dnsProbe = state.dnsProbe
+            if (state.probing || dnsProbe != null) {
+                ToolsRow(
+                    AnnotatedString(ht("DNS 接管实测")),
+                    icon = if (dnsProbe?.ok == true && !state.probing) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+                    iconTint = if (dnsProbe?.ok == true && !state.probing) LocalHomeColors.current.good else if (dnsProbe?.ok == false && !state.probing) LocalHomeColors.current.bad else LocalHomeColors.current.t3,
+                    subtitle = if (state.probing) ht("用系统解析器解析一个已拦截域名…") else dnsProbe?.detail.orEmpty(),
+                    compact = true, subtitleMaxLines = 4,
+                )
+                HomeRowDivider(start = HomeRowDims.textStart)
+            }
+        }
+        // Controller hitCount (in-memory, independent of the log level) and missCount: a rule that
+        // was never checked (miss 0) and one that sees hostless connections (miss > 0) differ.
+        CheckRow(
+            state.effective && state.hits > 0, ht("实际拦截"),
+            ht("%s 次").fill("%,d".format(state.shownHits)) + when {
+                !running -> ""
+                state.hitsFromController -> " · " + ht("已检查 %s 个连接").fill("%,d".format(state.missCount + state.hits))
+                else -> " · " + ht("日志计数")
+            },
+        )
+        if (state.hints.isNotEmpty()) {
+            Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.hints.forEach { hint -> HomeNotice(ht(hint), HomeIcons.TriangleAlert, Modifier.fillMaxWidth()) }
+            }
+        }
+        if (state.offerRecommendedDns && onRecommendedDnsChange != null) {
+            HomeRowDivider(start = HomeRowDims.textStart)
+            ToolsSwitchRow(
+                "河图推荐 DNS", state.recommendedDns, onRecommendedDnsChange, icon = ToolsFeatureIcons.Globe,
+                subtitle = "订阅没有 dns: 时启用 fake-ip + 国内 DoH；默认关闭，重启代理后生效", enabled = idle,
+            )
+        }
     }
 }
 
 @Composable
-private fun CheckRow(ok: Boolean, title: String, detail: String) {
+private fun CheckRow(ok: Boolean, title: String, detail: String, maxLines: Int = 2) {
     val c = LocalHomeColors.current
     val tint by animateColorAsState(if (ok) c.good else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current, 260), label = "tools-ad-check")
     ToolsRow(
         AnnotatedString(title),
         icon = if (ok) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
         iconTint = tint,
-        subtitle = detail, compact = true,
+        subtitle = detail, compact = true, subtitleMaxLines = maxLines,
     )
 }
 

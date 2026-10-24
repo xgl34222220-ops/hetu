@@ -110,6 +110,12 @@ public final class ProxyNetworkMatchService extends Service {
 
     @Override public int onStartCommand(Intent i,int f,int id){
         String action=i==null?"":i.getAction();
+        if(DaemonMonitorPolicy.ACTION_DAEMON.equals(action)){
+            // Root monitor hand-off (only Root/system can start this non-exported service).
+            handleDaemonHandoff(i);
+            if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false)){stopSelf();return START_NOT_STICKY;}
+            return START_STICKY;
+        }
         if(RootAutostart.ACTION_RUNNING.equals(action)&&bootAutoEnabled()){
             // Validate native boot state on the worker before publishing recovery intent.
             worker.execute(()->{
@@ -641,7 +647,10 @@ public final class ProxyNetworkMatchService extends Service {
                                 throw new IllegalStateException(result.optString("message","自动启动未完成"));
                         }
                     }else if("stop".equals(action)&&running&&"automation".equals(owner)){
-                        scheduleAutomaticStop(automaticStopGeneration);
+                        if(!deferToDaemon(NetworkMatchRules.parseAction(action)))scheduleAutomaticStop(automaticStopGeneration);
+                    }else{
+                        NetworkMatchRules.Action background=NetworkMatchRules.parseAction(action);
+                        if(background.background()&&!deferToDaemon(background))scheduleBackgroundAction(automaticStopGeneration,environment,background);
                     }
                     // A failed start must remain eligible for the next callback.
                     prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
@@ -680,6 +689,98 @@ public final class ProxyNetworkMatchService extends Service {
         },3500L);
     }
 
+    // Switch-config / run-script: debounced (stable network for 2.5 s, same decision) and rate limited
+    // (the same decision not again within 30 s, at most 3 background actions per minute).
+    private final NetworkMatchRules.Limiter backgroundLimiter=new NetworkMatchRules.Limiter(30000L,60000L,3);
+    private void scheduleBackgroundAction(long generation,Environment decided,NetworkMatchRules.Action action){
+        final String decision=decided.label+"|"+decided.matched+"|"+action.encode();
+        scheduleWorker(()->{
+            if(generation!=automaticStopGeneration||!prefs.getBoolean("networkMatchEnabled",false))return;
+            Environment current=readEnvironment();
+            if(!action.encode().equals(current.action)||!current.label.equals(decided.label))return;
+            if(!backgroundLimiter.allow(decision,SystemClock.elapsedRealtime())){
+                prefs.edit().putString("networkMatchLastActionResult","已限流，跳过："+actionText(action)).apply();
+                return;
+            }
+            String result;
+            try{
+                if("switch".equals(action.kind)){
+                    JSONObject out=new RootProxyManager(getApplicationContext()).switchConfigForAutomation(action.target,
+                            ()->!destroyed&&generation==automaticStopGeneration&&action.encode().equals(readEnvironment().action));
+                    if(out.optBoolean("cancelled",false))return;
+                    if(out.optBoolean("unchanged",false))result="已是目标配置："+action.target;
+                    else if(!out.optBoolean("ok",false))result="切换配置失败："+out.optString("message","未知错误");
+                    else result="已切换配置 "+out.optString("from","")+" → "+action.target+(out.optBoolean("restarted",false)?"（已重启核心）":"（下次启动生效）");
+                }else{
+                    String command=NetworkMatchRules.scriptCommand(action.target,current.matched?"network-match":"network-unmatch",current.label,
+                            prefs.getString("proxyBaseMode",""),prefs.getString("proxyUiLastConfig",""));
+                    RootBridge.Result out=RootBridge.rootShell(getApplicationContext(),command,(NetworkMatchRules.SCRIPT_TIMEOUT_SECONDS+6)*1000L);
+                    result=out.ok()?"脚本已执行："+action.target:out.code==124?"脚本超时已停止："+action.target
+                            :out.code==44?"脚本不存在："+action.target:"脚本退出码 "+out.code+"："+action.target+"（见 scripts.log）";
+                }
+            }catch(Exception error){
+                result=actionText(action)+"失败："+(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage());
+            }
+            prefs.edit().putString("networkMatchLastActionResult",result).putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
+        },NetworkMatchRules.STABLE_DELAY_MS);
+    }
+    private static String actionText(NetworkMatchRules.Action action){
+        return "stop".equals(action.kind)?"停止 Root 代理":"switch".equals(action.kind)?"切换配置 "+action.target:"运行脚本 "+action.target;
+    }
+
+    /**
+     * While the Root monitor daemon is alive with network match enabled it owns stop / switch /
+     * script decisions (it keeps running when this process is killed); acting here as well would
+     * execute them twice. Asked only when a changed decision carries such an action.
+     */
+    private boolean deferToDaemon(NetworkMatchRules.Action action){
+        if(!prefs.getBoolean("proxyRootRuntimeRunning",false))return false;
+        DaemonMonitorPolicy.Status status=DaemonMonitorBridge.status(getApplicationContext());
+        if(!status.ownsNetworkMatch())return false;
+        prefs.edit().putString("networkMatchLastActionResult","已交由 Root 守护执行："+actionText(action))
+                .putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
+        return true;
+    }
+
+    /** Executes a stop / switch-config decision the Root monitor confirmed (debounced, rate limited there). */
+    private void handleDaemonHandoff(Intent intent){
+        final DaemonMonitorPolicy.Handoff handoff=DaemonMonitorPolicy.parseHandoff(intent.getStringExtra("kind"),intent.getStringExtra("target"),
+                intent.getStringExtra("label"),intent.getStringExtra("id"),intent.getLongExtra("at",0L),SystemClock.elapsedRealtime());
+        if(handoff==null||!prefs.getBoolean("networkMatchEnabled",false))return;
+        try{worker.execute(()->{
+            if(destroyed||!prefs.getBoolean("networkMatchEnabled",false))return;
+            // One execution per daemon decision, also when am delivers the intent again.
+            if(handoff.id.equals(prefs.getString("networkMatchDaemonHandledId",""))
+                    ||!prefs.edit().putString("networkMatchDaemonHandledId",handoff.id).commit())return;
+            automaticStopGeneration++;
+            final long generation=automaticStopGeneration;
+            java.util.function.BooleanSupplier current=()->!destroyed&&generation==automaticStopGeneration&&prefs.getBoolean("networkMatchEnabled",false);
+            String result;
+            try{
+                RootProxyManager root=new RootProxyManager(getApplicationContext());
+                if("stop".equals(handoff.kind)){
+                    JSONObject out=root.stopIfAutomationOwned(current);
+                    if(out.optBoolean("cancelled",false))result="Root 守护请求停止：当前会话不是自动匹配启动，已保留运行";
+                    else{
+                        result="Root 守护稳定确认后已停止："+handoff.label;
+                        prefs.edit().putString("proxyLastAutoStopReason","网络匹配（Root 守护）在稳定确认后执行停止："+handoff.label)
+                                .putLong("proxyLastAutoStopAt",System.currentTimeMillis()).apply();
+                    }
+                }else{
+                    JSONObject out=root.switchConfigForAutomation(handoff.target,current);
+                    if(out.optBoolean("cancelled",false))result="Root 守护请求切换配置：已被新的决定取代";
+                    else if(out.optBoolean("unchanged",false))result="已是目标配置："+handoff.target;
+                    else if(!out.optBoolean("ok",false))result="切换配置失败："+out.optString("message","未知错误");
+                    else result="Root 守护已切换配置 "+out.optString("from","")+" → "+handoff.target+(out.optBoolean("restarted",false)?"（已重启核心）":"（下次启动生效）");
+                }
+            }catch(Exception error){
+                result="Root 守护交办失败："+(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage());
+            }
+            prefs.edit().putString("networkMatchLastActionResult",result).putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
+        });}catch(RejectedExecutionException stopped){}
+    }
+
+
     private static final class Environment{
         final String label;
         final boolean matched;
@@ -698,11 +799,50 @@ public final class ProxyNetworkMatchService extends Service {
             WifiInfo info=wm==null?null:wm.getConnectionInfo();
             if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
         }catch(SecurityException ignored){}
-        boolean matched=(wifi&&matches(ssid,set("networkMatchSsids"),false)&&matches(bssid,set("networkMatchBssids"),true))
-                ||(mobile&&prefs.getBoolean("networkMatchMobile",false));
-        String action=prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none");
-        String label=wifi?("Wi‑Fi"+(ssid.isEmpty()?"":" · "+ssid)+(bssid.isEmpty()?"":" · "+bssid)):(mobile?"移动数据":"其他/离线");
-        return new Environment(label,matched,action);
+        NetworkMatchRules.Conditions conditions=new NetworkMatchRules.Conditions(set("networkMatchSsids"),set("networkMatchBssids"),
+                prefs.getBoolean("networkMatchMobile",false),set("networkMatchSimSlots"),set("networkMatchMccMnc"));
+        int slot=-1;String simOperator="",networkOperator="";
+        if(mobile){
+            int[] slotHolder={-1};String[] operators=readSimOperators(slotHolder,conditions);
+            slot=slotHolder[0];simOperator=operators[0];networkOperator=operators[1];
+        }
+        NetworkMatchRules.Observation observation=new NetworkMatchRules.Observation(wifi,mobile,ssid,bssid,slot,simOperator,networkOperator);
+        boolean matched=NetworkMatchRules.matched(observation,conditions);
+        String action=NetworkMatchRules.parseAction(prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none")).encode();
+        return new Environment(NetworkMatchRules.label(observation),matched,action);
+    }
+
+    // Default data SIM without READ_PHONE_STATE: SubscriptionManager#getDefaultDataSubscriptionId and
+    // #getSlotIndex (API 29+) and TelephonyManager#getSimOperator/#getNetworkOperator need no
+    // permission. Only when those are empty and an MCC+MNC condition exists, Root getprop
+    // gsm.sim.operator.numeric / gsm.operator.numeric (per slot, comma separated) fills them,
+    // cached for 30 s so network callbacks do not spawn a Root shell each.
+    private volatile long simPropAt=-60000L;private volatile String simProp="",netProp="";
+    private String[] readSimOperators(int[] slotOut,NetworkMatchRules.Conditions conditions){
+        String sim="",net="";int slot=-1;
+        try{
+            int sub=android.telephony.SubscriptionManager.getDefaultDataSubscriptionId();
+            if(sub!=android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID){
+                if(Build.VERSION.SDK_INT>=29){int index=android.telephony.SubscriptionManager.getSlotIndex(sub);if(index>=0)slot=index+1;}
+                android.telephony.TelephonyManager tm=(android.telephony.TelephonyManager)getSystemService(TELEPHONY_SERVICE);
+                if(tm!=null){tm=tm.createForSubscriptionId(sub);sim=tm.getSimOperator();net=tm.getNetworkOperator();}
+            }
+        }catch(RuntimeException ignored){}
+        sim=NetworkMatchRules.normalizeMccMnc(sim);net=NetworkMatchRules.normalizeMccMnc(net);
+        if(conditions.needsOperator()&&slot>=1&&(sim.isEmpty()||net.isEmpty())){
+            long now=SystemClock.elapsedRealtime();
+            if(now-simPropAt>30000L&&RootProxyManager.observationTicket()>=0L){
+                simPropAt=now;
+                try{
+                    RootBridge.Result r=RootBridge.rootShell(getApplicationContext(),"getprop gsm.sim.operator.numeric; getprop gsm.operator.numeric",3000L);
+                    if(r.ok()){String[] lines=r.output.split("\\r?\\n",-1);simProp=lines.length>0?lines[0]:"";netProp=lines.length>1?lines[1]:"";}
+                }catch(Exception ignored){}
+            }
+            if(sim.isEmpty())sim=NetworkMatchRules.operatorForSlot(simProp,slot);
+            if(net.isEmpty())net=NetworkMatchRules.operatorForSlot(netProp,slot);
+        }
+        slotOut[0]=slot;
+        return new String[]{sim,net};
     }
 
     private boolean coreAlive(){
@@ -897,6 +1037,22 @@ public final class ProxyNetworkMatchService extends Service {
                 previousHits=prefs.getLong("proxyAdblockSessionHits",0L);
                 oldRecent=prefs.getString("proxyAdblockRecentDomains","");
             }
+            // The counter comes from the controller over loopback HTTP (RuleWrapper hitCount, kept in
+            // memory and independent of the log level): no su, no log scan. core.log is read through
+            // su only while the 广告过滤 page is visible, for the recent-domain list.
+            final long controllerHits=controllerAdblockHits();
+            if(controllerHits>=0){
+                synchronized(ProxyAdblockSession.LOCK){
+                    if(destroyed||generation!=prefs.getLong("proxyAdblockSessionGeneration",0L)
+                            ||!prefs.getBoolean("proxyAdblockCounterArmed",false))return;
+                    if(controllerHits!=previousHits){
+                        SharedPreferences.Editor counted=prefs.edit().putLong("proxyAdblockSessionHits",controllerHits);
+                        if(controllerHits>previousHits)counted.putLong("proxyAdblockLastHitAt",System.currentTimeMillis());
+                        counted.apply();
+                    }
+                }
+            }
+            if(controllerHits>=0&&!prefs.getBoolean("proxyAdblockUiVisible",false))return;
             String path="/data/adb/hetu/run/core.log";
             String command="set +e; S=$(stat -c %s "+RootBridge.quote(path)+" 2>/dev/null || wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
                     +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
@@ -912,14 +1068,14 @@ public final class ProxyNetworkMatchService extends Service {
             try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
             String chunk=newline<0?"":result.output.substring(newline+1);
             ProxyLogLines lines=ProxyLogLines.read(pending,discarding,chunk,size<offset);
-            long hits=previousHits;
+            long hits=controllerHits>=0?controllerHits:previousHits;
             LinkedHashSet<String> recent=new LinkedHashSet<>();
             if(oldRecent!=null&&!oldRecent.isEmpty())for(String item:oldRecent.split("\\n"))if(!item.trim().isEmpty())recent.add(item.trim());
             java.util.regex.Pattern domainPattern=java.util.regex.Pattern.compile("-->\\s+([^\\s\\\"]+)");
             for(String line:lines.complete.split("\\r?\\n")){
                 String lower=line.toLowerCase(Locale.ROOT);
                 if(!lower.contains("hetu-adblock")||!lower.contains("reject")||!lower.contains("match"))continue;
-                hits++;
+                if(controllerHits<0)hits++;
                 java.util.regex.Matcher matcher=domainPattern.matcher(line);
                 if(matcher.find()){
                     String raw=matcher.group(1);
@@ -957,6 +1113,23 @@ public final class ProxyNetworkMatchService extends Service {
                 edit.apply();
             }
         }catch(Exception ignored){}
+    }
+
+    /** hitCount of the live strict REJECT rule from the controller; -1 when it cannot be read. */
+    private long controllerAdblockHits(){
+        try{
+            org.json.JSONArray rules=new MihomoControllerClient(getApplicationContext()).rules().optJSONArray("rules");
+            if(rules==null)return -1L;
+            for(int i=0;i<rules.length();i++){
+                org.json.JSONObject rule=rules.optJSONObject(i);
+                if(rule==null)continue;
+                org.json.JSONObject extra=rule.optJSONObject("extra");
+                boolean disabled=rule.optBoolean("disabled",false)||(extra!=null&&extra.optBoolean("disabled",false));
+                if(AdblockRuleInspection.isBlockingRule(rule.optString("type"),rule.optString("payload"),rule.optString("proxy"),disabled))
+                    return extra==null?-1L:Math.max(0L,extra.optLong("hitCount",0L));
+            }
+        }catch(Exception ignored){}
+        return -1L;
     }
 
     private Set<String> set(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?Collections.emptySet():new HashSet<>(s);}

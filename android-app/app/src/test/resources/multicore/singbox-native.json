@@ -1,0 +1,12 @@
+{
+  // user's own sing-box profile
+  "log": {"level": "warn"},
+  "dns": {"servers": [{"type": "udp", "tag": "google", "server": "8.8.8.8"}], "final": "google"},
+  "inbounds": [{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080}],
+  "outbounds": [
+    {"type": "vless", "tag": "proxy", "server": "203.0.113.20", "server_port": 443, "uuid": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3", "routing_mark": 1234,
+     "tls": {"enabled": true, "server_name": "example.com"}},
+    {"type": "direct", "tag": "direct"}
+  ],
+  "route": {"rules": [{"domain_suffix": ["cn"], "outbound": "direct"}], "final": "proxy", "default_mark": 255}
+}

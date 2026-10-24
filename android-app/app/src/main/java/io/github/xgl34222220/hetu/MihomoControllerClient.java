@@ -74,6 +74,14 @@ final class MihomoControllerClient {
             secret=string(snapshot,customApi?"proxyCustomApiSecret":"proxyControllerSecret","");
             if(secret.indexOf('\r')>=0||secret.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
             if(!customApi&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
+            // Xray / V2Fly / Hysteria have no Clash-compatible controller: report the explicit
+            // unsupported state instead of a refused connection on the local port.
+            // Kept free of other app classes: the network soak harness compiles this file standalone.
+            if(!customApi){
+                Object running=snapshot.get("proxyRootRuntimeCore");
+                String label="xray".equals(running)?"Xray":"v2fly".equals(running)?"V2Fly":"hysteria".equals(running)?"Hysteria":null;
+                if(label!=null)throw new IOException("此核心不支持面板、策略组与测速（没有 Clash 控制接口）（"+label+"）");
+            }
         }
 
         private static String string(Map<String,?> values,String key,String fallback)throws IOException {
@@ -93,14 +101,9 @@ final class MihomoControllerClient {
     }
 
     private void addDelayUrls(ArrayList<String> urls,String preferredUrl){
-        String custom=customDelayUrl();
-        if(!custom.isEmpty())urls.add(custom);
-        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
-            String preferred=preferredUrl.trim();
-            if(!urls.contains(preferred))urls.add(preferred);
-        }else{
-            for(String item:DEFAULT_DELAY_URLS)if(!urls.contains(item))urls.add(item);
-        }
+        // 7.0.0: a Cloudflare group URL gets gstatic after it (edgetunnel nodes cannot reach CF).
+        for(String item:DelayUrlChoice700.delayUrls(customDelayUrl(),preferredUrl,DEFAULT_DELAY_URLS))
+            if(!urls.contains(item))urls.add(item);
     }
 
     JSONObject proxies()throws Exception{
@@ -147,6 +150,11 @@ final class MihomoControllerClient {
         request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));
     }
 
+    /** Releases a URLTest/Fallback pin (Mihomo DELETE /proxies/{group} clears `fixed`). */
+    void unfix(String group)throws Exception{
+        request("DELETE","/proxies/"+Uri.encode(group),null);
+    }
+
     void updateRuleProvider(String name)throws Exception{
         request("PUT","/providers/rules/"+Uri.encode(name),null,30000);
     }
@@ -175,6 +183,25 @@ final class MihomoControllerClient {
         return delayPath("/proxies/"+Uri.encode(node)+"/delay",preferredUrl,expected);
     }
 
+    /**
+     * 7.0.0: one per-proxy delay request with an explicit timeout, used to retest nodes whose
+     * first group-test reading failed. Returns the delay, -1 for a core timeout (504) or -2 for
+     * another core-reported failure; controller transport errors are thrown.
+     */
+    long delayOnce(String node,String url,String expected,int timeoutMs)throws Exception{
+        String test=URLEncoder.encode(url,"UTF-8");
+        String status=URLEncoder.encode((expected==null||expected.trim().isEmpty())?"200-399":expected.trim(),"UTF-8");
+        try{
+            JSONObject v=request("GET","/proxies/"+Uri.encode(node)+"/delay?timeout="+timeoutMs+"&url="+test+"&expected="+status,null,timeoutMs+1500);
+            long d=v.optLong("delay",-1);
+            return d>0?d:-2L;
+        }catch(ControllerHttpException error){
+            if(error.statusCode==504||error.statusCode==408)return -1L;
+            if(error.statusCode==503)return -2L;
+            throw error;
+        }
+    }
+
     long providerDelay(String provider,String node,String preferredUrl,String expected)throws Exception{
         return delayPath("/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck",preferredUrl,expected);
     }
@@ -191,7 +218,8 @@ final class MihomoControllerClient {
             ArrayList<String> urls=new ArrayList<>();
             addDelayUrls(urls,preferredUrl);
             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
-            for(String rawUrl:urls){
+            for(int urlIndex=0;urlIndex<urls.size();urlIndex++){
+                String rawUrl=urls.get(urlIndex);
                 budget.check();
                 try{
                     String test=URLEncoder.encode(rawUrl,"UTF-8");
@@ -206,6 +234,8 @@ final class MihomoControllerClient {
                 }catch(ControllerHttpException error){
                     // A core-confirmed timeout already spent the whole 5 s window on this node.
                     // Retrying the next default URL only doubled the dead-node cost of a wave.
+                    // 7.0.0 exception: a Cloudflare target timing out still tries the gstatic fallback.
+                    if(error.statusCode==504&&urlIndex+1<urls.size()&&DelayUrlChoice700.isCloudflareTarget(rawUrl)){last=new DelayFailure(true);continue;}
                     if(error.statusCode==504)throw new DelayFailure(true);
                     else if(error.statusCode==503)last=new DelayFailure(false);
                     else throw error;
@@ -254,6 +284,17 @@ final class MihomoControllerClient {
     }
 
     /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
+    /** 7.0.0: URL for the failed-node retry (gstatic instead of a Cloudflare group URL). */
+    boolean firstRoundUsedCloudflare(String groupUrl,boolean selector){
+        String custom=customDelayUrl();
+        if(!custom.isEmpty())return DelayUrlChoice700.isCloudflareTarget(custom);
+        return !selector&&DelayUrlChoice700.isCloudflareTarget(waveDelayUrl(groupUrl));
+    }
+
+    String retryDelayUrl(String groupUrl){
+        return DelayUrlChoice700.retryUrl(customDelayUrl(),groupUrl,DEFAULT_DELAY_URLS[0]);
+    }
+
     String waveDelayUrl(String groupUrl){
         String custom=customDelayUrl();
         if(!custom.isEmpty())return custom;
@@ -309,7 +350,10 @@ final class MihomoControllerClient {
             raw.flush();
 
             BufferedInputStream in=new BufferedInputStream(socket.getInputStream());
-            String status=readLine(in);if(status==null||!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
+            String status=readLine(in);
+            // A connection closed before any reply byte is a lost reply (retryable), not a malformed one.
+            if(status==null)throw new EOFException("Mihomo 控制接口返回无效 HTTP 响应");
+            if(!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
             String[] bits=status.split(" ",3);if(bits.length<2)throw new IOException("Mihomo 控制接口状态行无效");
             int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
             HashMap<String,String> headers=new HashMap<>();String line;
@@ -346,4 +390,48 @@ final class MihomoControllerClient {
         return out.toByteArray();
     }
     private static String compact(String s){s=s.replace('\n',' ').replace('\r',' ').trim();return s.length()>220?s.substring(0,220)+"…":s;}
+
+    /** 7.0.0 delay-URL choice, nested so the verbatim network-soak host compiles this file alone. */
+    static final class DelayUrlChoice700 {
+        static final String NEUTRAL_URL = "https://www.gstatic.com/generate_204";
+
+        private DelayUrlChoice700() {}
+
+        static boolean isCloudflareTarget(String url) {
+            if (url == null) return false;
+            String host;
+            try { host = new URI(url.trim()).getHost(); } catch (Exception ignored) { return false; }
+            if (host == null) return false;
+            host = host.toLowerCase(Locale.ROOT);
+            if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
+            if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
+            return host.equals("cloudflare.com") || host.endsWith(".cloudflare.com")
+                || host.equals("1.1.1.1") || host.equals("1.0.0.1")
+                || host.equals("2606:4700:4700::1111") || host.equals("2606:4700:4700:0:0:0:0:1111");
+        }
+
+        /** Ordered per-node delay URLs: custom only when set; else preferred (+gstatic after a Cloudflare target); else defaults. */
+        static List<String> delayUrls(String custom, String preferred, String[] defaults) {
+            ArrayList<String> urls = new ArrayList<>();
+            String c = custom == null ? "" : custom.trim();
+            if (!c.isEmpty()) urls.add(c);
+            String p = preferred == null ? "" : preferred.trim();
+            if (!p.isEmpty()) {
+                if (!urls.contains(p)) urls.add(p);
+                if (c.isEmpty() && isCloudflareTarget(p) && !urls.contains(NEUTRAL_URL)) urls.add(NEUTRAL_URL);
+            } else {
+                for (String item : defaults) if (!urls.contains(item)) urls.add(item);
+            }
+            return urls;
+        }
+
+        /** URL for the one failed-node retry: custom wins; a Cloudflare group URL is swapped for gstatic. */
+        static String retryUrl(String custom, String groupUrl, String fallback) {
+            String c = custom == null ? "" : custom.trim();
+            if (!c.isEmpty()) return c;
+            String g = groupUrl == null ? "" : groupUrl.trim();
+            if (g.isEmpty()) return fallback;
+            return isCloudflareTarget(g) ? NEUTRAL_URL : g;
+        }
+    }
 }

@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.HomeMotion
 import io.github.xgl34222220.hetu.home.HomePop
 import io.github.xgl34222220.hetu.home.HomeReveal
@@ -72,6 +74,7 @@ import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.homeColors
 import io.github.xgl34222220.hetu.panel.PanelIcons
 import io.github.xgl34222220.hetu.tools.ToolsIcons
 import io.github.xgl34222220.hetu.ui.ht
@@ -93,6 +96,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
     var choice by remember { mutableStateOf<String?>(null) }
     var subPage by remember { mutableStateOf(initialSubPage) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    // Audit4 G12: 撤销上次恢复 — the snapshot taken right before the last restore.
+    var undoTick by remember { mutableIntStateOf(0) }
+    var confirmUndo by remember { mutableStateOf(false) }
+    val restoreUndo = remember(undoTick, subPage) { HxRestoreUndo.info(context) }
     val density = LocalDensity.current
     var firstGroupHeightPx by remember { mutableIntStateOf(0) }
 
@@ -155,6 +162,16 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                             "选择文件", onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } },
                             modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 10.dp), filled = false,
                         )
+                        restoreUndo?.let { undo ->
+                            SettingsDivider()
+                            SettingsNavRow(
+                                ht("撤销上次恢复"),
+                                subtitle = ht("恢复于 %s · 回到恢复前的设置，并删除恢复新增的配置副本").fill(
+                                    java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.ROOT).format(java.util.Date(undo.restoredAt)),
+                                ),
+                                icon = HomeIcons.RefreshCw,
+                            ) { confirmUndo = true }
+                        }
                     }
                 }
             }
@@ -352,7 +369,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                 restoreUri = null
                 scope.launch {
                     try {
-                        val count = HetuSettingsBackup.restore(context, uri)
+                        val count = HxRestoreUndo.restoreWithSnapshot(context, uri)
                         vm.toast("已恢复 $count 项，请检查设置后手动应用")
                         vm.reloadAppearance()
                         bump()
@@ -360,6 +377,8 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                         throw cancel
                     } catch (error: Exception) {
                         vm.toast(error.message ?: "恢复失败")
+                    } finally {
+                        undoTick++
                     }
                 }
             },
@@ -367,6 +386,36 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
         ) {
             Text(
                 ht("备份内的设置与配置将写入当前应用。同名同内容配置会复用；同名不同内容配置将保留为副本。正在运行的代理不会自动重启。"),
+                Modifier.fillMaxWidth(), color = c.t2, style = HomeType.body.copy(fontSize = 15.sp, lineHeight = 22.sp), textAlign = TextAlign.Center,
+            )
+        }
+    }
+
+    if (confirmUndo) {
+        SettingsDialog(
+            title = ht("撤销上次恢复？"),
+            confirmLabel = "撤销",
+            onConfirm = {
+                confirmUndo = false
+                scope.launch {
+                    try {
+                        HxRestoreUndo.undo(context)
+                        vm.toastAs(HxTone.Good, "已撤销上次恢复")
+                        vm.reloadAppearance()
+                        bump()
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        vm.toastAs(HxTone.Bad, hxErrorMessage(error, "撤销失败"))
+                    } finally {
+                        undoTick++
+                    }
+                }
+            },
+            onDismiss = { confirmUndo = false },
+        ) {
+            Text(
+                ht("恢复之前的设置会写回；恢复之后又改过的设置保持不变。恢复时新增的配置副本会删除（已被选中或改过的除外），你原有的配置不受影响。正在运行的代理不会自动重启。"),
                 Modifier.fillMaxWidth(), color = c.t2, style = HomeType.body.copy(fontSize = 15.sp, lineHeight = 22.sp), textAlign = TextAlign.Center,
             )
         }
@@ -393,21 +442,22 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     val context = LocalContext.current
     val prefs = vm.prefs
-    val scope = rememberCoroutineScope()
-    val c = LocalHomeColors.current
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
+    var configsLoading by remember { mutableStateOf(true) }
+    var editTarget by remember { mutableStateOf<SettingsConfigEditTarget?>(null) }
     val profile = ProxyRuntimeProfile.load(prefs)
-    LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
-    val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) scope.launch {
-            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
-                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
-                .onFailure { vm.toast(it.message ?: "配置导入失败") }
-        }
+    LaunchedEffect(revision, profile.core) {
+        configsLoading = true
+        configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList())
+        configsLoading = false
     }
-
+    // 查看 / 编辑 open the shared config editor right here, over this page; back returns to it.
+    editTarget?.let { target ->
+        ConfigEditorScreen(vm, onBackOverride = { editTarget = null; revision++ }, target = target.name, startReadOnly = target.readOnly)
+        return
+    }
     fun changed(key: String) {
         ProxyRuntimeSettings.markDirty(prefs, key)
         revision++
@@ -460,15 +510,18 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                     SettingsNavRow(ht("查看启动配置"), subtitle = ht("查看当前生成的运行配置文件"), icon = ToolsIcons.FileCog) {
                         context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
                     }
+                    SettingsDivider()
+                    // The one import page (工具 › 配置管理 › 导入配置), reached from here too.
+                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件或链接导入配置，导入后设为当前配置"), icon = ToolsIcons.Download) {
+                        nav.openRequested(HxRoute.Main)
+                        vm.openToolsImport()
+                    }
                 }
             }
         }
         item(key = "config") {
             SettingsSection {
-                SettingsGroup {
-                    SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
-                        icon = ToolsIcons.FileText, onClick = { choice = "config" })
-                }
+                SettingsConfigPicker(vm, configs, configsLoading, onChanged = { revision++ }, onOpen = { editTarget = it })
             }
         }
         if (pending) {
@@ -485,49 +538,56 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     }
 
     when (choice) {
-        "config" -> HxSheet(title = ht("当前配置"), onDismiss = { choice = null }) {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
-                items(configs.size, key = { configs[it].name }) { index ->
-                    val config = configs[index]
-                    SettingsRow(config.name, icon = ToolsIcons.FileText, compact = true, onClick = {
-                        choice = null
-                        if (!config.selected) scope.launch {
-                            try {
-                                vm.controller.selectConfig(config.name)
-                                vm.applyConfigChange("已切换到 ${config.name}")
-                                revision++
-                            } catch (cancel: CancellationException) { throw cancel }
-                            catch (error: Exception) { vm.toast(error.message ?: "切换配置失败") }
-                        }
-                    }) {
-                        if (config.selected) Icon(HomeIcons.Check, ht("当前配置"), Modifier.size(22.dp), tint = c.accent)
-                    }
-                }
-                item(key = "import-config") {
-                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件导入 YAML 配置"), icon = HxIcons.Upload) {
-                        choice = null
-                        launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) }
-                    }
-                }
-            }
-        }
         "core" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
             title = ht("代理核心"),
-            choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
+            choices = ProxyRuntimeProfile.Core.values().map { core ->
+                val supported = ProxyCoreSupport.runtimeSupported(core)
                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
-                HxChoice(core.id, core.label, if (installed) null else ht("尚未安装，请先在核心管理下载"), enabled = installed)
+                when {
+                    !supported -> HxChoice(core.id, core.label, ht("暂不支持：") + ProxyCoreSupport.unsupportedReason(core), enabled = false)
+                    // Non-Mihomo cores run too; say up front which panel features they lack.
+                    installed -> HxChoice(core.id, core.label, ProxyCoreSupport.featureSummary(core).takeIf { it.isNotEmpty() })
+                    // Tappable: it opens 工具 › 核心管理 instead of being a dead end.
+                    else -> HxChoice(core.id, core.label, ht("尚未安装，请先在核心管理下载"))
+                }
             },
             selected = profile.core.id,
-            onPick = { putString("proxyBaseCore", it); choice = null },
+            onPick = pick@{
+                val picked = ProxyRuntimeProfile.Core.from(it)
+                if (picked != ProxyRuntimeProfile.Core.MIHOMO && !ProxyCoreStore(context).installed(picked)) {
+                    choice = null
+                    nav.openRequested(HxRoute.Main)
+                    vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Cores)
+                    return@pick
+                }
+                // A non-Mihomo core with no config of its own starts on its built-in template (内置);
+                // selected before the core is saved so one dirty check sees both changes.
+                ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(picked)
+                // TUN / Enhance / eBPF are Mihomo-only: the picked core runs in TPROXY instead of being refused,
+                // and Mihomo gets its mode back when it is picked again.
+                val mode = ProxyRuntimeProfile.modeForPick(prefs, picked, profile.mode)
+                if (mode != profile.mode) putString("proxyBaseMode", mode.id)
+                putString("proxyBaseCore", it)
+                if (mode != profile.mode) vm.toast(
+                    if (ProxyRuntimeProfile.runnableMode(picked, profile.mode) != profile.mode) "${picked.label} 不支持 ${profile.mode.label}，运行模式已改为 ${mode.label}"
+                    else "运行模式已恢复为 ${mode.label}",
+                )
+                choice = null
+            },
             onDismiss = { choice = null },
         )
         "mode" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
             title = ht("运行模式"),
+            // Modes another core supports stay listed, disabled with the reason, so a hidden mode is not a mystery.
             choices = ProxyRuntimeProfile.Mode.values()
-                .filter { ProxyRuntimeProfile.capability(profile.core, it).available }
-                .map { HxChoice(it.id, it.label, ht(modeDescription(it))) },
+                .filter { mode -> ProxyRuntimeProfile.Core.values().any { ProxyRuntimeProfile.capability(it, mode).available } }
+                .map {
+                    val capability = ProxyRuntimeProfile.capability(profile.core, it)
+                    if (capability.available) HxChoice(it.id, it.label, ht(modeDescription(it)))
+                    else HxChoice(it.id, it.label, ht(if (it == ProxyRuntimeProfile.Mode.TUN) "仅 Mihomo / sing-box 可用" else "仅 Mihomo 可用"), enabled = false)
+                },
             selected = profile.mode.id,
             onPick = { putString("proxyBaseMode", it); choice = null },
             onDismiss = { choice = null },
@@ -627,9 +687,10 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
     val tileShape = RoundedCornerShape(18.dp)
     Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         listOf(
-            Triple("system", ht("跟随系统"), ht("与系统设置保持一致")),
-            Triple("light", ht("浅色模式"), ht("始终使用浅色主题")),
-            Triple("dark", ht("深色模式"), ht("始终使用深色主题")),
+            // Audit4 U13: one short line under each title instead of three lines repeating it.
+            Triple("system", ht("跟随系统"), ht("随系统切换")),
+            Triple("light", ht("浅色模式"), ht("始终浅色")),
+            Triple("dark", ht("深色模式"), ht("始终深色")),
         ).forEach { (value, label, note) ->
             val active = selected == value
             val source = remember { MutableInteractionSource() }
@@ -652,7 +713,8 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
             ) {
                 Box(Modifier.fillMaxWidth().height(58.dp)) {
                     val accent = c.accent
-                    Box(Modifier.fillMaxWidth().height(58.dp).drawBehind { drawThemePreview(value, accent) })
+                    val tint = c.canvasTint
+                    Box(Modifier.fillMaxWidth().height(58.dp).drawBehind { drawThemePreview(value, accent, tint) })
                     HomePop(active, Modifier.align(Alignment.TopEnd).padding(5.dp)) {
                         Box(Modifier.size(20.dp).background(c.accent, CircleShape), contentAlignment = Alignment.Center) {
                             Icon(HomeIcons.Check, null, Modifier.size(13.dp), tint = c.onAccent)
@@ -662,17 +724,20 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
                 Spacer(Modifier.height(10.dp))
                 Text(label, color = c.t1, style = HomeType.noteStrong.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), maxLines = 2, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(2.dp))
-                Text(note, color = c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 2, textAlign = TextAlign.Center)
+                Text(note, color = c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
     }
 }
 
-/** A thumbnail of the app in one theme: canvas, a bar, a card with two lines and the accent. */
-private fun DrawScope.drawThemePreview(mode: String, accent: Color) {
+/**
+ * A thumbnail of the app in one theme: canvas, a bar, a card with two lines and the accent.
+ * [tint] is the live palette's canvas tint, so a non-default accent previews its washed canvas.
+ */
+private fun DrawScope.drawThemePreview(mode: String, accent: Color, tint: Color) {
     val radius = CornerRadius(12.dp.toPx())
     fun half(dark: Boolean) {
-        val canvas = if (dark) Color(0xFF0E0F13) else Color(0xFFECEEFB)
+        val canvas = if (tint.isSpecified) homeColors(dark, tint).bg else if (dark) Color(0xFF0E0F13) else Color(0xFFECEEFB)
         val card = if (dark) Color(0xFF20232B) else Color(0xFFFFFFFF)
         val ink = if (dark) Color(0xFFEBEDF2) else Color(0xFF12161A)
         drawRoundRect(canvas, cornerRadius = radius)
@@ -794,7 +859,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     SettingsDivider()
                     SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = HxIcons.PanelBottom)
                     SettingsDivider()
-                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = HxIcons.Sparkles, enabled = blur)
+                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht(if (blur) "为底栏加入通透的折射与高光" else "需先开启模糊效果"), icon = HxIcons.Sparkles, enabled = blur)
                 }
             }
         }

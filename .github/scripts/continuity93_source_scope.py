@@ -13,11 +13,27 @@ import re
 import subprocess
 
 import continuity92_source_scope as prior
+from verify_packaged_runtime import EBPF_PAYLOADS
 
 ROOT = prior.ROOT
 BASE_COMMIT = 'cffeff08ee38c7220922bdb36de81b621c935daf'
 ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
-VERSION_CODE, VERSION_NAME = 2093, '0.12.20-v20-glass'
+# 2026-10-13: the user authorized shipping this layer as the official 1.0.0 release (versionCode 2094).
+# 2026-10-15: 3.3.3 release (versionCode 2099) = 3.0.0 + real-probe Wi-Fi heal, home latency/public IP, audit5 polish.
+# 2026-10-17: 4.0.0 release (versionCode 2100) = 3.3.3 + stop no longer blocks fake-IP, foreign-rule start check, store-fake-ip, UI/func 400.
+# 2026-10-17: 4.4.4 (versionCode 2101) = 4.0.0 + iptables CNIP tree opt-in only, robust tree cleanup.
+# 2026-10-18: 5.0.0 (versionCode 2102) = 4.4.4 + watchdog closes only the failing node's connections, non-Mihomo
+# built-ins follow Mihomo's built-in, built-in NoJunkFilter repair, SnakeYAML chunk-edge fix.
+# 2026-10-19: 5.5.5 (versionCode 2103; user: 发布5.5.5) = 5.0.0 + non-Mihomo cores start (sing-box rule-sets pre-downloaded, the
+# chosen core kept in TUN/Enhance/eBPF, follow Mihomo's selected config, Hysteria lazy), core downloads through the
+# running proxy, watchdog never cuts a node that is moving data.
+# 2026-10-19: 6.0.0 (versionCode 2104; user: 下一个版本是6.0.0) = 5.5.5 + ColorOS eBPF Google block cleanup (hetu-bpf
+# vendor-uid), sing-box 订阅 / 规则集 from Hetu's own record (rule-set files hot-replaced), sing-box fake-IP TTL 1 s.
+# 2026-10-20: 6.6.6 (versionCode 2105; user: 做6.6.6 自动组不就是自动切走的吗？而且我测试都有延迟啊) = 6.0.0 + stalled-node
+# watchdog (a node that answers delay tests but returns nothing: auto groups pinned elsewhere, timed return),
+# connection chains with "]" in node names matched again, Google vendor-chain cleanup with One True Awk.
+# 2026-10-23: 7.0.0 (versionCode 2106) = 6.6.6 + whole-phone outage fail-open, bounded force stop, full-colour network-test brand logos
+VERSION_CODE, VERSION_NAME = 2106, '7.0.0'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -28,28 +44,154 @@ PRIOR_FOLDER = 'updates/v2092-rule-mode-continuity'
 # The 2026-10-08 authorization covers all UI pages and existing runtime safety.
 # Build dependencies, permissions, package, signing and other runtime binaries
 # remain outside this source layer, and every actual delta is sealed individually.
+RELEASE_RULES = 'android-app/app/proguard-rules.pro'
+BASELINE_PROFILE = 'android-app/app/src/main/baseline-prof.txt'
+# The exact authorized Gradle change of the release-build pass: the shipped variant becomes an
+# R8, non-debuggable release signed by the unchanged CI debug identity, plus profileinstaller.
+# Nothing else in the build file may differ from the pinned predecessor beyond the version.
+RELEASE_BUILD_DELTA = (
+    ('''        getByName("release") {
+            isMinifyEnabled = false
+        }''',
+     '''        // Shipped build: R8 + non-debuggable ART (debuggable=true disables JIT/AOT optimisations and is
+        // the main cause of Compose jank). Same CI signing identity as debug, so it upgrades in place.
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = false
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }'''),
+    ('''    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+''',
+     '''    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    // Installs the bundled baseline profile (src/main/baseline-prof.txt) on sideloaded installs.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+'''),
+)
+RES = 'android-app/app/src/main/res/'
+# 2026-10-13 eBPF matcher authorization (user-approved extension of this gate): three new runtime
+# payloads under assets/hetu-bpf, added beside the unchanged original 23. Their bytes are pinned
+# (verify_packaged_runtime.EBPF_PAYLOADS) and must be the reproducible build of the pinned
+# native/ebpf sources below (protected flag ebpfPayloadsFromSource). nativePayloadsUnchanged keeps
+# its meaning: no original native payload changes.
+EBPF_FILES = frozenset('android-app/app/src/main/' + name for name in EBPF_PAYLOADS)
+EBPF_SOURCE_SHA256 = {
+    'native/ebpf/build.sh': '84c7baabc89b9b64a40075168af19f3f271ee0e09b3205542c3cf755811b4b31',
+    'native/ebpf/hetu_match.c': '6894382415e89690e1bd339668f22e03894c1902065f10d969034e59017aecc9',
+    'native/ebpf/loader/bpf.go': '4e000618fc3471ce5fb8aeb6681b37fd280207215a00bbc4b309c6e14bd99e87',
+    'native/ebpf/loader/elf.go': '8fc8439405d069481d8290d91e90e8729ffd4d6a352a025adde1e8123f7b39cc',
+    'native/ebpf/loader/elf_test.go': '679d1e5720d4edea6bc8b824e911ec1d518daa017aa14a80f3743d3c16b3d00b',
+    'native/ebpf/loader/go.mod': 'f83b045d0d732bf55b3bb67502faf67bbc3f90e393327dfefc7dcd4a4556522b',
+    'native/ebpf/loader/lists.go': 'bbc2ab8d07e1946f09f59ebc75849e9fa9f3f4be5c6713d68a32bae7a335c2bf',
+    'native/ebpf/loader/lists_test.go': '81d122bdcebf94920e46cb328b5fc28f5f2aa07539dfedddae2989cb44154ec0',
+    'native/ebpf/loader/main.go': '5e6056935a146914c105af275f669a499b1ad90d0c33366223b17181f5d719a3',
+    'native/ebpf/loader/sys_amd64.go': 'e3bd41140ed61c27c5f68357e28c3fb3540b195b501e45729e18f6e444f54dc7',
+    'native/ebpf/loader/sys_arm64.go': 'bbee487efa05311c8be7f8103706c99a96576e441ecfc38331d3d823c2c51fb5',
+}
 AUTHORIZED_FILES = frozenset((
     BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT,
     PACKAGE + 'RootAutostart.java', PACKAGE + 'RootProxyManager.java',
     PACKAGE + 'ProxyNetworkMatchService.java', PACKAGE + 'ProxyLatencyHistory.kt',
     PACKAGE + 'ProxyRuntimeSettings.java', PACKAGE + 'ProxyControlEpoch.java',
     PACKAGE + 'StartupConfigViewer.kt', PACKAGE + 'ProxyDashboardRepository.kt',
+    PACKAGE + 'DelayUrlChoice700.java', PACKAGE + 'PanelExtras19.kt',
     PACKAGE + 'MihomoControllerClient.java', PACKAGE + 'LatencyProbeBudget.java',
-    PACKAGE + 'LatencyProbeOperation.kt',
+    PACKAGE + 'LatencyProbeOperation.kt', PACKAGE + 'BootReceiver.java',
     PACKAGE + 'ProxyScriptsActivity.kt',
     PACKAGE + 'ProxyComposeController.kt', PACKAGE + 'ProxyStatusBridge.kt',
+    # 2026-10-11 release-build authorization: every downloadable core must run or be disabled
+    # with a reason (download policy), and the shipped APK is an R8 release build with a
+    # baseline profile. Only these three inputs are added; the Gradle delta is pinned below.
+    PACKAGE + 'ProxyCoreDownloadManager.kt',
+    RELEASE_RULES, BASELINE_PROFILE,
+    # 2026-10-11 multi-core authorization: sing-box, sing-box reF1nd, Xray, V2Fly and Hysteria 2
+    # run in Root TPROXY/Redirect. Only the core/mode capability model and the new pure-Java
+    # config writer/converter (no Android API) are added to the runtime scope.
+    PACKAGE + 'ProxyRuntimeProfile.java', PACKAGE + 'ProxyCoreConfig.java', PACKAGE + 'CoreJson.java',
+    # 2026-10-11 fast-start authorization: a manual start runs the cancellation receipt, the
+    # pre-start hook, deployment and hetu-root.sh start in one Root invocation. Only the pure-Java
+    # shell-fragment builder (no Android API) is added.
+    PACKAGE + 'StartPrelude.java',
+    # 2026-10-11 CNIP kernel-bypass authorization: the MIT notice of the CNIP data source
+    # (gaoyifan/china-operator-ip) that the built-in snapshots and ipset import already use.
+    'android-app/app/src/main/assets/licenses/china-operator-ip.txt',
+    # 2026-10-12 ad-block repair authorization (PR #33 audit): DNS-layer blocking (pure-Java
+    # nameserver-policy/fake-ip-filter writer and the third exported domain set), the startup copy
+    # that declares it, the controller-counter based chain reading shared by both ad-block pages,
+    # and the runtime inspector that no longer polls core.log through su for the counter.
+    PACKAGE + 'AdblockDnsPolicy.java', PACKAGE + 'MihomoStartupConfig.java', PACKAGE + 'ProxyAdblockRules.java',
+    PACKAGE + 'ToolsRuntimeBridge.kt',
+    # 2026-10-12 icon/splash authorization (user-approved 河图 swirl icon): the launcher icon becomes
+    # an adaptive icon under the unchanged resource name ic_hetu_official (anydpi-v26 variant; the
+    # legacy ic_hetu_official.webp and the manifest stay byte-identical), and Android 12+ gets a
+    # themed system splash plus the mesh-art first frame drawn by HetuActivity.
+    RES + 'drawable-anydpi-v26/ic_hetu_official.xml', RES + 'drawable/ic_hetu_official_background.xml',
+    *(RES + 'mipmap-' + density + '/ic_hetu_official_' + layer + '.webp'
+      for density in ('mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi') for layer in ('foreground', 'monochrome')),
+    *(RES + folder + '/hetu_splash_' + kind + '.webp'
+      for folder in ('drawable-nodpi', 'drawable-night-nodpi') for kind in ('art', 'icon')),
+    RES + 'values-v31/styles.xml', RES + 'values-night-v31/styles.xml',
+    # 2026-10-12 speed-test / core-template authorization: built-in starter configs for sing-box,
+    # Xray, V2Fly and Hysteria (pure-Java template holder) listed by the config library next to
+    # Mihomo's built-in; latency waves keep their existing six-request limit.
+    PACKAGE + 'BundledCoreTemplates.java', PACKAGE + 'ProxyConfigLibrary.java',
+    # 2026-10-12 parity batch A authorization: dangling proxy-reference cleanup, startup source
+    # diagnostics and the opt-in cgroup limit argument (three pure-Java helpers, no Android API),
+    # plus the 资源限制 switch for the cgroup limit on the advanced proxy settings page.
+    PACKAGE + 'ConfigReferenceCleaner.java', PACKAGE + 'StartupDiagnostics.java', PACKAGE + 'CoreResourceLimits.java',
+    PACKAGE + 'ProxyAdvancedSettingsActivity.kt',
+    # 2026-10-12 network-match / shared-network parity authorization: the network-match page and
+    # the shared-network inspector, plus two pure-Java rule classes (no Android API) for the
+    # SIM/MCC+MNC conditions, switch-config/run-script actions and the shared ingress policy.
+    PACKAGE + 'ProxyNetworkAutomationActivity.kt', PACKAGE + 'ProxySharedNetworkInspector.kt',
+    PACKAGE + 'NetworkMatchRules.java', PACKAGE + 'SharedNetworkRules.java',
+    # 2026-10-12 Root monitor daemon authorization (BoxProxy parity #4/#5): network match and
+    # traffic accounting keep running in a session-scoped hetu-root.sh monitor while the App is
+    # killed; the pure-Java policy/hand-off/batch rules (no Android API), the App bridge and the
+    # multi-dimension history tables of the existing traffic history store.
+    PACKAGE + 'DaemonMonitorPolicy.java', PACKAGE + 'app/DaemonMonitorBridge.kt', PACKAGE + 'ProxyApiHistoryStore.kt',
+    *EBPF_FILES,
+    # 2026-10-13 eBPF matcher App side (same authorization): the pure-Java helper (no Android API)
+    # for payload/policy deployment fragments, reason text and the hot-update decision.
+    PACKAGE + 'EbpfMatcher.java',
+    # 2026-10-13 function polish (audit B7): the log viewer reads only the open file on live refresh,
+    # keeps stable list keys, exports through SAF CreateDocument (no new permission) and pages
+    # earlier lines.
+    PACKAGE + 'ProxyLogViewerActivity.kt',
+    # 2026-10-13 WeChat message-latency fix: the subscription-exception list of WeChat message
+    # transports (MessagingFilterPolicy) also protects the Hong Kong hk*.weixin.qq.com transports.
+    PACKAGE + 'MessagingFilterPolicy.java',
+    # 2026-10-15 home probe fix: the 网络延迟 card's Google target measures google.com (gstatic is
+    # served inside mainland China and answered without a proxy); a saved old default is migrated.
+    PACKAGE + 'ProxyLatencyTargets.kt',
+    # 2026-10-15 3.3.3 polish (audit5 G7): the opt-in subscription expiry/traffic alert also runs as a
+    # second periodic job of the already-declared UpdateJobService (no manifest/permission change).
+    PACKAGE + 'UpdateJobService.java',
+    # 2026-10-16 4.0.0 function pass (func-400 N1-N3/T1-T2): the status notification offers 启动 while
+    # stopped, shows a failed control's reason and follows the App language; the Quick Settings tile
+    # follows the App language, toasts the failure reason and is re-read after an in-App start/stop.
+    PACKAGE + 'ProxyStatusNotificationService.kt', PACKAGE + 'HetuProxyTileService.kt',
+    # 2026-10-18 built-in config fix (user: the non-Mihomo built-ins must work like Mihomo's): every runtime
+    # YAML parse reads through RuntimeYaml15.reader, which keeps SnakeYAML 2.3 off its chunk-edge surrogate
+    # read (IndexOutOfBoundsException for about one in thirty subscription URL lengths of the built-in).
+    PACKAGE + 'RuntimeYaml15.java',
+    # 2026-10-18 5.0.0 no-network fix (user: 测速有网但实际没网，停止启动都一样): a proxy start pauses the standalone
+    # DNS VPN even when the chain flag survived a session that never reached a clean stop.
+    PACKAGE + 'ProxyAdblockCoordinator.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
 # Old layers retain their original protected flags. This new layer records the
 # explicitly authorized two Root asset deltas instead of claiming unchanged bytes.
 PROTECTED_FLAGS = (
-    'manifestAndPermissionsUnchanged', 'dependenciesUnchanged', 'signingUnchanged',
+    'manifestAndPermissionsUnchanged', 'dependenciesChangedOnlyByProfileInstaller', 'signingUnchanged',
     'nativePayloadsUnchanged', 'allBaselineTestMethodsPreserved',
     'allPredecessor644TestMethodsPreserved', 'other21RuntimePayloadsPreserved',
     'runtimeRevisionTestChangedOnly153To154', 'old17BootTestBodiesPreserved',
     'old26RootHealthTestBodiesPreserved', 'oldRecoveryStressAssertionsAndBudgetsPreserved',
     'allOriginalRecoveryArtifactsPreserved',
+    'ebpfPayloadsFromSource',
 )
 HOST_FIXTURE = 'tools/qa/test_root_autostart.py'
 HOST_NEW_TEST = 'tools/qa/test_root_safety93.py'
@@ -233,6 +375,20 @@ def other_payloads(previous, root=ROOT):
     return {name: previous[name] for name in sorted(names - {ROOT_SCRIPT, AUTOSTART_SCRIPT})}
 
 
+def validate_ebpf_payloads(changes, root=ROOT):
+    ebpf = {name: changes[name] for name in sorted(EBPF_FILES & set(changes))}
+    if not ebpf:
+        return ebpf
+    assert set(ebpf) == EBPF_FILES, 'eBPF payloads must be sealed all together'
+    for name, value in ebpf.items():
+        assert value == EBPF_PAYLOADS[name.removeprefix('android-app/app/src/main/')], 'eBPF payload is not the pinned source build: ' + name
+    root = Path(root)
+    sources = {str(path.relative_to(root)) for path in (root / 'native/ebpf').rglob('*') if path.is_file()}
+    assert sources == set(EBPF_SOURCE_SHA256), 'eBPF source set differs from the pinned native/ebpf sources'
+    assert all(digest(root / name) == value for name, value in EBPF_SOURCE_SHA256.items()), 'eBPF source bytes changed'
+    return ebpf
+
+
 def committed_bytes(name, root=ROOT):
     return subprocess.check_output(['git', 'show', BASE_COMMIT + ':' + name], cwd=root)
 
@@ -273,10 +429,13 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2093', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "0.12.20-v20-glass"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2106', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "7.0.0"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
-    assert after == expected, 'V20.93 changed Gradle inputs beyond the two version values'
+    for old, new in RELEASE_BUILD_DELTA:
+        assert expected.count(old) == 1, 'Pinned release-build anchor missing'
+        expected = expected.replace(old, new, 1)
+    assert after == expected, 'V20.93 changed Gradle inputs beyond the two version values and the pinned release-build delta'
 
 
 def selected_tests(root=ROOT, extra_sources=()):
@@ -308,6 +467,8 @@ def validate_layer(layer, previous, root=ROOT):
     assert layer['runtimePayloadCount'] == 23
     assert layer['other21RuntimePayloadFiles'] == other_payloads(previous, root)
     assert not set(layer['other21RuntimePayloadFiles']) & set(changes)
+    assert not EBPF_FILES & set(layer['other21RuntimePayloadFiles']) and not EBPF_FILES & set(previous)
+    validate_ebpf_payloads(changes, root)
     assert layer['rootScriptSha256'] == changes.get(ROOT_SCRIPT, previous[ROOT_SCRIPT]) and layer['autostartScriptSha256'] == changes.get(AUTOSTART_SCRIPT, previous[AUTOSTART_SCRIPT])
     assert layer['authorizedRootPayloadDeltas'] == {name: {'before': previous[name], 'after': changes.get(name, previous[name])}
                                                  for name in (ROOT_SCRIPT, AUTOSTART_SCRIPT)}

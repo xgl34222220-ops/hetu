@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import io.github.xgl34222220.hetu.AdblockVerification
 import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
 import io.github.xgl34222220.hetu.ProxyComposeController
 import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
@@ -57,7 +58,12 @@ private object Keys {
     const val BypassInterfaces = "proxyBypassInterfaces"
     const val SharedNetwork = "proxySharedNetwork"
     const val SharedMacs = "proxySharedBypassMacs"
+    const val SharedInterfaces = "proxySharedInterfaces"
+    const val SharedMacMode = "proxySharedMacMode"
+    const val SharedOnlyMacs = "proxySharedOnlyMacs"
     const val CnIp = "proxyCnIpDirect"
+    const val CnIpKernelV4 = "proxyCnIpKernelV4"
+    const val CnIpKernelV6 = "proxyCnIpKernelV6"
     const val AdblockChain = "proxyAdblockChain"
     const val AdblockFallback = "proxyAdblockFallbackEnabled"
     const val Cname = "cnameProtection"
@@ -116,7 +122,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {
-                        error.message ?: "导入失败"
+                        io.github.xgl34222220.hetu.hxErrorMessage(error, "导入失败")
                     }
                     request.second(message)
                 }
@@ -170,7 +176,11 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             },
             downloadCore = { id, onProgress -> ToolsRuntimeBridge.downloadCore(app, id, onProgress) },
             removeCore = { id -> ToolsRuntimeBridge.removeCore(app, id) },
-            importCore = { id, onDone -> importRequest = id to onDone; corePicker.launch(arrayOf("*/*")) },
+            importCore = { id, onDone ->
+                importRequest = id to onDone
+                // A disabled DocumentsUI ends the import with a message instead of crashing the tap.
+                io.github.xgl34222220.hetu.launchDocumentPicker({ message -> importRequest = null; onDone(message) }) { corePicker.launch(arrayOf("*/*")) }
+            },
 
             /* ------------------------------ 绕过规则 ------------------------------ */
             loadBypass = { ToolsBypassRules(prefs.strings(Keys.BypassCidrs).sorted(), prefs.strings(Keys.BypassInterfaces).sorted()) },
@@ -183,45 +193,96 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             /* ------------------------------ 共享网络 ------------------------------ */
             loadShare = {
                 val live = ProxySharedNetworkInspector.inspect(app)
-                val names = live.interfaces.map { it.name }.toSet()
+                val shared = prefs.strings(Keys.SharedInterfaces)
+                // Only tether ingress is offered (never the upstream / cellular link); a saved name
+                // that is not up right now stays visible so it can be switched off.
+                val offered = live.interfaces.filter { (it.tether && !it.upstream) || it.name in shared }
+                    .map { ToolsShareInterface(it.name, it.state, it.tether, it.upstream) } +
+                    (shared - live.interfaces.map { it.name }.toSet()).sorted().map { ToolsShareInterface(it, "未连接") }
+                // 绕过规则 interfaces that carry the default route make this device's own traffic direct.
+                val upstreamBypass = prefs.strings(Keys.BypassInterfaces).filter { name ->
+                    live.upstream.any { up -> up == name || (name.endsWith("+") && up.startsWith(name.dropLast(1))) }
+                }
+                val note = listOf(
+                    live.error,
+                    if (upstreamBypass.isEmpty()) "" else "绕过规则中的 " + upstreamBypass.joinToString("、") + " 是当前上行网络：本机经它的流量全部直连。请在「绕过规则」中确认。",
+                ).filter { it.isNotBlank() }.joinToString("\n")
                 ToolsShareSnapshot(
                     settings = ToolsShareSettings(
                         enabled = prefs.getBoolean(Keys.SharedNetwork, false),
-                        // The interface set is shared with 绕过规则; only names that are being shared show up here.
-                        directInterfaces = prefs.strings(Keys.BypassInterfaces).intersect(names),
                         macs = prefs.strings(Keys.SharedMacs).sorted(),
+                        sharedInterfaces = shared,
+                        macMode = if (prefs.getString(Keys.SharedMacMode, "direct") == "only") "only" else "direct",
+                        onlyMacs = prefs.strings(Keys.SharedOnlyMacs).sorted(),
                     ),
-                    interfaces = live.interfaces.map { ToolsShareInterface(it.name, it.state) },
-                    clients = live.clients.map { ToolsShareClient(it.ip, it.mac, it.iface, it.state) },
-                    note = live.error,
+                    interfaces = offered,
+                    clients = live.clients.map { ToolsShareClient(it.ip, it.mac, it.iface, it.state, it.hostname) },
+                    note = note,
                 )
             },
             saveShare = { value ->
-                val live = ProxySharedNetworkInspector.inspect(app).interfaces.map { it.name }.toSet()
-                // Keep the bypass interfaces that are not shared interfaces: they belong to 绕过规则.
-                val interfaces = TreeSet((prefs.strings(Keys.BypassInterfaces) - live) + value.directInterfaces)
+                // Shared interfaces live in their own key. 绕过规则 (proxyBypassInterfaces) is never
+                // written here any more: an upstream such as wlan0 ticked as "shared" used to make
+                // this device's own Wi-Fi traffic direct.
+                val normalized = value.normalized()
                 prefs.edit()
-                    .putBoolean(Keys.SharedNetwork, value.enabled)
-                    .putStringSet(Keys.BypassInterfaces, interfaces)
-                    .putStringSet(Keys.SharedMacs, TreeSet(value.macs))
+                    .putBoolean(Keys.SharedNetwork, normalized.enabled)
+                    .putStringSet(Keys.SharedMacs, TreeSet(normalized.macs))
+                    .putStringSet(Keys.SharedInterfaces, TreeSet(normalized.sharedInterfaces))
+                    .putString(Keys.SharedMacMode, normalized.macMode)
+                    .putStringSet(Keys.SharedOnlyMacs, TreeSet(normalized.onlyMacs))
                     .apply()
                 dirty(Keys.SharedNetwork)
-                dirty(Keys.BypassInterfaces)
                 dirty(Keys.SharedMacs)
+                // Not runtime-signature keys: mark the restart notice explicitly (as CNIP does).
+                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
             },
 
             /* ------------------------------ CNIP ------------------------------ */
             loadCnIp = { prefs.getBoolean(Keys.CnIp, false) },
             setCnIp = { on -> prefs.edit().putBoolean(Keys.CnIp, on).apply(); dirty(Keys.CnIp) },
+            loadCnIpKernel = {
+                ToolsCnIpKernel(
+                    prefs.getBoolean(Keys.CnIpKernelV4, false), prefs.getBoolean(Keys.CnIpKernelV6, false),
+                    prefs.getString("proxyCnIpKernelStatus", "").orEmpty(), prefs.getString("proxyCnIpKernelReason", "").orEmpty(),
+                    prefs.getInt("proxyCnIpKernelV4Entries", 0), prefs.getInt("proxyCnIpKernelV6Entries", 0),
+                )
+            },
+            setCnIpKernel = { v4, v6 ->
+                prefs.edit().putBoolean(Keys.CnIpKernelV4, v4).putBoolean(Keys.CnIpKernelV6, v6).apply()
+                // Not a runtime-signature key: mark the restart notice explicitly.
+                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
+            loadCnIpTcpOnly = { prefs.getBoolean("proxyCnIpKernelTcpOnly", false) },
+            setCnIpTcpOnly = { on ->
+                prefs.edit().putBoolean("proxyCnIpKernelTcpOnly", on).putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
+            loadCnIpUdp = {
+                prefs.getBoolean(io.github.xgl34222220.hetu.CnipFakeIp.PREF_UDP_DIRECT, true) to
+                    prefs.getBoolean("proxyCnIpKernelUdpOnlyActive", false)
+            },
+            setCnIpUdp = { on ->
+                prefs.edit().putBoolean(io.github.xgl34222220.hetu.CnipFakeIp.PREF_UDP_DIRECT, on).putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
+            networkEvents = { proxy.networkEvents() },
+            repairSessionRecord = {
+                try { proxy.repairSessionRecord() }
+                catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                catch (error: Exception) { io.github.xgl34222220.hetu.hxErrorMessage(error, "运行记录未修复，请查看网络诊断") }
+            },
             runPreflight = {
                 val (passed, message) = ToolsRuntimeBridge.preflight(app)
                 if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
             },
             startupConfig = { proxy.startupConfig() },
             diagnostics = { proxy.diagnostics() },
+            exportDiagnostics = { io.github.xgl34222220.hetu.HxDiagnosticsBundle.build(app, report = { proxy.diagnostics() }) },
             restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
             onCopy = { label, text ->
                 val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -234,6 +295,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             loadAdblock = {
                 val snapshot = rules.rulesSnapshot()
                 val chain = ToolsRuntimeBridge.adblockChain(app)
+                // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
+                val (coreLabel, coreRoutesAds, coreLiveVerify) = io.github.xgl34222220.hetu.ProxyCoreSupport.adblockCore(prefs, chain.running)
+                // Only Mihomo exposes the rule chain; other cores get the per-core state, not a failed read.
+                // The same controller reading feeds 广告过滤 here and in the legacy page (ToolsRuntimeBridge).
+                val report = if (chain.running && coreLiveVerify) chain.report else null
+                val (dnsPathOk, dnsPath) = AdblockVerification.dnsPath(chain)
                 val now = System.currentTimeMillis()
                 ToolsAdblockSnapshot(
                     ToolsAdblockState(
@@ -244,6 +311,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         modeLabel = when (chain.mode.lowercase()) { "global" -> "全局"; "direct" -> "直连"; else -> "" },
                         ruleCount = snapshot.count,
                         hits = chain.hits,
+                        missCount = chain.missCount,
+                        hitsFromController = chain.hitsFromController,
+                        dnsPath = if (coreLiveVerify) dnsPath else "",
+                        dnsPathOk = dnsPathOk,
+                        hints = if (prefs.getBoolean(Keys.AdblockChain, true) && coreRoutesAds) AdblockVerification.hints(chain) else emptyList(),
+                        offerRecommendedDns = !chain.sourceHasDns || chain.recommendedDns,
+                        recommendedDns = chain.recommendedDns,
                         allow = snapshot.allow,
                         block = snapshot.block,
                         sources = snapshot.sources.map { source ->
@@ -263,11 +337,28 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                         recent = chain.recent,
                         startupInjected = chain.startupInjected,
-                        controllerLoaded = chain.controllerLoaded,
+                        controllerLoaded = report?.let { it.loaded && it.ordered && it.providersLoaded } ?: chain.controllerLoaded,
+                        chainNote = report?.detail().orEmpty(),
                         standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
                         cnameProtection = prefs.getBoolean(Keys.Cname, true),
+                        coreLabel = coreLabel,
+                        coreRoutesAds = coreRoutesAds,
+                        coreLiveVerify = coreLiveVerify,
                     ),
                 )
+            },
+            probeAdblock = {
+                val result = AdblockVerification.probe(app)
+                ToolsAdProbe(result.ok, result.detail)
+            },
+            probeAdblockDns = {
+                val result = AdblockVerification.dnsProbe(app)
+                ToolsAdProbe(result.ok, result.detail)
+            },
+            setRecommendedDns = { on ->
+                prefs.edit().putBoolean("proxyRecommendedDns", on).apply()
+                dirty("proxyRecommendedDns")
+                "已保存，重启代理后生效"
             },
             setAdblockEnabled = { on ->
                 val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
@@ -334,16 +425,22 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
         downloaded = downloaded,
         runnable = runtimeReady,
         canDownload = canDownload,
+        notice = message.takeIf { !canDownload || latestVersion.isBlank() }.orEmpty(),
     )
 }
 
 /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
 @Composable
 private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
-    var bitmap by remember(app.packageName) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(app.packageName) { bitmap = controller.appIcon(app.packageName) }
+    // A row scrolled back into view shows its cached icon on the first frame instead of a
+    // letter avatar followed by an IO hop and a second composition.
+    var bitmap by remember(app.packageName) { mutableStateOf(controller.cachedAppIcon(app.packageName)) }
+    LaunchedEffect(app.packageName) { if (bitmap == null) bitmap = controller.appIcon(app.packageName) }
     val loaded = bitmap
-    if (loaded != null) Image(loaded.asImageBitmap(), null, modifier) else ToolsAvatar(app.label, modifier)
+    if (loaded != null) {
+        val image = remember(loaded) { loaded.asImageBitmap() }
+        Image(image, null, modifier)
+    } else ToolsAvatar(app.label, modifier)
 }
 
 /**

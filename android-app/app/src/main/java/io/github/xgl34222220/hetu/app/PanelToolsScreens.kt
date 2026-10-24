@@ -75,6 +75,11 @@ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 /*  面板: every live Mihomo view in one swipeable page                   */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The pre-V20.87 panel host and its legacy section screens. The four-tab shell draws the panel/
+ * module's [io.github.xgl34222220.hetu.panel.NewUiPanel] instead, so this host has no route in
+ * the running app; it is kept, unchanged, because nothing is deleted and tests still render it.
+ */
 @Composable
 internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
     HxTabbedPage(
@@ -118,107 +123,22 @@ internal fun ToolsScreen(
         ),
         onSubPageVisibleChanged = onSubPageVisibleChanged,
         onConfigChanged = { scope.launch { vm.refreshNow() } },
-        onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
+        // A running proxy picks the new config up (hot reload, or the restart notice), like 设置 › 配置.
+        onConfigSelected = { name -> vm.applyConfigChange("已切换到 $name") },
         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
+        requestedEntry = vm.toolsRequest,
+        onRequestConsumed = { vm.toolsRequest = null; vm.toolsImportRequest = false },
+        requestedImport = vm.toolsImportRequest,
         onOpenExternalEntry = { entry ->
             when (entry) {
                 io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }
                 io.github.xgl34222220.hetu.tools.ToolsEntry.Logs -> { nav.push(HxRoute.Logs); true }
                 io.github.xgl34222220.hetu.tools.ToolsEntry.NetMatch -> { nav.push(HxRoute.NetMatch); true }
+                io.github.xgl34222220.hetu.tools.ToolsEntry.NetTest -> { nav.push(HxRoute.NetTest); true }
                 else -> false
             }
         },
     )
-}
-
-/**
- * Tool-page card modeled after the reference UI: cards themselves define groups,
- * without extra section headings or divider lines competing with the content.
- */
-@Composable
-private fun ToolReferenceCard(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val c = Hx.colors
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 12.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = if (c.dark) c.surface.copy(alpha = .88f) else Color(0xFFF9F8FE),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.padding(vertical = 2.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            content = { content() },
-        )
-    }
-}
-
-@Composable
-private fun ToolReferenceRow(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-) {
-    val c = Hx.colors
-    val source = remember { MutableInteractionSource() }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .hxPressScale(source, .985f)
-            .clickable(
-                interactionSource = source,
-                indication = LocalIndication.current,
-                onClick = onClick,
-            )
-            .padding(horizontal = 15.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
-            Icon(
-                toolReferenceLineIcon(title, icon),
-                contentDescription = null,
-                tint = c.text.copy(alpha = if (c.dark) .92f else .88f),
-                modifier = Modifier.size(26.dp),
-            )
-        }
-        Spacer(Modifier.width(24.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                ht(title),
-                color = c.text,
-                fontSize = 18.sp,
-                lineHeight = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(1.dp))
-            Text(
-                ht(subtitle),
-                color = c.textMuted,
-                fontSize = 15.sp,
-                lineHeight = 19.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = c.textMuted.copy(alpha = .82f),
-            modifier = Modifier.size(20.dp),
-        )
-    }
 }
 
 internal class HxEditEntry(initial: String) {

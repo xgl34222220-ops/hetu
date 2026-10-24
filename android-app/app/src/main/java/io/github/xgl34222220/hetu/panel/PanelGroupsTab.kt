@@ -24,14 +24,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -57,6 +62,8 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.homeEnter
+import io.github.xgl34222220.hetu.home.homePressTint
+import io.github.xgl34222220.hetu.home.rememberHomeFlaggedName
 import io.github.xgl34222220.hetu.home.homeTap
 import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.ui.HetuStaggerState
@@ -131,6 +138,7 @@ internal fun LazyListScope.panelGroupsTab(
                         row.nodes.forEach { node ->
                             NodeCard(
                                 node = node, selected = row.group.now == node.name, switching = data.switching[row.group.name] == node.name,
+                                pinned = row.group.fixed.isNotEmpty() && row.group.fixed == node.name,
                                 delay = data.delayOf(node.name), view = view,
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 onSelect = { onSelectNode(row.group.name, node.name) }, onTest = { onTestNode(node.name) }, onInfo = { onNodeInfo(node.name) },
@@ -182,11 +190,13 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
     val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
     val opened = ht("已展开")
     val closed = ht("已收起")
+    val press = remember { MutableInteractionSource() }
     val shell = modifier
         .testTag("panel-group:${group.name}")
         .semantics { stateDescription = if (expanded) opened else closed }
-        .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+        .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button, interactionSource = press) { haptics(HomeHaptic.Tap); onClick() }
         .homeGlassPanel(PanelDims.groupShape, fill)
+        .homePressTint(press)
         .border(1.5.dp, outline, PanelDims.groupShape)
         .padding(start = 13.dp, end = 12.dp,
             top = if (compactInline) 8.dp else if (compact) 13.dp else 17.dp,
@@ -194,20 +204,20 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
     val title: @Composable (Modifier) -> Unit = { m ->
         Column(m) {
             Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = if (compact || wide) 1 else 2, overflow = TextOverflow.Ellipsis)
-            Text(group.summary, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // 7.0.0: type · count is never cut to "URLTe…"; it fades out only when it truly overflows.
+            PanelFadingLine(group.summary, c.t2, PanelType.groupSummary)
         }
     }
     val current: @Composable (Modifier) -> Unit = { m ->
         val nodeName: @Composable (Modifier) -> Unit = { nameModifier ->
-            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 HomeFlag(region, height = 16.dp)
-                Text(
-                    panelHighlight(currentName, view.needle), Modifier.weight(1f, fill = !wide || separateCurrent),
-                    color = c.t1, style = PanelType.groupNow, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                // 7.0.0: the current node takes all remaining width and fades at the edge
+                // instead of an early ellipsis; the latency pill next to it is compact.
+                PanelFadingLine(panelHighlight(currentName, view.needle), c.t1, PanelType.groupNow, Modifier.weight(1f))
                 if (!separateCurrent) PanelSwapFade(pending != null, motion) { busy ->
                     if (busy) Box(Modifier.size(40.dp), contentAlignment = Alignment.BottomEnd) { HomeSpinner(size = 16.dp) }
-                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
+                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组", compact = true)
                 }
             }
         }
@@ -229,7 +239,7 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
         Row(shell, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GroupTile(group)
             title(Modifier.weight(1f))
-            current(Modifier.weight(1f, fill = false))
+            current(Modifier.weight(1.25f))
         }
     } else {
         Column(shell, verticalArrangement = Arrangement.spacedBy(if (compactInline) 4.dp else if (compact) 6.dp else 12.dp)) {
@@ -241,6 +251,37 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
         }
     }
 }
+
+/**
+ * One line that is clipped with a short trailing fade, only when it really overflows, instead of
+ * an ellipsis that ate the end of short labels. The full text stays in semantics.
+ */
+@Composable
+private fun PanelFadingLine(text: androidx.compose.ui.text.AnnotatedString, color: Color, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
+    var overflow by remember(text) { mutableStateOf(false) }
+    Text(
+        text, modifier.then(if (overflow) Modifier.panelTrailingFade() else Modifier),
+        color = color, style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+        onTextLayout = { layout -> overflow = layout.hasVisualOverflow },
+    )
+}
+
+@Composable
+private fun PanelFadingLine(text: String, color: Color, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) =
+    PanelFadingLine(androidx.compose.ui.text.AnnotatedString(text), color, style, modifier)
+
+private fun Modifier.panelTrailingFade(width: androidx.compose.ui.unit.Dp = 18.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = width.toPx().coerceAtMost(size.width / 2f)
+        drawRect(
+            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                listOf(Color.Black, Color.Transparent), startX = size.width - fade, endX = size.width,
+            ),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }
 
 /** The configured image supplied by the adapter takes precedence over the region flag and the type mark. */
 @Composable
@@ -300,7 +341,7 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
             PanelSwapFade(testing, motion) { busy ->
                 if (busy) HomeSpinner(size = 18.dp) else Icon(PanelIcons.Gauge, null, Modifier.size(20.dp), tint = c.accent)
             }
-            Text(ht(if (testing) "测速中" else "测速"), color = c.accent, style = HomeType.buttonSmall)
+            Text(ht(if (testing) "测速中" else "测速"), color = c.accentText, style = HomeType.buttonSmall)
         }
     }
 }
@@ -322,6 +363,7 @@ private fun NodeCard(
     node: PanelNode,
     selected: Boolean,
     switching: Boolean,
+    pinned: Boolean = false,
     delay: PanelDelay?,
     view: PanelViewState,
     modifier: Modifier,
@@ -334,20 +376,22 @@ private fun NodeCard(
     val compact = view.layout.compactNodes
     val source = remember { MutableInteractionSource() }
     val motion = LocalHomeMotionEnabled.current
-    val rest = if (c.dark) c.sunken else c.sunken
+    val rest = c.sunken
     val fill by animateColorAsState(if (selected) lerp(rest, c.accent, if (c.dark) .20f else .09f) else rest, HomeMotion.fade(motion), label = "nodeFill")
     val outline by animateColorAsState(
         when { selected -> c.accent.copy(alpha = .62f); switching -> c.accent.copy(alpha = .28f); else -> Color.Transparent },
         HomeMotion.fade(motion), label = "nodeOutline",
     )
     val info = ht("节点信息")
+    val pinnedLabel = ht("已固定（再次点按取消固定）")
     val shell = modifier
         .heightIn(min = if (compact) 80.dp else 92.dp)
         .testTag("panel-node:${node.name}")
-        .semantics { this.selected = selected }
+        .semantics { this.selected = selected; if (pinned) stateDescription = pinnedLabel }
         .hetuPressScale(source, pressedScale = .975f, motion = motion)
         .clip(PanelDims.nodeShape)
         .background(fill)
+        .homePressTint(source)
         .border(1.5.dp, outline, PanelDims.nodeShape)
         .combinedClickable(
             interactionSource = source,
@@ -358,11 +402,18 @@ private fun NodeCard(
             onClick = { haptics(HomeHaptic.Confirm); onSelect() },
         )
         .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 8.dp)
+    // A leading flag emoji is drawn as the group cards' vector flag; the text itself is unchanged.
+    val (label, flag) = rememberHomeFlaggedName(node.name, PanelType.nodeName)
     val name: @Composable (Modifier) -> Unit = { m ->
         Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
-                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis,
+                label, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
+                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis, inlineContent = flag,
+            )
+            // 7.0.0: the node an automatic group is pinned to carries a pin; tapping it again unpins.
+            if (pinned && !switching) Icon(
+                Icons.Filled.PushPin, null,
+                Modifier.padding(top = 2.dp).size(16.dp).testTag("panel-node-pin:${node.name}"), tint = c.accent,
             )
             PanelSwapFade(switching, motion) { busy ->
                 if (busy) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)

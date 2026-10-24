@@ -311,7 +311,7 @@ internal fun RefApiConfigSheet19(
                         keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("api-delay-url"),
                         decorationBox = { inner ->
-                            if (delayUrl.isEmpty()) Text("https://cp.cloudflare.com/generate_204", color = t.textSecondary.copy(alpha = .6f), fontSize = 15.sp)
+                            if (delayUrl.isEmpty()) Text("https://www.gstatic.com/generate_204", color = t.textSecondary.copy(alpha = .6f), fontSize = 15.sp)
                             inner()
                         },
                     )

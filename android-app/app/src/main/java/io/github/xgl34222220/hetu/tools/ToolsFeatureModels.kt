@@ -97,6 +97,8 @@ internal data class ToolsCore(
     /** False for cores whose runtime backend is not wired up: “仅下载管理”. */
     val runnable: Boolean = true,
     val canDownload: Boolean = true,
+    /** Why the card offers no download or no latest version (no build for this ABI, the check failed); else empty. */
+    val notice: String = "",
 ) {
     val versionLine: String get() = "当前 $installed" + if (latest.isNotBlank() && updateAvailable) " · 最新 $latest" else ""
 }
@@ -144,17 +146,28 @@ internal data class ToolsBypassState(
 
 /* ---------------------------- 共享网络 (38) ---------------------------- */
 
-internal data class ToolsShareInterface(val name: String, val state: String = "")
-internal data class ToolsShareClient(val ip: String, val mac: String, val iface: String = "", val state: String = "")
+internal data class ToolsShareInterface(val name: String, val state: String = "", val tether: Boolean = true, val upstream: Boolean = false)
+internal data class ToolsShareClient(val ip: String, val mac: String, val iface: String = "", val state: String = "", val hostname: String = "")
 
 internal data class ToolsShareSettings(
     val enabled: Boolean = false,
-    /** Shared interfaces that bypass the proxy. */
+    /** Legacy: shared interfaces that bypassed the proxy through 绕过规则. No longer written by this page. */
     val directInterfaces: Set<String> = emptySet(),
-    /** Downstream devices that bypass the proxy, lower-case MACs. */
+    /** Downstream devices that bypass the proxy (blacklist mode), lower-case MACs. */
     val macs: List<String> = emptyList(),
+    /** Tether ingress the shared interception is scoped to; empty = every forwarded ingress (legacy). */
+    val sharedInterfaces: Set<String> = emptySet(),
+    /** "direct" = listed devices bypass (blacklist); "only" = only listed devices are proxied (whitelist). */
+    val macMode: String = "direct",
+    /** Whitelist, lower-case MACs. Kept apart from [macs] so switching mode loses neither list. */
+    val onlyMacs: List<String> = emptyList(),
 ) {
-    fun normalized(): ToolsShareSettings = copy(macs = macs.map { it.trim().lowercase(Locale.ROOT) }.clean())
+    fun normalized(): ToolsShareSettings = copy(
+        macs = macs.map { it.trim().lowercase(Locale.ROOT) }.clean(),
+        onlyMacs = onlyMacs.map { it.trim().lowercase(Locale.ROOT) }.clean(),
+        macMode = if (macMode == "only") "only" else "direct",
+    )
+    val whitelist: Boolean get() = macMode == "only"
 }
 
 internal class ToolsShareSnapshot(
@@ -180,7 +193,29 @@ internal data class ToolsShareState(
 
 /* ---------------------------- CNIP (39) ---------------------------- */
 
-internal data class ToolsCnIpState(val load: ToolsLoad = ToolsLoad.Loading, val enabled: Boolean = false)
+internal data class ToolsCnIpState(
+    val load: ToolsLoad = ToolsLoad.Loading,
+    val enabled: Boolean = false,
+    /** Kernel-level bypass (ipset): China IPs skip the core entirely, per family. */
+    val kernelV4: Boolean = false,
+    val kernelV6: Boolean = false,
+    /** Running session as status reports it: ipset / iptables (no ipset binary) / degraded / off ("" = not known yet). */
+    val kernelStatus: String = "",
+    val kernelReason: String = "",
+    val kernelV4Entries: Int = 0,
+    val kernelV6Entries: Int = 0,
+    /** Optional (default off): only TCP to CN addresses skips the core; UDP/QUIC still reaches it. */
+    val kernelTcpOnly: Boolean = false,
+    /** 6.0.0, default on while the full bypass is off: UDP to CN addresses (calls, games) skips the core. */
+    val udpDirect: Boolean = true,
+    /** The running session bypasses only UDP (status cnipUdpOnly). */
+    val kernelUdpOnly: Boolean = false,
+)
+
+/** What the CNIP kernel bypass page reads back. */
+internal data class ToolsCnIpKernel(
+    val v4: Boolean, val v6: Boolean, val status: String, val reason: String, val v4Entries: Int, val v6Entries: Int,
+)
 
 /* ---------------------------- 诊断与维护 (40–43) ---------------------------- */
 
@@ -203,6 +238,9 @@ internal sealed interface ToolsDiagOverlay {
 
     /** Page 42. */
     data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
+
+    /** 网络事件记录 / 修复运行记录: read-outs that used to live on a second 诊断与维护 page. */
+    data class Record(val title: String, val subtitle: String, val content: ToolsDiagText = ToolsDiagText()) : ToolsDiagOverlay
 }
 
 internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
@@ -217,6 +255,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
 
 /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
 internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
+
+/** One 实测拦截 request: [ok] is null when nothing could be concluded. */
+internal data class ToolsAdProbe(val ok: Boolean?, val detail: String)
 
 internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
@@ -241,13 +282,40 @@ internal data class ToolsAdblockState(
     val recent: List<String> = emptyList(),
     val startupInjected: Boolean = false,
     val controllerLoaded: Boolean = false,
+    /** What the core reported for the chain (position, rule counts); blank when unknown. */
+    val chainNote: String = "",
+    /** Last 实测拦截 result; null until the user runs one. */
+    val probe: ToolsAdProbe? = null,
+    /** Last DNS 接管实测 result (system resolver for a blocked host); null until run. */
+    val dnsProbe: ToolsAdProbe? = null,
+    /** Controller missCount of the REJECT rule; [hitsFromController] says [hits] is its hitCount. */
+    val missCount: Long = 0,
+    val hitsFromController: Boolean = false,
+    /** 运行链验证 › DNS 路径 (DNS mode, takeover, Private DNS, IPv6 DNS, CNIP, DNS layer). */
+    val dnsPath: String = "",
+    val dnsPathOk: Boolean = false,
+    /** Reasons the chain may miss ads (Private DNS hostname, sniffer, CNIP, app scope, counters). */
+    val hints: List<String> = emptyList(),
+    /** Subscription without dns: — the opt-in 河图推荐 DNS switch is offered. */
+    val offerRecommendedDns: Boolean = false,
+    val recommendedDns: Boolean = false,
+    val probing: Boolean = false,
     val standaloneDns: Boolean = false,
     val cnameProtection: Boolean = true,
     val updating: Boolean = false,
     val refreshing: Boolean = false,
     /** A toggle is being applied; switches and chips are inert meanwhile. */
     val busy: Boolean = false,
+    /** Label of the core the rules apply to (running, else next start). */
+    val coreLabel: String = "",
+    /** False for a core without rule routing (Hysteria 2): ad rules cannot take effect at all. */
+    val coreRoutesAds: Boolean = true,
+    /** False for cores other than Mihomo: no live chain verification and no hot rule refresh. */
+    val coreLiveVerify: Boolean = true,
 ) {
+    /** Running on a core that routes ads but cannot report its chain: shown as applied, not unverified. */
+    val coreManaged: Boolean get() = enabled && proxyRunning && coreRoutesAds && !coreLiveVerify
+
     val status: ToolsAdStatus
         get() = when {
             !enabled -> ToolsAdStatus.Off
@@ -312,6 +380,9 @@ internal object ToolsFeatureRules {
     fun shareError(settings: ToolsShareSettings): String? {
         settings.macs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
         if (settings.macs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
+        settings.onlyMacs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
+        if (settings.onlyMacs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
+        if (settings.sharedInterfaces.size > 16) return "共享接口最多 16 个"
         return null
     }
 
@@ -363,12 +434,25 @@ internal class ToolsFeatureActions(
     /* CNIP */
     val loadCnIp: (suspend () -> Boolean)? = null,
     val setCnIp: suspend (Boolean) -> Unit = {},
+    val loadCnIpKernel: (suspend () -> ToolsCnIpKernel)? = null,
+    val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
+    val loadCnIpTcpOnly: (suspend () -> Boolean)? = null,
+    val setCnIpTcpOnly: suspend (Boolean) -> Unit = {},
+    /** 6.0.0: 国内 UDP 内核直连 (default on) and whether the running session applies it UDP-only. */
+    val loadCnIpUdp: (suspend () -> Pair<Boolean, Boolean>)? = null,
+    val setCnIpUdp: suspend (Boolean) -> Unit = {},
 
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,
     val onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    /** 网络事件记录 read-out; null falls back to [onOpenDiagnosticsDetails]. */
+    val networkEvents: (suspend () -> String)? = null,
+    /** 修复运行记录; null hides the row. */
+    val repairSessionRecord: (suspend () -> String)? = null,
     val startupConfig: suspend () -> String = { "" },
     val diagnostics: suspend () -> String = { "" },
+    /** func-400 D1: builds the 导出诊断包 text; null hides the row. */
+    val exportDiagnostics: (suspend () -> String)? = null,
     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
     val restoreNetwork: suspend () -> String = { "已停止代理并回滚网络规则" },
     val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
@@ -385,6 +469,12 @@ internal class ToolsFeatureActions(
     val setCnameProtection: suspend (Boolean) -> Unit = {},
     /** “切到规则” on the wrong-mode warning; null hides the button. */
     val switchToRuleMode: (suspend () -> Unit)? = null,
+    /** 实测拦截: one request for a blocked host through the core; null hides the button. */
+    val probeAdblock: (suspend () -> ToolsAdProbe)? = null,
+    /** DNS 接管实测, run together with [probeAdblock]; null hides its row. */
+    val probeAdblockDns: (suspend () -> ToolsAdProbe)? = null,
+    /** 河图推荐 DNS (default off): only offered for subscriptions without dns:. */
+    val setRecommendedDns: suspend (Boolean) -> String = { "" },
 
     val onMessage: (String) -> Unit = {},
 ) {

@@ -69,6 +69,73 @@ final class MihomoStartupConfig {
 
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,false);
+    }
+
+    /**
+     * Opt-in (default off) Hetu DNS for subscriptions without any dns: block: fake-ip with domestic
+     * DoH, so DNS answers carry fake-ip mappings and are not plain system resolution. Never applied
+     * when the source has its own dns: block; the selected source file is never edited.
+     */
+    static final String RECOMMENDED_DNS=
+            "dns:\n"+
+            "  enable: true\n"+
+            "  ipv6: false\n"+
+            "  enhanced-mode: fake-ip\n"+
+            "  fake-ip-range: 198.18.0.1/16\n"+
+            "  default-nameserver:\n"+
+            "    - 223.5.5.5\n"+
+            "    - 119.29.29.29\n"+
+            "  nameserver:\n"+
+            "    - https://223.5.5.5/dns-query\n"+
+            "    - https://doh.pub/dns-query\n";
+
+    static boolean sourceHasDns(String source){return hasTopLevelKey(source==null?"":normalize(source),"dns");}
+
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,recommendedDns,false);
+    }
+
+    /**
+     * [wechatTransport] (the Root start passes true): WeChat/Tencent names get real addresses in
+     * fake-ip mode and WeChat transport domains go DIRECT before the final MATCH unless the source
+     * already routes WeChat itself (see WechatTransport). Source rules keep their order and win.
+     */
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns,boolean wechatTransport)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,
+                recommendedDns,wechatTransport,Collections.emptyList());
+    }
+
+    /**
+     * [validationHosts] (the Root start passes CaptivePortalBypass.hosts): Android's network-validation
+     * probe hosts get real addresses and go DIRECT first, so Wi-Fi validation never depends on the core.
+     */
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns,boolean wechatTransport,List<String> validationHosts)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,
+                recommendedDns,wechatTransport,validationHosts,CNIP_FAKE_IP_OFF);
+    }
+
+    /** CNIP kernel bypass off (or a mode without it): fake-ip answers stay as the source says. */
+    static final int CNIP_FAKE_IP_OFF=0;
+    /** Bypass on, no GeoSite.dat in the core home: the offline domestic list gets real addresses. */
+    static final int CNIP_FAKE_IP_OFFLINE=1;
+    /** Bypass on and GeoSite.dat present: geosite:cn gets real addresses. */
+    static final int CNIP_FAKE_IP_GEOSITE=2;
+
+    /**
+     * [cnipFakeIp] (the Root start passes it while the CNIP kernel bypass is on in TPROXY/Redirect/
+     * Enhance): in fake-ip mode domestic names get real addresses so the kernel bypass can match
+     * them (see CnipFakeIp); user fake-ip-filter entries keep precedence.
+     */
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns,boolean wechatTransport,List<String> validationHosts,int cnipFakeIp)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -116,6 +183,12 @@ final class MihomoStartupConfig {
         // filtering chain is enabled. The user's source YAML remains untouched.
         if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
 
+        if(recommendedDns&&!hasTopLevelKey(yaml,"dns")){
+            String base=trimOne(yaml);
+            yaml=base+(base.isEmpty()||base.endsWith("\n")?"":"\n")+RECOMMENDED_DNS;
+            // ipv6: false above only when the runtime IPv6 policy is not "enable".
+            if(profile.ipv6==ProxyRuntimeProfile.Ipv6.ENABLE)yaml=yaml.replace("  ipv6: false\n  enhanced-mode: fake-ip","  enhanced-mode: fake-ip");
+        }
         // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
         // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
         // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
@@ -136,10 +209,39 @@ final class MihomoStartupConfig {
             yaml=ensureAdblock(yaml);
         if(profile.cnIpDirect)
             yaml=ensureCnIpDirect(yaml);
+        // A subscription sniffer that is on but silent about parse-pure-ip gets it explicitly;
+        // enable: false / an explicit value are respected (UI explains the consequence).
+        if(profile.adblockChain&&hasTopLevelKey(yaml,"sniffer"))
+            yaml=AdblockDnsPolicy.ensureParsePureIp(yaml);
+        String wechatNote="";
+        if(wechatTransport){
+            WechatTransport.Result fake=WechatTransport.ensureFakeIpFilter(yaml);
+            WechatTransport.Result rules=WechatTransport.insertDirectRules(fake.yaml);
+            yaml=trimOne(rules.yaml);
+            wechatNote="# hetu-wechat-transport: fake-ip="+fake.state+" rules="+rules.state+"\n";
+        }
+        if(cnipFakeIp!=CNIP_FAKE_IP_OFF&&(profile.mode==ProxyRuntimeProfile.Mode.TPROXY
+                ||profile.mode==ProxyRuntimeProfile.Mode.REDIRECT||profile.mode==ProxyRuntimeProfile.Mode.ENHANCE)){
+            CnipFakeIp.Result cn=CnipFakeIp.ensureFakeIpFilter(yaml,cnipFakeIp==CNIP_FAKE_IP_GEOSITE);
+            yaml=trimOne(cn.yaml);
+            wechatNote+="# hetu-cnip-fake-ip: "+cn.state+"\n";
+        }
+        if(validationHosts!=null&&!validationHosts.isEmpty()){
+            CaptivePortalBypass.Result probe=CaptivePortalBypass.apply(yaml,validationHosts);
+            yaml=trimOne(probe.yaml);
+            wechatNote+="# hetu-validation-bypass: "+probe.state+"\n";
+        }
+
+        // Fake-IP mappings survive core restarts (watchdog self-heal, POST /restart, stop/start): see
+        // ensureStoreFakeIp. Absent profile: block = written below inside the isolation block.
+        boolean addProfile=!hasTopLevelKey(yaml,"profile");
+        if(!addProfile)yaml=ensureStoreFakeIp(yaml);
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
         override.append("\n# --- Hetu runtime isolation; source file is unchanged ---\n");
+        if(addProfile)override.append("profile:\n  store-fake-ip: true\n");
+        override.append(wechatNote);
         switch(profile.mode){
             case TPROXY:
                 tp=TPROXY_PORT;
@@ -372,12 +474,16 @@ final class MihomoStartupConfig {
     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
     private static String ensureAdblock(String source)throws IOException{
         String yaml=normalize(source);
-        yaml=injectAdblockProvider(yaml);
+        // DNS layer first (only the dns: block changes); the provider it names is declared only
+        // when the policy really went in, so a config without a usable dns: block is unchanged.
+        AdblockDnsPolicy.Result dns=AdblockDnsPolicy.inject(yaml);
+        if(dns.injected)yaml=dns.yaml;
+        yaml=injectAdblockProvider(yaml,dns.injected);
         yaml=insertAdblockRuleRespectingUserPolicy(yaml);
         return yaml;
     }
 
-    private static String injectAdblockProvider(String source)throws IOException{
+    private static String injectAdblockProvider(String source,boolean dnsProvider)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
         for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
@@ -391,7 +497,13 @@ final class MihomoStartupConfig {
                 "    type: file\n"+
                 "    behavior: domain\n"+
                 "    format: text\n"+
-                "    path: "+ADBLOCK_PATH+"\n";
+                "    path: "+ADBLOCK_PATH+"\n"+
+                (dnsProvider?
+                "  "+AdblockDnsPolicy.PROVIDER_NAME+":\n"+
+                "    type: file\n"+
+                "    behavior: domain\n"+
+                "    format: text\n"+
+                "    path: "+AdblockDnsPolicy.PROVIDER_PATH+"\n":"");
         if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
@@ -400,7 +512,8 @@ final class MihomoStartupConfig {
         for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
         for(int i=index+1;i<end;i++){
             String t=lines[i].trim();
-            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":"))
+            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":")
+                    ||t.startsWith(AdblockDnsPolicy.PROVIDER_NAME+":"))
                 throw new IOException("源配置占用了河图保留的 DNS 过滤 provider 名称");
         }
         StringBuilder out=new StringBuilder();
@@ -610,6 +723,45 @@ final class MihomoStartupConfig {
                 "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
     }
 
+    /**
+     * 2026-10 (real-device report: TikTok cannot connect under Hetu, other apps fine, switching nodes does not
+     * help). Mihomo keeps fake-IP mappings only in memory unless profile.store-fake-ip is on, so every core
+     * restart (Hetu's watchdog closes connections, reloads with POST /restart or restarts the core; every
+     * stop/start) hands out a new pool while apps with their own DNS cache (TikTok's TTNet among them) keep
+     * connecting to the old fake IPs: the core then has no domain (or the wrong one) for them. With the
+     * mapping stored in the private run directory's cache.db the same domain keeps the same fake IP. An
+     * explicit store-fake-ip in the source is respected; an inline profile: {...} is left alone.
+     */
+    static String ensureStoreFakeIp(String source){
+        String[] lines=normalize(source).split("\n",-1);
+        int start=-1;
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0||lines[i].startsWith("#"))continue;
+            if("profile".equals(keyOfMappingLine(lines[i].trim()))){start=i;break;}
+        }
+        if(start<0)return source;
+        String head=lines[start].trim();
+        String rest=head.substring(head.indexOf(':')+1).trim();
+        if(!rest.isEmpty()&&!rest.startsWith("#"))return source;
+        int childIndent=-1;
+        for(int i=start+1;i<lines.length;i++){
+            String t=lines[i].trim();
+            if(t.isEmpty()||t.startsWith("#"))continue;
+            int ind=indent(lines[i]);
+            if(ind==0)break;
+            if(childIndent<0)childIndent=ind;
+            if(ind==childIndent&&"store-fake-ip".equals(keyOfMappingLine(t)))return source;
+        }
+        if(childIndent<0)childIndent=2;
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            out.append(lines[i]);
+            if(i<lines.length-1)out.append('\n');
+            if(i==start)out.append(spaces(childIndent)).append("store-fake-ip: true\n");
+        }
+        return out.toString();
+    }
+
     /** Turn off AAAA answers without replacing the user's DNS policy or resolvers. */
     private static String disableDnsIpv6(String source)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
@@ -697,6 +849,12 @@ final class MihomoStartupConfig {
         try{int v=Integer.parseInt(m.group(1));return v>0&&v<=65535?v:0;}catch(Exception ignored){return 0;}
     }
     private static String normalize(String s){return s.replace("\r\n","\n").replace('\r','\n');}
+    /** 7.0.0: the editor/import check sees the same fingerprint migration the start path applies,
+     *  so a config with the removed `global-client-fingerprint` key is not rejected by the new core. */
+    static String editorValidationCompat(String source)throws IOException{
+        if(source==null||!source.contains("global-client-fingerprint"))return source;
+        return removeTopLevelScalar(RuntimeCompatibility14.migrateFingerprint(source),"global-client-fingerprint");
+    }
     private static String removeTopLevelScalar(String source,String key){StringBuilder out=new StringBuilder();String[] lines=source.split("\n",-1);for(String line:lines){if(indent(line)==0&&key.equals(keyOfMappingLine(line.trim())))continue;out.append(line).append('\n');}return trimOne(out.toString());}
     private static String removeTopLevelKey(String source,String key){
         String[] lines=source.split("\n",-1);StringBuilder out=new StringBuilder();boolean skipping=false;Pattern start=Pattern.compile("^"+Pattern.quote(key)+"\\s*:(.*)$");Pattern nextKey=Pattern.compile("^[A-Za-z0-9_.-]+\\s*:");

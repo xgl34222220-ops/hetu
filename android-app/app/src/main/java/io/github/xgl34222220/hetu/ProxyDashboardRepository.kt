@@ -11,6 +11,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import io.github.xgl34222220.hetu.panel.SingBoxPanelStore
 import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,6 +61,7 @@ internal class ProxyDashboardRepository(context: Context) {
     }
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
+    private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     private val controller = ProxyComposeController(app)
     // Keep credentials private and out of generated data-class toString output.
     internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long,
@@ -239,6 +242,19 @@ internal class ProxyDashboardRepository(context: Context) {
             .putInt("proxyLastSelectionCloseFailed", failed)
             .apply()
     }
+    /** 7.0.0: live (now, fixed, type) of one group, read from the ticket's controller. */
+    suspend fun readSelection(group: String, ticket: SelectionTicket): Triple<String, String, String>? =
+        withContext(Dispatchers.IO) {
+            requireCurrentOrigin(ticket.identity)
+            val entry = ticket.client(app).proxies().optJSONObject(group) ?: return@withContext null
+            Triple(entry.optString("now", ""), entry.optString("fixed", ""), entry.optString("type", ""))
+        }
+    /** 7.0.0: releases an automatic group's pin so the core resumes its own choice. */
+    suspend fun unpin(group: String, ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        ticket.client(app).unfix(group)
+        acknowledgeMutation(ticket)
+    }
     suspend fun closeConnection(id: String) = controller.closeConnection(id)
     /** V19: live Mihomo traffic mode (rule / global / direct); "rule" when unreadable. */
     suspend fun trafficMode(): String = withContext(Dispatchers.IO) {
@@ -284,14 +300,38 @@ internal class ProxyDashboardRepository(context: Context) {
 
     /** Only real remote HTTP providers belong on the subscription page. */
     suspend fun providers(): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
-        remoteProviders(api.proxyProviders())
+        if (ProxyCoreSupport.localProviders(prefs)) SingBoxPanelStore.providers(singBoxPanel())
+        else remoteProviders(api.proxyProviders())
     }
 
     suspend fun ruleSets(): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
-        parseRuleSets(api.ruleProviders())
+        if (ProxyCoreSupport.localProviders(prefs)) SingBoxPanelStore.ruleSets(singBoxPanel())
+        else parseRuleSets(api.ruleProviders())
+    }
+
+    /** sing-box: what Hetu recorded for the running start (RootProxyManager.recordSingBoxPanel). */
+    private fun singBoxPanel() = SingBoxPanelStore.load(RootProxyManager.singBoxPanelDir(app))
+
+    /** Every remote item of a sing-box list, three at a time; one failure does not stop the others. */
+    private suspend fun <T> refreshLocal(names: List<String>, refresh: (String) -> Unit, read: () -> List<T>): List<T> {
+        for (chunk in names.chunked(3)) coroutineScope {
+            chunk.map { name ->
+                async {
+                    try { refresh(name) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { }
+                }
+            }.awaitAll()
+        }
+        return read()
     }
 
     suspend fun refreshSubscriptions(ticket: SelectionTicket = captureSelection()): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) {
+            val root = RootProxyManager(app)
+            return@withContext refreshLocal(SingBoxPanelStore.providers(singBoxPanel()).map { it.name },
+                { root.refreshSingBoxProvider(it) }) { SingBoxPanelStore.providers(singBoxPanel()) }
+        }
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         val before = remoteProviders(operationApi.proxyProviders())
@@ -316,6 +356,11 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     suspend fun refreshRuleSets(ticket: SelectionTicket = captureSelection()): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) {
+            val root = RootProxyManager(app)
+            return@withContext refreshLocal(SingBoxPanelStore.ruleSets(singBoxPanel()).filter { it.vehicleType.equals("HTTP", true) }.map { it.name },
+                { root.refreshSingBoxRuleSet(it) }) { SingBoxPanelStore.ruleSets(singBoxPanel()) }
+        }
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         val before = parseRuleSets(operationApi.ruleProviders())
@@ -350,7 +395,8 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
-    suspend fun globalDelay(onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
+    suspend fun globalDelay(targetHint: Int = 0, onResult: ((String, Long) -> Unit)? = null): Map<String, Long> =
+        latencyProbeOperation(LatencyProbeBudget.waveTimeoutMs(targetHint)) {
         val snapshot = probeSnapshot(force = true)
         val targets = snapshot.proxies.keys().asSequence().filter { name ->
             val node = snapshot.proxies.optJSONObject(name)
@@ -364,35 +410,50 @@ internal class ProxyDashboardRepository(context: Context) {
         onResult: ((String, Long) -> Unit)? = null): Map<String, Long> {
         val results = LinkedHashMap<String, Long>()
         val pending = targets.distinct()
-        val next = java.util.concurrent.atomic.AtomicInteger()
+        val transient = java.util.Collections.synchronizedList(mutableListOf<String>())
         // A fixed worker pool keeps the six-request limit without a batch barrier:
         // each free worker can reach later healthy nodes while a sibling is slow.
-        coroutineScope {
-            List(minOf(6, pending.size)) { async {
-                while (true) {
-                    coroutineContext.ensureActive()
-                    if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
-                    val index = next.getAndIncrement()
-                    if (index >= pending.size) break
-                    val node = pending[index]
-                    try {
-                        val value = measuredProbe(node, snapshot)
+        suspend fun pass(nodes: List<String>, retry: Boolean) {
+            val next = java.util.concurrent.atomic.AtomicInteger()
+            coroutineScope {
+                List(minOf(LatencyProbeBudget.WAVE_CONCURRENCY, nodes.size)) { async {
+                    while (true) {
                         coroutineContext.ensureActive()
-                        synchronized(results) { results[node] = value }
-                        // Each leaf can be shown as soon as it lands, but only while the
-                        // wave's identity is still current; the final map keeps its guard.
-                        if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
-                            onResult(node, value)
+                        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
+                        val index = next.getAndIncrement()
+                        if (index >= nodes.size) break
+                        val node = nodes[index]
+                        try {
+                            val value = measuredProbe(node, snapshot)
+                            coroutineContext.ensureActive()
+                            synchronized(results) { results[node] = value }
+                            // Each leaf can be shown as soon as it lands, but only while the
+                            // wave's identity is still current; the final map keeps its guard.
+                            if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
+                                onResult(node, value)
+                        }
+                        catch (cancel: CancellationException) { throw cancel }
+                        // A controller/transport error has no new node measurement. Keep
+                        // successful siblings and let callers retain this node's old value.
+                        // A lost reply (socket timeout/reset while the core was busy) gets one
+                        // retry after the first pass; core answers (504/503/401) never do.
+                        catch (error: IOException) {
+                            if (!retry && transientProbeFailure(error) &&
+                                LatencyProbeBudget.CURRENT.get()?.expired() != true) transient += node
+                        }
                     }
-                    catch (cancel: CancellationException) { throw cancel }
-                    // A controller/transport error has no new node measurement. Keep
-                    // successful siblings and let callers retain this node's old value.
-                    catch (_: IOException) { }
-                }
-            } }.awaitAll()
+                } }.awaitAll()
+            }
         }
+        pass(pending, retry = false)
         requireCurrentProbe(snapshot.identity)
-        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap())
+        // Only an unfinished first pass is 「已到时限」; a retry cut short keeps the first answers.
+        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap(), pending.size)
+        val again = synchronized(transient) { transient.filter { it !in results } }
+        if (again.isNotEmpty()) {
+            pass(again, retry = true)
+            requireCurrentProbe(snapshot.identity)
+        }
         return results
     }
 
@@ -423,7 +484,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      * pin, which could briefly reroute live traffic.
      */
     suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
-        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> =
+        latencyProbeOperation(LatencyProbeBudget.waveTimeoutMs(targets.distinct().size)) {
         if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
         val snapshot = probeSnapshot(force = true)
         if (coreGroupWaveKeepsSelection(snapshot.proxies.optJSONObject(group.name)))
@@ -476,7 +538,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
             when {
                 error is MihomoControllerClient.ControllerHttpException && error.statusCode == 504 -> JSONObject()
                 error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
-                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() })
+                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() }, pending.size)
                 else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
             }
         }
@@ -503,6 +565,38 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         }
         requireCurrentProbe(snapshot.identity)
         synchronized(results) { results.toMap() }
+    }
+
+    /**
+     * 7.0.0: retests nodes whose first group-test reading failed, once each, with a per-proxy
+     * /proxies/{name}/delay against the group's test URL (the configured custom URL wins, as in
+     * the group wave). At most [RETRY_DELAY_CONCURRENCY_700] in flight, [RETRY_DELAY_TIMEOUT_MS_700]
+     * each. A node whose retry request itself failed is absent from the result.
+     */
+    /**
+     * 7.0.0: the one failed-node retry exists for Cloudflare-hosted nodes that cannot reach a
+     * Cloudflare test target. It runs only when the first round used such a URL; Selector
+     * groups without a custom URL already test against gstatic first.
+     */
+    fun retryWorthwhile(group: ProxyGroupUi): Boolean = api.firstRoundUsedCloudflare(
+        if (group.type.equals("Selector", ignoreCase = true)) "" else group.testUrl,
+        group.type.equals("Selector", ignoreCase = true))
+
+    suspend fun retryDelays(group: ProxyGroupUi, nodes: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
+        if (nodes.isEmpty()) return@withContext emptyMap()
+        val url = api.retryDelayUrl(group.testUrl)
+        val slots = kotlinx.coroutines.sync.Semaphore(io.github.xgl34222220.hetu.panel.RETRY_DELAY_CONCURRENCY_700)
+        coroutineScope {
+            nodes.distinct().map { node ->
+                async {
+                    slots.withPermit {
+                        try { node to api.delayOnce(node, url, "200-399", io.github.xgl34222220.hetu.panel.RETRY_DELAY_TIMEOUT_MS_700) }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (_: Exception) { null }
+                    }
+                }
+            }.awaitAll().filterNotNull().toMap()
+        }
     }
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */
@@ -615,6 +709,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
     suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) return@withContext SingBoxPanelStore.provider(RootProxyManager(app).refreshSingBoxProvider(name))
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         operationApi.updateProxyProvider(name)
@@ -623,6 +718,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
     suspend fun refreshRuleSet(name: String, ticket: SelectionTicket = captureSelection()): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
+        if (ProxyCoreSupport.localProviders(prefs)) return@withContext SingBoxPanelStore.ruleSet(RootProxyManager(app).refreshSingBoxRuleSet(name))
         requireCurrentOrigin(ticket.identity)
         val operationApi = ticket.client(app)
         operationApi.updateRuleProvider(name)
@@ -648,7 +744,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
             try {
                 val code = connection.responseCode
                 coroutineContext.ensureActive()
-                if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+                // generate_204 targets must answer 204 (a hijack/portal page is not a measurement).
+                if (hxProbeAnswered(url, code)) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
             } finally {
                 runCatching { connection.inputStream?.close() }
                 connection.disconnect()
@@ -734,3 +831,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
 }
+
+/**
+ * A request that produced no core answer because the reply was lost in transport (read timeout,
+ * reset, refused while the core was saturated). Core answers, credential errors, superseded
+ * runtimes and the wave's own deadline are never retried.
+ */
+internal fun transientProbeFailure(error: IOException): Boolean =
+    error !is MihomoControllerClient.ControllerHttpException &&
+        error !is MihomoControllerClient.DelayFailure &&
+        error !is IncompleteLatencyProbe &&
+        (error is java.net.SocketTimeoutException || error is java.net.SocketException ||
+            error is java.io.EOFException || error.cause is java.net.SocketTimeoutException)

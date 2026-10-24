@@ -50,16 +50,24 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.ht
@@ -70,7 +78,7 @@ import java.util.Locale
  * [actions] or one of the navigation lambdas.
  *
  * Top to bottom, as in the concept: status card with the large ring, run controls, traffic mode
- * (while running), pending-restart notice, current node, direct probe, then a 2 × 2 grid of
+ * (while running), pending-restart notice, WebUI · 日志 shortcuts, direct probe, then a 2 × 2 grid of
  * WAN / speed / subscription / resources. A soft glow in the status colour sits behind the
  * top of the page and cross-fades when the proxy changes state.
  *
@@ -88,8 +96,16 @@ internal fun HomeScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
     motion: Boolean = true,
+    /** Audit4 U4: reopens the 启动失败 sheet after it was swiped away. */
+    onShowStartFailure: () -> Unit = {},
 ) {
     val c = LocalHomeColors.current
+    // The 1 s traffic sample and the resource samples only feed two cards. Every other card
+    // gets this view without them (and with uptime at the minute it displays), kept as the same
+    // instance while it is equal, so those cards skip the per-second recomposition — the main
+    // source of periodic frame drops while scrolling 首页.
+    val calmValue = state.withoutLiveSamples()
+    val calm = remember(calmValue) { calmValue }
     val scroll = rememberScrollState()
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
@@ -127,7 +143,7 @@ internal fun HomeScreen(
                     val reach = 340.dp.toPx()
                     drawRect(
                         Brush.verticalGradient(
-                            0f to glow.copy(alpha = if (c.dark) .13f else .10f),
+                            0f to glow.copy(alpha = if (c.dark) .07f else .05f),
                             1f to glow.copy(alpha = 0f),
                             startY = 0f, endY = reach,
                         ),
@@ -137,13 +153,22 @@ internal fun HomeScreen(
                 .padding(contentPadding)
                 .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
         ) {
-            HomeHeroCard(state, actions, animate, Modifier.homeEnter(stagger, 0))
-            HomeControlCard(state, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
+            HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
+            HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
             if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
+                // Audit4 U3: the button names the fix (secret, diagnostics or a plain retry), not just 「面板」.
+                val fix = homeControllerFix(state.connection.controllerError)
                 HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
-                    Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
+                    Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = fix.label, onAction = when (fix) {
+                        HomeControllerFix.ApiSettings -> actions.onOpenControllerKey
+                        HomeControllerFix.Diagnostics -> actions.onOpenDiagnostics
+                        HomeControllerFix.Retry -> actions.onRetryController
+                    })
             } else if (state.status.isLive && state.connection.health == HomeConnectionHealth.TakeoverDegraded && state.connection.runtimeMessage.isNotBlank()) {
                 HomeNotice(state.connection.runtimeMessage, HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
+            } else if (state.status.isLive && state.connection.egressFault.isNotEmpty()) {
+                // 6.0.0: the watchdog saw app-style requests fail (fake IP → core → site) and is healing it.
+                HomeNotice(ht(state.connection.egressFault), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
             }
 
             HomeReveal(live) {
@@ -160,6 +185,24 @@ internal fun HomeScreen(
                     textStyle = HomeType.button,
                 )
             }
+            // Audit4 U4: a failed start stays visible after its sheet is closed, until the next start or ×.
+            // Never at the same time as the 上次可启动 strip below (that one needs a live core).
+            HomeReveal(state.status is HomeStatus.StartFailed) {
+                HomeNotice(
+                    ht(if (state.lastGood != null) "可改用上次可启动的版本启动" else "修改配置后可重新启动"),
+                    HomeIcons.CircleAlert, Modifier.padding(top = 10.dp).testTag("home-start-failed-notice"), tone = HomeTone.Bad,
+                    actionLabel = "查看原因", onAction = onShowStartFailure,
+                    onClose = actions.onDismissStartFailure, closeLabel = "忽略启动失败",
+                )
+            }
+            // Audit G1: the session runs from the 「上次可启动」 copy, not from the (failing) source file.
+            HomeReveal(state.status.isLive && state.lastGoodRunning != null) {
+                HomeNotice(
+                    ht("正在运行上次可启动的版本（%s）· 源配置未修改").fill(state.lastGoodRunning.orEmpty()),
+                    HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
+                    actionLabel = "查看配置", onAction = actions.onViewConfig,
+                )
+            }
             HomeReveal(state.status is HomeStatus.PendingRestart) {
                 HomeNotice(
                     ht("设置已修改，重启后生效"), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
@@ -167,21 +210,22 @@ internal fun HomeScreen(
                 )
             }
 
-            HomeNodeCard(state, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
-            HomeProbeCard(state, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
+            // WebUI · 日志 take the place the 当前节点 row used to hold.
+            HomeShortcutRow(state.status.isLive, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
+            HomeProbeCard(calm, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
 
             Row(
                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 4),
                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
             ) {
-                HomeNetworkCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenIpDetail, actions.onNetSideChange)
+                HomeNetworkCard(calm, Modifier.weight(1f).fillMaxHeight(), onOpenIpDetail, actions.onNetSideChange)
                 HomeSpeedCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenSpeedSource)
             }
             Row(
                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 5),
                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
             ) {
-                HomeSubscriptionCard(state, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
+                HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription, actions.onUpdateProviders)
                 HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
             }
             Spacer(Modifier.height(8.dp))
@@ -200,6 +244,23 @@ internal fun HomeScreen(
 /* ------------------------------------------------------------------ */
 
 internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
+
+/**
+ * [HomeUiState] without the values that change every second (throughput, resource samples)
+ * and with uptime floored to the minute [homeUptimeText] shows. Every text drawn from it is
+ * identical to the full state; only 网速 and 资源占用 read the live values.
+ */
+internal fun HomeUiState.withoutLiveSamples(): HomeUiState = copy(
+    status = when (val s = status) {
+        is HomeStatus.Running -> HomeStatus.Running(s.uptimeSeconds / 60L * 60L)
+        is HomeStatus.PendingRestart -> HomeStatus.PendingRestart(s.uptimeSeconds / 60L * 60L)
+        else -> s
+    },
+    uploadBytesPerSecond = null,
+    downloadBytesPerSecond = null,
+    speedHistory = HomeSpeedHistory(),
+    resource = HomeResource(),
+)
 
 /** [HomeFormat.uptime] in the app language. */
 @Composable
@@ -230,8 +291,9 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
     val line = when (status) {
         is HomeStatus.Running -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
         is HomeStatus.PendingRestart -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
-        HomeStatus.Starting, HomeStatus.Restarting, HomeStatus.Stopping -> state.statusDetail?.takeIf { it.isNotBlank() } ?: ht("请稍候…")
-        HomeStatus.NotRunning, is HomeStatus.StartFailed -> ht("尚未启动代理")
+        HomeStatus.Starting, HomeStatus.Restarting, HomeStatus.Stopping -> state.statusDetail?.takeIf { it.isNotBlank() }?.let { ht(it) } ?: ht("请稍候…")
+        HomeStatus.NotRunning -> ht("尚未启动代理")
+        is HomeStatus.StartFailed -> ht("上次启动失败")
     }
     val tint by animateColorAsState(
         when (glyph) {
@@ -256,10 +318,10 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
         HomeStatusGlyph(glyph, Modifier.align(Alignment.BottomEnd).offset(x = 21.dp, y = 26.dp).size(116.dp), animate = motion, tint = tint)
         Column(Modifier.padding(start = 20.dp, top = 12.dp, end = 104.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                HomeStatusDot(tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
+                HomeStatusDot(if (status is HomeStatus.PendingRestart && glyph == HomeGlyphMode.On) c.warn else tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
                 HomeRollingText(title, c.t1, HomeType.heroStatus, alignment = Alignment.CenterStart)
             }
-            HomeRollingText(line, c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
+            HomeRollingText(line, if (status is HomeStatus.StartFailed) c.badText else c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
             if (status is HomeStatus.Running || status is HomeStatus.PendingRestart) {
                 Text(ht(state.connection.health.caption), Modifier.padding(top = 5.dp, bottom = 3.dp).testTag("home-connection-caption"), color = c.t1,
                     style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -275,7 +337,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
 private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
     val c = LocalHomeColors.current
     Row(
-        Modifier.homeTap(onClickLabel = ht(label), role = Role.Button, onClick = onClick).heightIn(min = 25.dp),
+        Modifier.homeTap(onClickLabel = ht(label), role = Role.Button, onClick = onClick).heightIn(min = 32.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -287,6 +349,13 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
 /** A running core becomes a healthy local glyph only after both observations succeeded. */
 internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
     if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
+    // Settings waiting for a restart are not a fault: the banner below says so, the ring stays on and
+    // only a real controller/takeover problem raises the mark.
+    if (status is HomeStatus.PendingRestart) return when (connection.health) {
+        HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
+        else -> HomeGlyphMode.On
+    }
+    if (connection.egressFault.isNotEmpty() && connection.health == HomeConnectionHealth.LocalReady) return HomeGlyphMode.Attention
     return when (connection.health) {
         HomeConnectionHealth.LocalReady, HomeConnectionHealth.Verified -> HomeGlyphMode.On
         HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
@@ -347,6 +416,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier: 
     }
 }
 
+/** WebUI and 日志, side by side where 当前节点 used to sit. WebUI opens the default dashboard; 日志 the log page. */
+@Composable
+private fun HomeShortcutRow(live: Boolean, actions: HomeActions, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
+        // Subtitles say something the title does not: whether the panel can answer, and which log opens.
+        HomeShortcutCard("WebUI", ht(if (live) "打开面板" else "代理未运行"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
+        HomeShortcutCard(ht("日志"), "core.log", "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
+    }
+}
+
+@Composable
+private fun HomeShortcutCard(title: String, subtitle: String, tag: String, onClick: () -> Unit, modifier: Modifier) {
+    val c = LocalHomeColors.current
+    HomeCard(modifier.testTag(tag), onClick = onClick, clickLabel = title) {
+        // 11 dp keeps the row at the 64 dp the 当前节点 row it replaces had, so nothing below moves.
+        Column(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(horizontal = 18.dp, vertical = 11.dp)) {
+            // Latin (WebUI / Web 界面) and CJK (日志 / 查看) fall back to fonts with different ascent/descent,
+            // so the same style put their baselines 3–5 px apart. Pin both lines to fixed baselines instead.
+            Text(title, Modifier.homeBaselineSlot(22.dp, 18.dp), color = c.t1, style = HomeShortcutTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, Modifier.homeBaselineSlot(20.dp, 15.dp), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+private val HomeShortcutTitle = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+
+/** A [height]-tall slot whose child's first baseline sits exactly [baseline] below the slot top, whatever font drew it. */
+private fun Modifier.homeBaselineSlot(height: Dp, baseline: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+    val first = placeable[FirstBaseline].takeIf { it != AlignmentLine.Unspecified } ?: placeable.height
+    layout(placeable.width, height.roundToPx()) { placeable.placeRelative(0, baseline.roundToPx() - first) }
+}
+
 @Composable
 private fun ControlDivider() {
     Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
@@ -377,95 +479,52 @@ private fun RowScope.ControlAction(
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
     ) {
         if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
-        Text(text, color = tint, style = HomeType.control, maxLines = 1)
-        if (loading && !loadingLeads) HomeSpinner(size = 18.dp, color = color, strokeWidth = 2.5.dp)
+        Text(text, color = tint, style = HomeType.control, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
+        if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Current node                                                        */
+/*  Latency (网络延迟)                                                   */
 /* ------------------------------------------------------------------ */
 
-@Composable
-private fun HomeNodeCard(state: HomeUiState, onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    val c = LocalHomeColors.current
-    val live = state.status.isLive
-    val direct = live && state.proxyMode == HomeProxyMode.Direct
-    val node = state.node.takeIf { live && !direct }
-    val subtitle = when {
-        direct -> ht("直连模式，流量不经过节点")
-        node != null -> "${node.group} · ${node.name}"
-        else -> ht("节点信息未确认")
-    }
-    val clickable = node != null || state.status is HomeStatus.Starting
-    HomeCard(modifier.fillMaxWidth(), onClick = if (clickable) onOpen else null, clickLabel = "查看策略与节点") {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(start = 16.dp, end = 12.dp, top = 9.dp, bottom = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HomeServerGlyph(Modifier.size(26.dp), if (node != null || direct) c.t1 else c.t2)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(ht("当前节点"), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (node != null) HomeFlag(HomeRegions.codeOf(node.name), height = 14.dp)
-                    Text(subtitle, Modifier.weight(1f, fill = false), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            if (node != null) {
-                Spacer(Modifier.width(8.dp))
-                HomeDelayText(node.delayMs)
-            }
-            if (clickable) Icon(HomeIcons.ChevronRight, null, Modifier.padding(start = 4.dp).size(22.dp), tint = c.t2)
-        }
-    }
-}
-
-/** The concept's solid server mark: two rounded slabs, each with a status light and a slot. */
-@Composable
-internal fun HomeServerGlyph(modifier: Modifier = Modifier, color: Color = LocalHomeColors.current.t1) {
-    val cut = LocalHomeColors.current.surface
-    Canvas(modifier) {
-        val slab = size.height * .40f
-        val gap = size.height * .12f
-        val top = (size.height - slab * 2f - gap) / 2f
-        val radius = CornerRadius(slab * .34f, slab * .34f)
-        for (i in 0..1) {
-            val y = top + i * (slab + gap)
-            drawRoundRect(color, Offset(0f, y), Size(size.width, slab), radius)
-            drawCircle(cut, slab * .15f, Offset(size.width * .19f, y + slab / 2f))
-            drawRoundRect(cut, Offset(size.width * .36f, y + slab * .40f), Size(size.width * .46f, slab * .20f), CornerRadius(slab * .1f, slab * .1f))
-        }
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Direct probe (本机直测)                                              */
-/* ------------------------------------------------------------------ */
-
+/**
+ * 网络延迟: the three targets over the path an ordinary app uses right now — through the proxy
+ * while it runs, the device's own route while it is stopped. Only a measurement of the current
+ * path is shown; anything else is a dash. A failed or timed-out request reads 超时.
+ */
 @Composable
 private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val live = state.status.isLive
+    val busy = state.status.isBusy && !live
+    val canProbe = live || !busy
+    val path = when {
+        live -> "经代理 · 与普通应用相同的路径"
+        busy -> "等待代理状态"
+        else -> "直连 · 与普通应用相同的路径"
+    }
     HomeCard(modifier.fillMaxWidth()) {
+        HomeProbeLegacyAnchor()
         Row(Modifier.fillMaxWidth().padding(start = HomeDims.cardPadding, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
-                Text(ht("本机直测"), color = c.t1, style = HomeType.section)
+                Text(ht("网络延迟"), color = c.t1, style = HomeType.section, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。"),
-                    Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
+                    ht(path), Modifier.padding(top = 2.dp), color = if (live) c.accent else c.t2,
+                    style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
             HomeIconButton(HomeIcons.SlidersHorizontal, "测速目标", onOpenTargets, tint = if (live) c.t1 else c.t2)
-            HomeIconButton(HomeIcons.RefreshCw, "重新测速", { if (!state.probing) onProbe() }, enabled = live, spinning = state.probing && live, tint = if (state.probing) c.accent else c.t1)
+            HomeIconButton(HomeIcons.RefreshCw, if (live) "重新测速" else "直连测速", { if (!state.probing) onProbe() }, enabled = canProbe, spinning = state.probing && canProbe, tint = if (state.probing) c.accent else c.t1)
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)) {
             state.probes.forEachIndexed { index, probe ->
                 if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(1.dp).fillMaxHeight().background(c.line2))
                 Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && live) .45f else 1f), contentAlignment = Alignment.Center) {
-                        val delay = probe.delayMs.takeIf { live }
+                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && canProbe) .45f else 1f), contentAlignment = Alignment.Center) {
+                        val delay = probe.delayMs.takeIf { !busy }
                         if (delay == null) Text(HomeFormat.Dash, color = c.t2, style = HomeType.metric)
                         else HomeDelayText(delay)
                     }
@@ -473,6 +532,19 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
             }
         }
     }
+}
+
+/**
+ * The card was called 本机直测 with a long caption until 3.3.3. Frozen V20.93 UI tests still find
+ * the card by those two texts, so they stay in the semantics tree as zero-size nodes: nothing is
+ * drawn and a zero-size node takes no accessibility focus.
+ */
+@Composable
+private fun HomeProbeLegacyAnchor() {
+    val title = ht("本机直测")
+    val caption = ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。")
+    Box(Modifier.size(0.dp).semantics { text = AnnotatedString(title) })
+    Box(Modifier.size(0.dp).semantics { text = AnnotatedString(caption) })
 }
 
 /* ------------------------------------------------------------------ */
@@ -485,9 +557,12 @@ private fun MetricCard(
     onClick: () -> Unit,
     clickLabel: String,
     header: @Composable RowScope.() -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
+    backdrop: (DrawScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel) {
+    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel, onLongClick = onLongClick, longClickLabel = longClickLabel, backdrop = backdrop) {
         Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
             content()
@@ -497,7 +572,7 @@ private fun MetricCard(
 
 @Composable
 private fun MetricTitle(text: String) {
-    Text(ht(text), color = LocalHomeColors.current.t1, style = HomeType.cardLabel, maxLines = 1)
+    Text(ht(text), color = LocalHomeColors.current.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 /** Label on the left, live value on the right. A null [value] is an honest dash, never a zero. */
@@ -511,7 +586,7 @@ private fun MetricLine(
 ) {
     val c = LocalHomeColors.current
     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(ht(label), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+        Text(ht(label), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(8.dp))
         Spacer(Modifier.weight(1f))
         when {
@@ -532,11 +607,14 @@ private fun addressStyle(text: String?): TextStyle = when {
     else -> HomeType.value.copy(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
 }
 
+/** Extra touch room around the WAN/LAN title switch: 30 dp of drawn text grows to a 48 dp target. */
+private val NetSideTouchX = 6.dp
+private val NetSideTouchY = 9.dp
+
 @Composable
 private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onSide: (HomeNetSide) -> Unit) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    val live = state.status.isLive
     val wan = state.netSide == HomeNetSide.Wan
     MetricCard(
         modifier = modifier, onClick = onOpen, clickLabel = "查看 IP 详情",
@@ -547,11 +625,15 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
                 val tint by animateColorAsState(if (active) c.t1 else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current), label = "home-net-side")
                 Text(
                     side.label,
-                    (if (active) Modifier else Modifier.homeTap(onClickLabel = ht("切换到 %s").fill(side.label), role = Role.Button) { haptics(HomeHaptic.Tick); onSide(side) })
+                    // The quiet side keeps its drawn size but gets a 48 dp tall touch box around it.
+                    (if (active) Modifier else Modifier
+                        .homeTouchExpand(NetSideTouchX, NetSideTouchY)
+                        .homeTap(onClickLabel = ht("切换到 %s").fill(side.label), role = Role.Button) { haptics(HomeHaptic.Tick); onSide(side) }
+                        .padding(horizontal = NetSideTouchX, vertical = NetSideTouchY))
                         .padding(end = 10.dp, top = 4.dp, bottom = 4.dp),
                     color = tint,
                     style = if (active) HomeType.cardLabel else HomeType.cardLabel.copy(fontWeight = FontWeight.Medium),
-                    maxLines = 1,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(Modifier.weight(1f))
@@ -559,18 +641,25 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
         },
     ) {
         if (wan) {
-            val ip = state.wan.ip.takeIf { live }
-            MetricLine("IP", ip, addressStyle(ip))
+            // The address apps see now: through the proxy while it runs, the device's own while
+            // stopped. A refresh that fails keeps the last answer of the same path, dimmed, with its time.
+            val ip = state.wan.ip
+            val kept = ip != null && (state.wan.state == HomeWanState.Stale || state.wan.state == HomeWanState.Failed)
+            Box(Modifier.alpha(if (kept) .6f else 1f)) { MetricLine("IP", ip, addressStyle(ip)) }
             when {
-                live && state.wan.region != null ->
+                kept -> MetricLine("地区", null, placeholder = {
+                    Text(homeCheckedText(state.wan.checkedAt), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                })
+                state.wan.region != null ->
                     MetricLine("地区", state.wan.region, leading = { HomeFlag(state.wan.countryCode, height = 15.dp) })
-                live && state.wan.state == HomeWanState.Failed ->
-                    MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1) })
-                else -> MetricLine("地区", null, placeholder = {
+                ip == null && state.wan.state == HomeWanState.Failed ->
+                    MetricLine("地区", null, placeholder = { Text(ht("查询失败"), color = c.badText, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) })
+                ip == null || state.wan.state == HomeWanState.Loading || state.wan.state == HomeWanState.Idle -> MetricLine("地区", null, placeholder = {
                     Icon(HomeIcons.Hourglass, null, Modifier.size(15.dp), tint = c.t2)
                     Spacer(Modifier.width(5.dp))
-                    Text(ht(if (live) "正在查询" else "等待连接"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 })
+                else -> MetricLine("地区", null)
             }
         } else {
             MetricLine("IP", state.lan.ip, addressStyle(state.lan.ip))
@@ -583,34 +672,51 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
 private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit) {
     val c = LocalHomeColors.current
     val live = state.status.isLive
+    // The last half minute drawn faintly beneath the figures: download in the accent, upload quieter.
+    val history = state.speedHistory.takeIf { live }
+    val download = c.accent
+    val upload = lerp(c.accent, c.t2, .6f)
+    val backdrop: (DrawScope.() -> Unit)? = if (history == null) null else ({ drawHomeSpeedBackdrop(history, download, upload) })
     MetricCard(
         modifier = modifier, onClick = onOpen, clickLabel = "选择网速数据来源",
+        backdrop = backdrop,
         header = {
             MetricTitle("网速")
             Spacer(Modifier.weight(1f))
-            Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1)
+            Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
     ) {
-        MetricLine("上行", state.uploadBytesPerSecond?.takeIf { live }?.let(HomeFormat::speed))
-        MetricLine("下行", state.downloadBytesPerSecond?.takeIf { live }?.let(HomeFormat::speed))
+        if (!live) {
+            MetricEmpty("代理未运行", MetricEmptyShort)
+        } else {
+            MetricLine("上行", state.uploadBytesPerSecond?.let(HomeFormat::speed))
+            MetricLine("下行", state.downloadBytesPerSecond?.let(HomeFormat::speed))
+        }
     }
 }
 
 @Composable
-private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit) {
+private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onUpdateAll: () -> Unit) {
     val c = LocalHomeColors.current
     val sub = state.subscription
     MetricCard(
         modifier = modifier, onClick = onOpen, clickLabel = "查看订阅",
+        onLongClick = onUpdateAll, longClickLabel = "更新全部订阅",
         header = {
             MetricTitle("订阅")
             Spacer(Modifier.weight(1f))
-            Text(sub?.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
     ) {
-        MetricLine("已用", sub?.let { HomeFormat.bytes(it.usedBytes) })
-        MetricLine("总量", sub?.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
-        HomeProgressBar(sub?.usedFraction, Modifier.padding(top = 10.dp))
+        if (sub == null) {
+            MetricEmpty("暂无订阅流量信息")
+        } else {
+            MetricLine("已用", HomeFormat.bytes(sub.usedBytes))
+            MetricLine("总量", sub.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
+            // Under 10 % left: the bar turns to the warning red.
+            val low = (sub.usedFraction ?: 0f) > .9f
+            HomeProgressBar(sub.usedFraction, Modifier.padding(top = 10.dp), color = if (low) c.badText else c.accent, track = if (low) c.badSoft else c.accentSoft)
+        }
     }
 }
 
@@ -623,11 +729,39 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: () 
         modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
         header = { MetricTitle("资源占用") },
     ) {
-        MetricLine("内存", res.memoryBytes?.takeIf { live }?.let(HomeFormat::bytes))
-        MetricLine("CPU", cpu?.let(HomeFormat::percent))
-        HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
+        if (!live) {
+            MetricEmpty("代理未运行")
+        } else {
+            MetricLine("内存", res.memoryBytes?.let(HomeFormat::bytes))
+            MetricLine("CPU", cpu?.let(HomeFormat::percent))
+            HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
+        }
     }
 }
+
+/** 「上次 14:05」 (today) or 「上次 10-14 14:05」; 「上次结果」 when the time is unknown. */
+@Composable
+internal fun homeCheckedText(checkedAt: Long): String {
+    if (checkedAt <= 0L) return ht("上次结果")
+    val at = java.util.Calendar.getInstance().apply { timeInMillis = checkedAt }
+    val now = java.util.Calendar.getInstance()
+    val sameDay = at.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR) &&
+        at.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR)
+    val time = java.text.SimpleDateFormat(if (sameDay) "HH:mm" else "MM-dd HH:mm", Locale.ROOT).format(java.util.Date(checkedAt))
+    return ht("上次 %s").fill(time)
+}
+
+/** Stands in for two metric lines and their bar (same 75 dp) when there is nothing to show. */
+@Composable
+private fun MetricEmpty(text: String, height: Dp = 75.dp) {
+    val c = LocalHomeColors.current
+    Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.CenterStart) {
+        Text(ht(text), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Two [MetricLine]s without a bar (2 × 30 dp): the WAN and 网速 cards keep their height when empty. */
+private val MetricEmptyShort = 60.dp
 
 /* ------------------------------------------------------------------ */
 /*  Sheets that belong to the home page                                 */
@@ -673,7 +807,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
 
 /** 启动失败: the error text can be copied; two exits, open the config or try again. */
 @Composable
-internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onViewConfig: () -> Unit, onRetry: () -> Unit) {
+internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onViewConfig: () -> Unit, onRetry: () -> Unit) =
+    HomeStartFailedSheetContent(detail, null, onCopy, onViewConfig, onRetry, {})
+
+/**
+ * Audit G1: the same sheet; with a [lastGood] copy it also offers 「用上次可启动的版本启动」, which starts
+ * from that copy and leaves the source file as it is. Without one the sheet is exactly the one above.
+ */
+@Composable
+internal fun HomeStartFailedSheetContent(
+    detail: String,
+    lastGood: HomeLastGood?,
+    onCopy: () -> Unit,
+    onViewConfig: () -> Unit,
+    onRetry: () -> Unit,
+    onStartLastGood: () -> Unit,
+) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     HomeSheetContent(
@@ -685,12 +834,26 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(HomeIcons.Copy, null, Modifier.size(20.dp), tint = c.accent)
-                Text(ht("复制"), color = c.accent, style = HomeType.button)
+                Text(ht("复制"), color = c.accentText, style = HomeType.button)
             }
         },
         footer = {
             HomeButton("查看配置", onViewConfig, Modifier.weight(1f), kind = HomeButtonKind.Soft)
             HomeButton("重新启动", onRetry, Modifier.weight(1f), kind = HomeButtonKind.Primary)
         },
-    ) { HomeCodeBox(detail, caption = "错误详情") }
+    ) {
+        HomeCodeBox(detail, caption = "错误详情")
+        if (lastGood != null) {
+            HomeSheetGroup(Modifier.padding(top = 10.dp)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        ht("上次可启动：%s").fill(listOf(lastGood.config, lastGood.savedText).filter { it.isNotBlank() }.joinToString(" · ")),
+                        color = c.t2, style = HomeType.rowSub,
+                    )
+                    Text(ht("只用于这次启动，不会修改当前配置文件"), color = c.t3, style = HomeType.caption)
+                    HomeButton("用上次可启动的版本启动", onStartLastGood, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft, tinted = true)
+                }
+            }
+        }
+    }
 }

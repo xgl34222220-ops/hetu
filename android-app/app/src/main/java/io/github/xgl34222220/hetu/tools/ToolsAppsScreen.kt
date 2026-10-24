@@ -181,7 +181,7 @@ internal fun ToolsAppsScreen(
                 ToolsFooterBar {
                     Text(ht("已选"), color = c.t1, style = HomeType.noteStrong)
                     Spacer(Modifier.width(6.dp))
-                    HomeRollingText(state.selectedCount.toString(), c.accent, HomeType.value.copy(fontWeight = FontWeight.Bold), alignment = Alignment.Center)
+                    HomeRollingText(state.selectedCount.toString(), c.accentText, HomeType.value.copy(fontWeight = FontWeight.Bold), alignment = Alignment.Center)
                     Spacer(Modifier.width(6.dp))
                     Text(ht("个"), color = c.t1, style = HomeType.noteStrong)
                     Text("  ·  ", color = c.t3, style = HomeType.note)
@@ -228,7 +228,7 @@ private fun AppRow(
         }
         if (app.uid >= 0) {
             Spacer(Modifier.width(10.dp))
-            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1)
+            Text("#${app.uid}", color = c.accentText, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(12.dp))
         ToolsCheckCircle(checked)

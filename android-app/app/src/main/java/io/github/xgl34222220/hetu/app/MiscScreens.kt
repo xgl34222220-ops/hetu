@@ -68,9 +68,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.HomePill
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.homeFloat
 import io.github.xgl34222220.hetu.home.homeRowPressTint
@@ -380,7 +382,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                                 }
                                 if (!status.runtimeReady) {
                                     Spacer(Modifier.width(8.dp))
-                                    HxPill(ht("仅下载管理"), HxTone.Neutral)
+                                    HxPill(ht("暂不支持运行"), HxTone.Neutral)
                                 }
                             }
                             Text(
@@ -437,7 +439,8 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                             },
                             icon = Icons.Rounded.FileOpen,
                             filled = false,
-                            enabled = working == null,
+                            // A core the Root runtime cannot start is not imported either; the card says why.
+                            enabled = working == null && status.runtimeReady,
                             modifier = Modifier.weight(1f),
                         )
                         if (status.downloaded) {
@@ -492,9 +495,14 @@ internal fun AboutScreen(vm: HetuViewModel) {
     val scope = rememberCoroutineScope()
     val c = LocalHomeColors.current
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val revision = remember {
-        runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+    // Asset and file reads stay off the main thread; the row fills in once they are known.
+    val bundled by produceState(HxBundledCoreInfo(), context) {
+        value = withContext(Dispatchers.IO) { HxBundledCoreVersion.read(context, vm.prefs) }
     }
+    val revision = bundled.revision
+    // Audit4 U12: a version people can read first, the source revision second.
+    val coreVersion = HxBundledCoreVersion.versionFor(bundled, vm.coreVersion)
+    LaunchedEffect(bundled, vm.coreVersion) { HxBundledCoreVersion.remember(vm.prefs, bundled, vm.coreVersion) }
 
     fun openAsset(title: String, path: String) {
         scope.launch {
@@ -502,6 +510,34 @@ internal fun AboutScreen(vm: HetuViewModel) {
                 runCatching { context.assets.open(path).bufferedReader().use { it.readText() } }.getOrElse { it.message ?: "读取失败" }
             }
             sheet = title to text
+        }
+    }
+
+    // Audit4 G9: 检查更新 runs only when tapped; a newer release adds 打开发布页 (no in-app install).
+    var updateChecking by remember { mutableStateOf(false) }
+    var updateStatus by remember { mutableStateOf<String?>(null) }
+    var updateRelease by remember { mutableStateOf<HetuUpdateCheck.Release?>(null) }
+    fun checkUpdate() {
+        if (updateChecking) return
+        updateChecking = true
+        scope.launch {
+            try {
+                val release = HetuUpdateCheck.fetchLatest()
+                if (HetuUpdateCheck.isNewer(release.version, BuildConfig.VERSION_NAME)) {
+                    updateRelease = release
+                    updateStatus = null
+                } else {
+                    updateRelease = null
+                    updateStatus = "已是最新版本"
+                }
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                updateRelease = null
+                updateStatus = if (error is HetuUpdateCheck.NoRelease) "还没有发布版本" else hxErrorMessage(error, "检查更新失败")
+            } finally {
+                updateChecking = false
+            }
         }
     }
 
@@ -562,8 +598,17 @@ internal fun AboutScreen(vm: HetuViewModel) {
         item(key = "info") {
             SettingsSection {
                 SettingsGroup(title = ht("信息")) {
-                    SettingsRow(ht("内置核心"), subtitle = "Mihomo", icon = ToolsIcons.Cpu) {
-                        if (revision.isNotBlank()) Text(revision.take(12), color = c.t3, style = HomeType.mono.copy(fontSize = 12.sp), maxLines = 1)
+                    SettingsRow(
+                        ht("内置核心"),
+                        subtitle = if (revision.isBlank()) "Mihomo" else "Mihomo · " + ht("修订 %s").fill(revision.take(7)),
+                        icon = ToolsIcons.Cpu,
+                    ) {
+                        Text(
+                            coreVersion.ifBlank { ht("启动后显示版本") },
+                            color = if (coreVersion.isBlank()) c.t3 else c.t2,
+                            style = if (coreVersion.isBlank()) HomeType.caption else HomeType.value.copy(fontWeight = FontWeight.Medium),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
                     }
                     SettingsDivider()
                     SettingsRow(ht("运行目录"), subtitle = "/data/adb/hetu", icon = ToolsIcons.Folder)
@@ -578,6 +623,33 @@ internal fun AboutScreen(vm: HetuViewModel) {
                     SettingsNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = HxIcons.Scale) { openAsset("AdGuard", "ADGUARD-LICENSE") }
                     SettingsDivider()
                     SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = HxIcons.Scale) { openAsset("Lucide", "licenses/lucide.txt") }
+                    SettingsDivider()
+                    SettingsNavRow("china-operator-ip", subtitle = "MIT · CNIP", icon = HxIcons.Scale) { openAsset("china-operator-ip", "licenses/china-operator-ip.txt") }
+                }
+            }
+        }
+        item(key = "update") {
+            SettingsSection {
+                SettingsGroup(title = ht("更新")) {
+                    val release = updateRelease
+                    SettingsNavRow(
+                        ht("检查更新"),
+                        subtitle = when {
+                            updateChecking -> ht("正在检查…")
+                            release != null -> ht("发现新版本 %s").fill(release.version)
+                            updateStatus != null -> ht(updateStatus!!)
+                            else -> ht("当前版本 %s").fill(BuildConfig.VERSION_NAME)
+                        },
+                        icon = HomeIcons.RefreshCw,
+                    ) { checkUpdate() }
+                    if (release != null) {
+                        SettingsDivider()
+                        SettingsNavRow(ht("打开发布页"), subtitle = release.name, icon = ToolsIcons.Link) {
+                            runCatching {
+                                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(release.url)))
+                            }.onFailure { vm.toast("没有可打开链接的应用") }
+                        }
+                    }
                 }
             }
         }
