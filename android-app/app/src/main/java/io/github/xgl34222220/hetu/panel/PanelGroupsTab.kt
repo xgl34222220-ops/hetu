@@ -30,10 +30,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -201,20 +204,20 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
     val title: @Composable (Modifier) -> Unit = { m ->
         Column(m) {
             Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = if (compact || wide) 1 else 2, overflow = TextOverflow.Ellipsis)
-            Text(group.summary, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // 7.0.0: type · count is never cut to "URLTe…"; it fades out only when it truly overflows.
+            PanelFadingLine(group.summary, c.t2, PanelType.groupSummary)
         }
     }
     val current: @Composable (Modifier) -> Unit = { m ->
         val nodeName: @Composable (Modifier) -> Unit = { nameModifier ->
-            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 HomeFlag(region, height = 16.dp)
-                Text(
-                    panelHighlight(currentName, view.needle), Modifier.weight(1f, fill = !wide || separateCurrent),
-                    color = c.t1, style = PanelType.groupNow, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                // 7.0.0: the current node takes all remaining width and fades at the edge
+                // instead of an early ellipsis; the latency pill next to it is compact.
+                PanelFadingLine(panelHighlight(currentName, view.needle), c.t1, PanelType.groupNow, Modifier.weight(1f))
                 if (!separateCurrent) PanelSwapFade(pending != null, motion) { busy ->
                     if (busy) Box(Modifier.size(40.dp), contentAlignment = Alignment.BottomEnd) { HomeSpinner(size = 16.dp) }
-                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
+                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组", compact = true)
                 }
             }
         }
@@ -236,7 +239,7 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
         Row(shell, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GroupTile(group)
             title(Modifier.weight(1f))
-            current(Modifier.weight(1f, fill = false))
+            current(Modifier.weight(1.25f))
         }
     } else {
         Column(shell, verticalArrangement = Arrangement.spacedBy(if (compactInline) 4.dp else if (compact) 6.dp else 12.dp)) {
@@ -248,6 +251,37 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
         }
     }
 }
+
+/**
+ * One line that is clipped with a short trailing fade, only when it really overflows, instead of
+ * an ellipsis that ate the end of short labels. The full text stays in semantics.
+ */
+@Composable
+private fun PanelFadingLine(text: androidx.compose.ui.text.AnnotatedString, color: Color, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
+    var overflow by remember(text) { mutableStateOf(false) }
+    Text(
+        text, modifier.then(if (overflow) Modifier.panelTrailingFade() else Modifier),
+        color = color, style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+        onTextLayout = { layout -> overflow = layout.hasVisualOverflow },
+    )
+}
+
+@Composable
+private fun PanelFadingLine(text: String, color: Color, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) =
+    PanelFadingLine(androidx.compose.ui.text.AnnotatedString(text), color, style, modifier)
+
+private fun Modifier.panelTrailingFade(width: androidx.compose.ui.unit.Dp = 18.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = width.toPx().coerceAtMost(size.width / 2f)
+        drawRect(
+            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                listOf(Color.Black, Color.Transparent), startX = size.width - fade, endX = size.width,
+            ),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }
 
 /** The configured image supplied by the adapter takes precedence over the region flag and the type mark. */
 @Composable

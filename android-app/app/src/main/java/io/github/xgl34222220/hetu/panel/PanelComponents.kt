@@ -424,7 +424,7 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
  * only and gets a comfortable touch box that grows up and to the left of it.
  */
 @Composable
-internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速") {
+internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速", compact: Boolean = false) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val motion = LocalHomeMotionEnabled.current
@@ -458,7 +458,7 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
     }
     val capsule: @Composable () -> Unit = {
         Row(
-            Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = 10.dp),
+            Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = if (compact) 7.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
