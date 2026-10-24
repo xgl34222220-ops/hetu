@@ -101,14 +101,9 @@ final class MihomoControllerClient {
     }
 
     private void addDelayUrls(ArrayList<String> urls,String preferredUrl){
-        String custom=customDelayUrl();
-        if(!custom.isEmpty())urls.add(custom);
-        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
-            String preferred=preferredUrl.trim();
-            if(!urls.contains(preferred))urls.add(preferred);
-        }else{
-            for(String item:DEFAULT_DELAY_URLS)if(!urls.contains(item))urls.add(item);
-        }
+        // 7.0.0: a Cloudflare group URL gets gstatic after it (edgetunnel nodes cannot reach CF).
+        for(String item:DelayUrlChoice700.delayUrls(customDelayUrl(),preferredUrl,DEFAULT_DELAY_URLS))
+            if(!urls.contains(item))urls.add(item);
     }
 
     JSONObject proxies()throws Exception{
@@ -223,7 +218,8 @@ final class MihomoControllerClient {
             ArrayList<String> urls=new ArrayList<>();
             addDelayUrls(urls,preferredUrl);
             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
-            for(String rawUrl:urls){
+            for(int urlIndex=0;urlIndex<urls.size();urlIndex++){
+                String rawUrl=urls.get(urlIndex);
                 budget.check();
                 try{
                     String test=URLEncoder.encode(rawUrl,"UTF-8");
@@ -238,6 +234,8 @@ final class MihomoControllerClient {
                 }catch(ControllerHttpException error){
                     // A core-confirmed timeout already spent the whole 5 s window on this node.
                     // Retrying the next default URL only doubled the dead-node cost of a wave.
+                    // 7.0.0 exception: a Cloudflare target timing out still tries the gstatic fallback.
+                    if(error.statusCode==504&&urlIndex+1<urls.size()&&DelayUrlChoice700.isCloudflareTarget(rawUrl)){last=new DelayFailure(true);continue;}
                     if(error.statusCode==504)throw new DelayFailure(true);
                     else if(error.statusCode==503)last=new DelayFailure(false);
                     else throw error;
@@ -286,6 +284,11 @@ final class MihomoControllerClient {
     }
 
     /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
+    /** 7.0.0: URL for the failed-node retry (gstatic instead of a Cloudflare group URL). */
+    String retryDelayUrl(String groupUrl){
+        return DelayUrlChoice700.retryUrl(customDelayUrl(),groupUrl,DEFAULT_DELAY_URLS[0]);
+    }
+
     String waveDelayUrl(String groupUrl){
         String custom=customDelayUrl();
         if(!custom.isEmpty())return custom;

@@ -575,7 +575,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      */
     suspend fun retryDelays(group: ProxyGroupUi, nodes: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
         if (nodes.isEmpty()) return@withContext emptyMap()
-        val url = api.waveDelayUrl(group.testUrl)
+        val url = api.retryDelayUrl(group.testUrl)
         val slots = kotlinx.coroutines.sync.Semaphore(io.github.xgl34222220.hetu.panel.RETRY_DELAY_CONCURRENCY_700)
         coroutineScope {
             nodes.distinct().map { node ->
