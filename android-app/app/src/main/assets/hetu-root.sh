@@ -260,6 +260,29 @@ TUN_RULE_PREF_MAX=9099
 FAILOPEN_STATE="$RUN/failopen-state"
 FAILOPEN_TEXT='检测到整机断网，河图已自动退出并恢复系统网络'
 WD_FAILOPEN_FAST=60
+# 7.0.0 bounded auto-resume (field report 2026-10-24: "突然自己关了，然后一直启动不了"): after a watchdog fail-open the
+# user still wants the proxy (only an explicit stop / force-stop says otherwise: it disarms FAILOPEN_RESUME and
+# ends the worker). A detached failopen-resume worker waits until the physical network is back (a default-network
+# rule, a real interface route, both for WD_RESUME_STABLE s on end, then a DIRECT 204 outside Hetu) and starts the
+# recorded session once: not before WD_RESUME_HOLDOFF s after the fail-open, at most WD_RESUME_MAX per boot
+# (FAILOPEN_RESUMES), for at most WD_RESUME_WINDOW s. A failed resumed start leaves the network clean and the
+# worker stops. A manual start clears the fail-open record and the worker then exits on its own.
+FAILOPEN_RESUME="$RUN/state/failopen-resume"
+# 7.0.0 soft-pass (same field report: the outage began exactly when wlan0 changed subnet/netId): before a fail-open
+# the watchdog lifts only the DNS takeover hooks (nat OUTPUT -> HETU_DNSOUT, v4/v6) and the DoT guard hook
+# (filter OUTPUT -> HETU_DOTOUT), core and every other rule kept, so the new network's validation DNS never
+# depends on the core. Re-hooked (at their old positions) as soon as a default network exists and the Wi-Fi is
+# validated, or after WD_SOFTPASS_MAX s when no outage is left (WD_SOFTPASS_CAP s at most). The fail-open
+# waits WD_SOFTPASS_MAX s of soft-pass first. SOFTPASS_STATE: "<core pid> <uptime>" then "<bin> <table> <chain> <pos>".
+SOFTPASS_STATE="$RUN/state/softpass"
+WD_SOFTPASS_MAX=45
+WD_SOFTPASS_CAP=90
+FAILOPEN_RESUMES="$RUN/state/failopen-resumes"
+WD_RESUME_MAX=2
+WD_RESUME_HOLDOFF=120
+WD_RESUME_STABLE=20
+WD_RESUME_POLL=5
+WD_RESUME_WINDOW=3600
 WD_FAILOPEN_AFTER=150
 WD_FAILOPEN_HEAL_MAX=240
 # Boot grace: an automatic start early in a boot (service.d restore or App boot recovery, uptime below
@@ -290,12 +313,75 @@ has(){ command -v "$1" >/dev/null 2>&1; }
 xt4(){
   transaction_current || return 1
   if [ "$XT_BATCH" = 1 ]; then xt_record 4 "$@"; return; fi
-  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 iptables -w 2 "$@"; else command iptables -w 2 "$@"; fi
+  xt_exec iptables "$@"; X4_RC=$?
+  [ "$X4_RC" != 0 ] || return 0
+  xt_reclaim_new iptables "$X4_RC" "$@"
 }
 xt6(){
   transaction_current || return 1
   if [ "$XT_BATCH" = 1 ]; then xt_record 6 "$@"; return; fi
-  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 ip6tables -w 2 "$@"; else command ip6tables -w 2 "$@"; fi
+  xt_exec ip6tables "$@"; X6_RC=$?
+  [ "$X6_RC" != 0 ] || return 0
+  xt_reclaim_new ip6tables "$X6_RC" "$@"
+}
+# 7.0.0 (field report 2026-10-24, OnePlus PLK110 / ColorOS, KernelSU: Wi-Fi 192.168.2.158 -> 192.168.1.141, fail-open,
+# then every start failed "IPv6 禁用保护安装失败" with HETU_V6OUT/HETU_DOTOUT left complete and hooked from OUTPUT):
+# right after a network change netd holds the xtables lock in bursts, a command fails on it (exit 4,
+# nothing committed) and the rollback's removals fail the same way. One call stays bounded (timeout during a
+# start, -w 2); a lock failure is retried twice, ~1 s apart, while the transaction is still current.
+xt_exec(){
+  XE_BIN="$1"; shift; XE_TRY=0
+  while :; do
+    if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 "$XE_BIN" -w 2 "$@"; else command "$XE_BIN" -w 2 "$@"; fi
+    XE_RC=$?
+    { [ "$XE_RC" = 4 ] && [ "$XE_TRY" -lt 2 ]; } || return "$XE_RC"
+    XE_TRY=$((XE_TRY+1)); sleep 1
+    transaction_current || return "$XE_RC"
+  done
+}
+# A failed "-t <table> -N <HETU chain>" whose chain is already there (a leftover a failed rollback or a
+# command killed after its commit left behind) is reclaimed instead of failing the start: every jump to it
+# from a builtin chain goes (repeated while one is left, bounded), the chain is flushed, and the caller then
+# adds its rules and its single hook again. The Kill Switch chains (kept hooked across starts on purpose)
+# and anything that is not Hetu's keep the failure. $1 binary, $2 status of the failed call, then its args.
+xt_reclaim_new(){
+  XRN_BIN="$1"; XRN_RC="$2"; shift 2
+  [ "$#" = 4 ] && [ "$1" = -t ] && [ "$3" = -N ] || return "$XRN_RC"
+  XRN_T="$2"; XRN_C="$4"
+  case "$XRN_C" in HETU_KOUT*|HETU_KFWD*) return "$XRN_RC";; HETU_*) ;; *) return "$XRN_RC";; esac
+  xt_exec "$XRN_BIN" -t "$XRN_T" -S "$XRN_C" >/dev/null 2>&1 || return "$XRN_RC"
+  xt_unhook_builtin "$XRN_BIN" "$XRN_T" "$XRN_C" || return "$XRN_RC"
+  xt_exec "$XRN_BIN" -t "$XRN_T" -F "$XRN_C" >/dev/null 2>&1 || return "$XRN_RC"
+  wd_log "start: reclaimed leftover $XRN_BIN $XRN_T chain $XRN_C (unhooked, flushed)"
+  return 0
+}
+# Deletes every jump to chain $3 from the builtin chains of table $2 ($1 binary). 1 when one is still there.
+xt_unhook_builtin(){
+  XUB_BIN="$1"; XUB_T="$2"; XUB_C="$3"
+  for XUB_B in OUTPUT PREROUTING FORWARD INPUT POSTROUTING; do
+    XUB_N=0
+    while [ "$XUB_N" -lt 8 ] && xt_exec "$XUB_BIN" -t "$XUB_T" -C "$XUB_B" -j "$XUB_C" >/dev/null 2>&1; do
+      xt_exec "$XUB_BIN" -t "$XUB_T" -D "$XUB_B" -j "$XUB_C" >/dev/null 2>&1 || break
+      XUB_N=$((XUB_N+1))
+    done
+  done
+  # Hooks with matches ("-A OUTPUT -o wlan0 -j HETU_X") are not found by -C above: delete their exact -S lines.
+  XUB_RULES=$(xt_exec "$XUB_BIN" -t "$XUB_T" -S 2>/dev/null) || return 1
+  XUB_LEFT=$(printf '%s\n' "$XUB_RULES" | awk -v c="$XUB_C" '$1 == "-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD|INPUT|POSTROUTING)$/ {
+      for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && $(i+1) == c) { line = $0; sub(/^-A /, "-D ", line); print line; break } }')
+  [ -n "$XUB_LEFT" ] || return 0
+  while IFS= read -r XUB_L; do
+    case "$XUB_L" in ''|*\"*|*\'*|*\\*) continue;; esac
+    case $- in *f*) XUB_GLOB=1;; *) XUB_GLOB=0; set -f;; esac
+    # shellcheck disable=SC2086
+    xt_exec "$XUB_BIN" -t "$XUB_T" $XUB_L >/dev/null 2>&1 || true
+    [ "$XUB_GLOB" = 1 ] || set +f
+  done <<EOF_XUB
+$XUB_LEFT
+EOF_XUB
+  XUB_RULES=$(xt_exec "$XUB_BIN" -t "$XUB_T" -S 2>/dev/null) || return 1
+  ! printf '%s\n' "$XUB_RULES" | awk -v c="$XUB_C" '$1 == "-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD|INPUT|POSTROUTING)$/ {
+      for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && $(i+1) == c) { found = 1 } } END { exit !found }'
 }
 # Batched rule installation: append-style rules are recorded per family/table and then
 # committed with one iptables-restore --noflush per table (a handful of processes instead of
@@ -320,8 +406,31 @@ xt_batch_begin(){
   mkdir -p "$XT_BATCH_DIR"
 }
 xt_restore(){
-  # $1 restore binary; rules on stdin.
-  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 5 "$1" -w 2 --noflush; else "$1" -w 2 --noflush; fi
+  # $1 restore binary; rules on stdin. 7.0.0: stdin is kept so a lock failure (exit 4, nothing
+  # committed) can be retried twice, ~1 s apart, like xt_exec.
+  XRS_IN=$(cat); XRS_TRY=0
+  while :; do
+    if [ "$START_ACTIVE" = 1 ]; then printf '%s\n' "$XRS_IN" | timeout -s TERM -k 1 5 "$1" -w 2 --noflush; else printf '%s\n' "$XRS_IN" | "$1" -w 2 --noflush; fi
+    XRS_RC=$?
+    { [ "$XRS_RC" = 4 ] && [ "$XRS_TRY" -lt 2 ]; } || return "$XRS_RC"
+    XRS_TRY=$((XRS_TRY+1)); sleep 1
+    transaction_current || return "$XRS_RC"
+  done
+}
+# 7.0.0: a batch "-N <chain>" fails the whole table's restore when the chain is a leftover. Before the one
+# retry of a refused table: every such chain is reclaimed (xt_reclaim_new) and its -N line dropped.
+# 0 when at least one leftover was reclaimed (the table is worth one more restore).
+xt_batch_reclaim(){
+  XBR_BIN=iptables; [ "$1" = 4 ] || XBR_BIN=ip6tables
+  XBR_RULES=$(xt_exec "$XBR_BIN" -t "$2" -S 2>/dev/null) || return 1
+  XBR_DONE=1
+  for XBR_C in $(awk '$1 == "-N" && $2 ~ /^HETU_/ {print $2}' "$3"); do
+    printf '%s\n' "$XBR_RULES" | grep -Fxq -- "-N $XBR_C" || continue
+    xt_reclaim_new "$XBR_BIN" 1 -t "$2" -N "$XBR_C" || return 1
+    awk -v c="$XBR_C" '!($1 == "-N" && $2 == c && NF == 2)' "$3" > "$3.r" && mv -f "$3.r" "$3" || return 1
+    XBR_DONE=0
+  done
+  return "$XBR_DONE"
 }
 xt_batch_commit(){
   [ -n "$XT_BATCH_DIR" ] && [ -d "$XT_BATCH_DIR" ] || return 0
@@ -331,6 +440,8 @@ xt_batch_commit(){
       XB_FILE="$XT_BATCH_DIR/$XB_F-$XB_T"; [ -s "$XB_FILE" ] || continue
       XB_RESTORE=iptables-restore; [ "$XB_F" = 4 ] || XB_RESTORE=ip6tables-restore
       if ! has "$XB_RESTORE" || ! transaction_current; then XB_RC=1; break 2; fi
+      { printf '*%s\n' "$XB_T"; cat "$XB_FILE"; printf 'COMMIT\n'; } | xt_restore "$XB_RESTORE" >/dev/null 2>&1 && continue
+      xt_batch_reclaim "$XB_F" "$XB_T" "$XB_FILE" || { XB_RC=1; break 2; }
       { printf '*%s\n' "$XB_T"; cat "$XB_FILE"; printf 'COMMIT\n'; } | xt_restore "$XB_RESTORE" >/dev/null 2>&1 || { XB_RC=1; break 2; }
     done
   done
@@ -454,7 +565,7 @@ rollback_start(){
     # Capture routes stay intact if a strict guard cannot be confirmed.
     [ "$RB_FAILED" != 0 ] || cleanup
   else
-    cleanup_confirmed || RB_FAILED=1
+    cleanup_confirmed || { RB_FAILED=1; guard_force_remove; }
   fi
   restorev6 || RB_FAILED=1
   net_sysctl_restore; cgroup_release
@@ -462,6 +573,39 @@ rollback_start(){
     printf '%s\n' 'rollback-incomplete' > "$RUN/rollback-state"
   fi
   START_ACTIVE=0
+}
+
+# 7.0.0: a rollback whose cleanup could not be confirmed (xtables lock, timeouts, the 20 s rollback clock)
+# must not leave the guards that block every app behind: the IPv6-disable guard (HETU_V6OUT/HETU_V6FWD) and
+# the DoT guard (HETU_DOTOUT). One bounded command at a time (fx), outside the transaction clock, a lock
+# failure retried twice; only what one `-S` still shows. The next start reclaims anything left anyway.
+guard_force_remove(){
+  for GFR_BIN in ip6tables iptables; do
+    has "$GFR_BIN" || continue
+    GFR_RULES=$(fx "$GFR_BIN" -w 2 -t filter -S 2>/dev/null) || GFR_RULES="-N $V6OUT
+-N $V6FWD
+-N $DOTOUT"
+    for GFR_C in "$V6OUT" "$V6FWD" "$DOTOUT"; do
+      [ "$GFR_BIN" = ip6tables ] || [ "$GFR_C" = "$DOTOUT" ] || continue
+      printf '%s\n' "$GFR_RULES" | grep -Fxq -- "-N $GFR_C" || continue
+      for GFR_B in OUTPUT FORWARD; do
+        GFR_N=0
+        while [ "$GFR_N" -lt 4 ] && guard_force_xt "$GFR_BIN" -D "$GFR_B" -j "$GFR_C"; do GFR_N=$((GFR_N+1)); done
+      done
+      guard_force_xt "$GFR_BIN" -F "$GFR_C" || true
+      if guard_force_xt "$GFR_BIN" -X "$GFR_C"; then wd_log "rollback: removed $GFR_BIN guard $GFR_C after an unconfirmed cleanup"
+      else wd_log "rollback: $GFR_BIN guard $GFR_C could not be removed; the next start reclaims it"; fi
+    done
+  done
+  return 0
+}
+guard_force_xt(){
+  GFX_BIN="$1"; shift; GFX_TRY=0
+  while :; do
+    fx "$GFX_BIN" -w 2 -t filter "$@" >/dev/null 2>&1; GFX_RC=$?
+    { [ "$GFX_RC" = 4 ] && [ "$GFX_TRY" -lt 2 ]; } || return "$GFX_RC"
+    GFX_TRY=$((GFX_TRY+1)); sleep 1
+  done
 }
 
 acquire_lock(){
@@ -1094,7 +1238,7 @@ force_teardown(){
   if has ipset; then for FTD_S in "$CN_SET4" "$CN_SET6" hetu_cn4_new hetu_cn6_new hetu_probe; do fx ipset destroy "$FTD_S" >/dev/null 2>&1 || true; done; fi
   restorev6 >/dev/null 2>&1 || true
   net_sysctl_restore; cgroup_release
-  rm -f "$SESSION" "$NET_STATE" "$RUN/egress-state" "$RUN/fake-reject" 2>/dev/null
+  rm -f "$SESSION" "$NET_STATE" "$RUN/egress-state" "$RUN/fake-reject" "$SOFTPASS_STATE" 2>/dev/null
   FORCE_LEFT=$(force_left)
   wd_log "force-stop ($1): ended ${FORCE_KILLED:-no other} Hetu process(es), core ${FORCE_CORES:-none}; ${FORCE_LEFT:+still left: $FORCE_LEFT}${FORCE_LEFT:-network clean (no Hetu hook, chain or policy rule)}"
   [ -z "$FORCE_LEFT" ]
@@ -1104,6 +1248,7 @@ force_teardown(){
 # $RUN/stop-result tells the dispatcher (whose shielded child this is) which way it ended.
 stop_transaction_bounded(){
   rm -f "$RUN/stop-result" 2>/dev/null
+  failopen_resume_disarm
   ( stop_transaction; SBT_RC=$?; release_lock; exit "$SBT_RC" ) </dev/null >/dev/null 2>&1 &
   SB_CHILD=$!
   SB_N=0; SB_LIMIT=$((STOP_FORCE_AFTER*10))
@@ -1124,6 +1269,7 @@ stop_transaction_bounded(){
 # force_teardown plus the result line; fails only when a core survived SIGKILL.
 force_stop_run(){
   rm -f "$RUN/stop-result" 2>/dev/null
+  [ "$1" = failopen-resume ] || failopen_resume_disarm
   force_teardown "$1"
   printf 'forced %s\n' "${FORCE_LEFT:-clean}" > "$RUN/stop-result" 2>/dev/null
   # Resolver caches and NetworkMonitor, as after a normal stop (Android only, detached).
@@ -2850,9 +2996,11 @@ install_v6_disable(){
   xt6 -t filter -N "$V6OUT" || return 1
   xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1
   xt6 -t filter -A "$V6OUT" -p ipv6-icmp -j RETURN || return 1
+  # 7.0.0: system UIDs (the resolver, NetworkMonitor's validation, netd) before the port-53 REJECTs: a new
+  # Wi-Fi whose validation DNS goes over IPv6 must not be refused (field report 2026-10-24, Wi-Fi change).
+  xt6 -t filter -A "$V6OUT" -m owner --uid-owner 0-9999 -j RETURN || return 1
   xt6 -t filter -A "$V6OUT" -p udp --dport 53 -j REJECT || return 1
   xt6 -t filter -A "$V6OUT" -p tcp --dport 53 -j REJECT || return 1
-  xt6 -t filter -A "$V6OUT" -m owner --uid-owner 0-9999 -j RETURN || return 1
   xt6 -t filter -A "$V6OUT" -j REJECT || return 1
   xt6 -t filter -I OUTPUT 1 -j "$V6OUT" || return 1
   if [ "$V6_SHARE" = 1 ]; then
@@ -3301,6 +3449,7 @@ wd_selfheal_init(){
   WD_OFF_N=0; WD_OFF_NEXT=0; WD_OFF_SINCE=0; WD_OFF_LAST=0; WD_OFF_HEAL_AT=0; WD_FO_HELD=0; WD_CACHE_SEEN=0; WD_STALL_AT=$((WD_NOW+WD_STALL_EVERY)); WD_PIN_TTL="$WD_STALL_PIN_TTL"
   WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
   WD_BOOT_GRACE_UNTIL=0; WD_BOOT_GRACE_LOGGED=0
+  WD_SP_TRIED=x; WD_SP_CHECK_AT=0; WD_NET_CHANGED_AT=0; rm -f "${SOFTPASS_STATE:-$RUN/state/softpass}" 2>/dev/null
   WD_BG_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
   if [ -n "$WD_BG_BOOT" ] && [ "$(cat "${BOOT_GRACE_STATE:-$RUN/state/boot-grace}" 2>/dev/null)" = "$WD_BG_BOOT" ]; then
     WD_BOOT_GRACE_UNTIL=$((WD_NOW+${WD_BOOT_GRACE:-300}))
@@ -3335,7 +3484,7 @@ wd_net_sig(){ ip -o -4 addr show scope global 2>/dev/null | awk '{printf "%s=%s 
 wd_net_watch(){
   WNW_SIG=$(wd_net_sig)
   [ "$WNW_SIG" != "$WD_NET_SIG" ] || return 0
-  WD_NET_SIG="$WNW_SIG"; wd_now
+  WD_NET_SIG="$WNW_SIG"; wd_now; WD_NET_CHANGED_AT="$WD_NOW"
   wd_log "network change (${WNW_SIG:-offline}): re-checking core liveness"
   WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
   WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
@@ -3884,9 +4033,11 @@ wd_offline_seen(){
   # One outage = offline verdicts at most 300 s apart; an older start belongs to an outage that ended.
   if [ "${WD_OFF_SINCE:-0}" = 0 ] || [ $((WD_NOW-${WD_OFF_LAST:-0})) -gt 300 ]; then WD_OFF_SINCE="$WD_NOW"; WD_OFF_HEAL_AT=0; fi
   WD_OFF_LAST="$WD_NOW"
+  # 7.0.0 soft-pass first when the physical network changed / has no default network / is not validated.
+  softpass_on_offline "$1"
   # 7.0.0 fail-open: the outage outlasted the Wi-Fi heal (see FAILOPEN_STATE). wd_failopen exits the watchdog.
   if [ "${WD_OFF_HEAL_AT:-0}" != 0 ] && [ $((WD_NOW-WD_OFF_SINCE)) -ge "${WD_FAILOPEN_FAST:-60}" ]; then
-    if wd_failopen_due; then wd_failopen "$1"; return 0; fi
+    if wd_failopen_due; then softpass_holds "$1" && return 0; wd_failopen "$1"; return 0; fi
   fi
   WD_OFF_N=$((WD_OFF_N+1))
   [ "$WD_OFF_N" -ge "$WIFI_HEAL_OFFLINE_LIMIT" ] || return 0
@@ -3903,7 +4054,9 @@ wd_offline_seen(){
 wd_no_default_network(){
   WNDN=$(ip -4 rule show 2>/dev/null) || return 1
   [ -n "$WNDN" ] || return 1
-  ! printf '%s\n' "$WNDN" | grep -Eq '^22000:.*lookup '
+  printf '%s\n' "$WNDN" | grep -Eq '^22000:.*lookup ' && return 1
+  # Android 17 ColorOS: the default-network rule sits at pref 31000 ("fwmark 0x0/0xffff iif lo lookup <if>").
+  ! printf '%s\n' "$WNDN" | grep -v uidrange | grep -Eq 'fwmark 0x0/0xffff( iif lo)? lookup [A-Za-z0-9_.-]+'
 }
 # 0 when Hetu should end itself now (WD_FO_WHY says why). Called only once the outage has lasted
 # WD_FAILOPEN_FAST s and the Wi-Fi heal was started for it.
@@ -3933,6 +4086,104 @@ wd_failopen_due(){
   WFD_PID=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
   if [ -n "$WFD_PID" ] && kill -0 "$WFD_PID" 2>/dev/null && [ $((WD_NOW-WD_OFF_HEAL_AT)) -lt "${WD_FAILOPEN_HEAL_MAX:-240}" ]; then return 1; fi
   WD_FO_WHY="still offline ${WFD_AGE}s after the outage began, after the Wi-Fi heal"
+  return 0
+}
+# ---- 7.0.0 soft-pass (see SOFTPASS_STATE) -------------------------------------------------------------
+# 0 while this core's hooks are lifted (repair-network leaves them alone then). $1 core pid (default PIDFILE).
+softpass_active(){
+  SPA_P=""; SPA_AT=""
+  [ -r "$SOFTPASS_STATE" ] && read -r SPA_P SPA_AT SPA_REST < "$SOFTPASS_STATE" 2>/dev/null || return 1
+  [ "$SPA_P" = "${1:-$(cat "$PIDFILE" 2>/dev/null)}" ] || return 1
+  case "$SPA_AT" in ''|*[!0-9]*) return 1;; esac
+  fo_uptime; [ $((FOU-SPA_AT)) -lt $((${WD_SOFTPASS_CAP:-90}+30)) ]
+}
+# Lifts the hooks (under the transaction lock, skipped while a start/stop owns the rules).
+# 0 = lifted (SOFTPASS_STATE written), 1 = nothing to lift or busy.
+softpass_lift(){ (
+  trap 'release_lock' EXIT
+  try_lock_once || exit 1
+  SPL_LIST=""
+  for SPL_E in "iptables nat $DNSOUT" "ip6tables nat $DNSOUT" "iptables filter $DOTOUT" "ip6tables filter $DOTOUT"; do
+    set -- $SPL_E
+    has "$1" || continue
+    SPL_POS=$(xt_exec "$1" -t "$2" -S OUTPUT 2>/dev/null | awk -v h="-A OUTPUT -j $3" '$1 == "-A" { n++; if ($0 == h) { print n; exit } }')
+    [ -n "$SPL_POS" ] || continue
+    SPL_N=0
+    while [ "$SPL_N" -lt 4 ] && xt_exec "$1" -t "$2" -C OUTPUT -j "$3" >/dev/null 2>&1; do
+      xt_exec "$1" -t "$2" -D OUTPUT -j "$3" >/dev/null 2>&1 || break; SPL_N=$((SPL_N+1))
+    done
+    [ "$SPL_N" = 0 ] || SPL_LIST="$SPL_LIST
+$1 $2 $3 $SPL_POS"
+  done
+  [ -n "$SPL_LIST" ] || exit 1
+  mkdir -p "$RUN/state" 2>/dev/null
+  printf '%s %s%s\n' "$COREPID" "$WD_NOW" "$SPL_LIST" > "$SOFTPASS_STATE" || exit 1
+  exit 0
+) }
+# Puts every lifted hook back at its recorded position (never twice) and drops SOFTPASS_STATE. $1 why.
+softpass_restore(){
+  [ -r "$SOFTPASS_STATE" ] || return 0
+  SPR_LEFT=""
+  while read -r SPR_B SPR_T SPR_C SPR_POS; do
+    [ -n "$SPR_POS" ] || continue
+    case "$SPR_POS" in *[!0-9]*) SPR_POS=1;; esac
+    xt_exec "$SPR_B" -t "$SPR_T" -C OUTPUT -j "$SPR_C" >/dev/null 2>&1 && continue
+    xt_exec "$SPR_B" -t "$SPR_T" -S "$SPR_C" >/dev/null 2>&1 || continue
+    SPR_HAVE=$(xt_exec "$SPR_B" -t "$SPR_T" -S OUTPUT 2>/dev/null | grep -c '^-A ')
+    if [ "$SPR_POS" -le $((SPR_HAVE+1)) ]; then xt_exec "$SPR_B" -t "$SPR_T" -I OUTPUT "$SPR_POS" -j "$SPR_C" >/dev/null 2>&1
+    else xt_exec "$SPR_B" -t "$SPR_T" -A OUTPUT -j "$SPR_C" >/dev/null 2>&1; fi || SPR_LEFT="$SPR_LEFT $SPR_B/$SPR_T/$SPR_C"
+  done <<EOF_SPR
+$(sed -n '2,$p' "$SOFTPASS_STATE" 2>/dev/null)
+EOF_SPR
+  rm -f "$SOFTPASS_STATE"
+  wd_log "soft-pass ended ($1): DNS takeover and DoT guard hooks restored${SPR_LEFT:+; could not restore:$SPR_LEFT (repair-network retries)}"
+  return 0
+}
+softpass_begin(){
+  WD_SP_TRIED="${WD_OFF_SINCE:-0}"
+  softpass_active "$COREPID" && return 0
+  softpass_lift || return 1
+  wd_log "soft-pass: $1; DNS takeover and DoT guard hooks lifted for up to ${WD_SOFTPASS_MAX:-45}s (core and capture rules kept)"
+  return 0
+}
+# Offline verdict: soft-pass once per outage when the physical network changed recently, Android has no
+# default network, or the latest Wi-Fi check saw it not validated.
+softpass_on_offline(){
+  [ "${KILL:-0}" != 1 ] || return 0
+  [ "${WD_SP_TRIED:-x}" != "${WD_OFF_SINCE:-0}" ] || return 0
+  SPO_WHY=""
+  if ! failopen_resume_default_net; then SPO_WHY="no default network"
+  elif grep -q ' validated=0 ' "$RUN/state/wifi-check" 2>/dev/null; then SPO_WHY="Wi-Fi not validated"
+  elif [ "${WD_NET_CHANGED_AT:-0}" != 0 ] && [ $((WD_NOW-${WD_NET_CHANGED_AT:-0})) -le 120 ]; then SPO_WHY="network changed"; fi
+  [ -n "$SPO_WHY" ] || return 0
+  softpass_begin "$SPO_WHY ($1)" || true
+  return 0
+}
+# The fail-open is due: 0 (wait) while soft-pass has not had WD_SOFTPASS_MAX s for this outage; a soft-pass
+# not tried yet starts now. Otherwise WD_FO_WHY says that soft-pass did not help, and the fail-open goes on.
+softpass_holds(){
+  [ "${KILL:-0}" != 1 ] || return 1
+  if [ "${WD_SP_TRIED:-x}" != "${WD_OFF_SINCE:-0}" ]; then softpass_begin "fail-open due ($1)" && return 0; fi
+  softpass_active "$COREPID" || return 1
+  [ $((WD_NOW-SPA_AT)) -ge "${WD_SOFTPASS_MAX:-45}" ] || return 0
+  WD_FO_WHY="$WD_FO_WHY; soft-pass $((WD_NOW-SPA_AT))s did not help"
+  return 1
+}
+# Every watchdog tick while lifted: re-hook once the network is usable (default network, validated Wi-Fi or
+# no Wi-Fi at all), or once the window is over with no outage left; never later than WD_SOFTPASS_CAP s.
+wd_softpass_tick(){
+  [ -f "$SOFTPASS_STATE" ] || return 0
+  softpass_active "$COREPID" || { softpass_restore "stale"; return 0; }
+  SPT_AGE=$((WD_NOW-SPA_AT))
+  if [ "$SPT_AGE" -ge "${WD_SOFTPASS_CAP:-90}" ]; then softpass_restore "after ${SPT_AGE}s"; return 0; fi
+  if [ "$SPT_AGE" -ge "${WD_SOFTPASS_MAX:-45}" ] && { [ "${WD_OFF_SINCE:-0}" = 0 ] || [ $((WD_NOW-${WD_OFF_LAST:-0})) -gt 60 ]; }; then
+    softpass_restore "window over, no outage"; return 0
+  fi
+  [ "$WD_NOW" -ge "${WD_SP_CHECK_AT:-0}" ] || return 0
+  WD_SP_CHECK_AT=$((WD_NOW+6))
+  failopen_resume_default_net || return 0
+  SPT_NAI=$(timeout 8 dumpsys connectivity 2>/dev/null | wifi_nai)
+  if [ -z "$SPT_NAI" ] || [ "${SPT_NAI##* }" = 1 ]; then softpass_restore "default network${SPT_NAI:+, Wi-Fi validated}"; fi
   return 0
 }
 # Boot grace marker for this session's watchdog (see BOOT_GRACE_STATE). A self-heal restart keeps the
@@ -3995,8 +4246,153 @@ wd_failopen(){
   failopen_wifi
   sleep "${WIFI_HEAL_WAIT:-20}"
   net_recover "fail-open"
+  failopen_resume_arm "${WD_NOW:-}"
   rm -f "$RUN/watchdog.ready.$$" "${WD_TMP:-$RUN/.wd.$$}".* 2>/dev/null
   exit 0
+}
+# ---- 7.0.0 bounded auto-resume after a fail-open (see FAILOPEN_RESUME) ---------------------------------
+fo_uptime(){ FOU=0; read -r FOU FOU_REST < /proc/uptime 2>/dev/null || FOU=0; FOU=${FOU%%.*}; case "$FOU" in ''|*[!0-9]*) FOU=0;; esac; }
+# Auto-resumes already started in this boot (FAILOPEN_RESUMES "<boot> <count>").
+failopen_resume_count(){
+  FRC_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); FRC_B=""; FRC_N=0
+  [ ! -r "$FAILOPEN_RESUMES" ] || read -r FRC_B FRC_N < "$FAILOPEN_RESUMES" 2>/dev/null || true
+  case "$FRC_N" in ''|*[!0-9]*) FRC_N=0;; esac
+  [ -n "$FRC_BOOT" ] && [ "$FRC_B" = "$FRC_BOOT" ] || FRC_N=0
+  printf '%s\n' "$FRC_N"
+}
+# $1 the fail-open's uptime (WD_NOW). Arms the marker and spawns the worker (Android only), unless this boot's
+# resume budget is used up.
+failopen_resume_arm(){
+  [ "${KILL:-0}" != 1 ] || return 0
+  FRA_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); [ -n "$FRA_BOOT" ] || return 0
+  FRA_N=$(failopen_resume_count)
+  if [ "$FRA_N" -ge "${WD_RESUME_MAX:-2}" ]; then wd_log "fail-open: automatic resume budget used ($FRA_N in this boot); start Hetu manually"; return 0; fi
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  FRA_AT="$1"; case "$FRA_AT" in ''|*[!0-9]*) fo_uptime; FRA_AT="$FOU";; esac
+  mkdir -p "$RUN/state" 2>/dev/null || return 0
+  printf '%s %s\n' "$FRA_BOOT" "$FRA_AT" > "$FAILOPEN_RESUME" 2>/dev/null || return 0
+  failopen_resume_async
+  wd_log "fail-open: automatic resume armed ($FRA_N of ${WD_RESUME_MAX:-2} used); waits for the network to come back"
+  return 0
+}
+failopen_resume_async(){
+  detach_probe
+  $SETSID "$0" failopen-resume </dev/null >/dev/null 2>&1 &
+  cg_escape "$!"
+  return 0
+}
+# An explicit stop / force-stop: the user no longer wants the proxy, nothing resumes it.
+failopen_resume_disarm(){
+  rm -f "$FAILOPEN_RESUME" 2>/dev/null
+  FRD_P=$(cat "$RUN/failopen-resume.lock/pid" 2>/dev/null)
+  case "$FRD_P" in ''|*[!0-9]*) return 0;; esac
+  [ "$FRD_P" != "$$" ] && [ "$FRD_P" != "${SELF_PID:-}" ] || return 0
+  tr '\000' ' ' < "/proc/$FRD_P/cmdline" 2>/dev/null | grep -q 'failopen-resume' || return 0
+  kill -9 "$FRD_P" 2>/dev/null || true
+  rm -rf "$RUN/failopen-resume.lock" 2>/dev/null
+  return 0
+}
+# 0 while a resume is still wanted: the marker of this boot and fail-open is there, the fail-open record still
+# holds (a manual start clears it) and no core runs.
+failopen_resume_wanted(){
+  FRW_B=""; FRW_AT=""
+  [ -r "$FAILOPEN_RESUME" ] && read -r FRW_B FRW_AT < "$FAILOPEN_RESUME" 2>/dev/null || return 1
+  [ -n "$FRW_B" ] && [ "$FRW_B" = "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)" ] || return 1
+  case "$FRW_AT" in ''|*[!0-9]*) return 1;; esac
+  failopen_current >/dev/null || return 1
+  ! pidcore "$(cat "$PIDFILE" 2>/dev/null)"
+}
+# Android picked a default network: netd's default-network rule ("fwmark 0x0/0xffff [iif lo] lookup <if>"
+# without a uidrange; pref 22000 on older releases, 31000 on Android 17 ColorOS) in either family.
+failopen_resume_default_net(){
+  FRN_RULES=$({ ip -4 rule show; ip -6 rule show; } 2>/dev/null)
+  printf '%s\n' "$FRN_RULES" | grep -Eq '^22000:.*lookup ' && return 0
+  printf '%s\n' "$FRN_RULES" | grep -v uidrange | grep -Eq 'fwmark 0x0/0xffff( iif lo)? lookup [A-Za-z0-9_.-]+'
+}
+# A usable uplink as root sees it: a real interface route (never unreachable/prohibit/lo). FRR_IF = its device.
+failopen_resume_route(){
+  FRR_IF=$({ ip -4 route get 1.1.1.1; ip -6 route get 2606:4700:4700::1111; } 2>/dev/null |
+    grep -Ev '^(unreachable|prohibit|blackhole|throw)' | grep ' dev ' | grep -Ev ' dev lo( |$)' | head -n 1 | sed 's/^.* dev \([^ ]*\).*$/\1/')
+  [ -n "$FRR_IF" ]
+}
+# DIRECT works outside Hetu: an HTTP 204 over the route's interface (wifi_probe). Without an HTTP tool the
+# system's own validation of that Wi-Fi decides. FRP_HOW says what was seen.
+failopen_resume_direct(){
+  wifi_probe "$1"; FRP_RC=$?; FRP_HOW="$WP_HOW"
+  [ "$FRP_RC" != 0 ] || return 0
+  [ "$FRP_RC" = 2 ] || return 1
+  [ "$(timeout 8 dumpsys connectivity 2>/dev/null | wifi_nai)" = "$1 1" ]
+}
+# The detached worker (failopen-resume). One per boot; bounded by WD_RESUME_WINDOW.
+failopen_resume(){
+  mkdir -p "$RUN/state" 2>/dev/null || return 0
+  if ! mkdir "$RUN/failopen-resume.lock" 2>/dev/null; then
+    FR_P=$(cat "$RUN/failopen-resume.lock/pid" 2>/dev/null)
+    if [ -n "$FR_P" ] && kill -0 "$FR_P" 2>/dev/null; then return 0; fi
+    rm -rf "$RUN/failopen-resume.lock"; mkdir "$RUN/failopen-resume.lock" 2>/dev/null || return 0
+  fi
+  printf '%s\n' "$$" > "$RUN/failopen-resume.lock/pid" 2>/dev/null || true
+  failopen_resume_body
+  [ "$(cat "$RUN/failopen-resume.lock/pid" 2>/dev/null)" != "$$" ] || rm -rf "$RUN/failopen-resume.lock"
+  return 0
+}
+failopen_resume_body(){
+  fo_uptime; FR_BEGIN="$FOU"; FR_UP_SINCE=0
+  while :; do
+    failopen_resume_wanted || { wd_log "auto-resume: no longer wanted (stopped, started or ended); worker exits"; return 0; }
+    fo_uptime
+    if [ $((FOU-FR_BEGIN)) -ge "${WD_RESUME_WINDOW:-3600}" ]; then
+      wd_log "auto-resume: the network did not come back within ${WD_RESUME_WINDOW:-3600}s; start Hetu manually"
+      rm -f "$FAILOPEN_RESUME" 2>/dev/null; return 0
+    fi
+    if failopen_resume_default_net && failopen_resume_route; then
+      [ "$FR_UP_SINCE" != 0 ] || FR_UP_SINCE="$FOU"
+      if [ $((FOU-FR_UP_SINCE)) -ge "${WD_RESUME_STABLE:-20}" ] && [ $((FOU-FRW_AT)) -ge "${WD_RESUME_HOLDOFF:-120}" ]; then
+        if failopen_resume_direct "$FRR_IF"; then
+          failopen_resume_start "$FRR_IF"; return 0
+        fi
+        FR_UP_SINCE=0
+      fi
+    else
+      FR_UP_SINCE=0
+    fi
+    sleep "${WD_RESUME_POLL:-5}"
+  done
+}
+# One resumed start (the recorded start arguments, as a watchdog restart replays them). $1 the uplink.
+failopen_resume_start(){
+  FRS_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+  FRS_N=$(failopen_resume_count)
+  # Budget and marker first: a start that hangs or kills this worker still counts, and is never repeated.
+  rm -f "$FAILOPEN_RESUME" 2>/dev/null
+  if [ "$FRS_N" -ge "${WD_RESUME_MAX:-2}" ]; then wd_log "auto-resume: budget used ($FRS_N in this boot)"; return 0; fi
+  printf '%s %s\n' "$FRS_BOOT" "$((FRS_N+1))" > "$FAILOPEN_RESUMES" 2>/dev/null || return 0
+  [ -r "$RUN/state/start.args" ] || { wd_log "auto-resume: no saved start arguments; start Hetu manually"; return 0; }
+  FRS_RECORD=$(cat "$FAILOPEN_STATE" 2>/dev/null)
+  wd_log "auto-resume: network back on $1 (default network, route, DIRECT: $FRP_HOW); starting the proxy again ($((FRS_N+1))/${WD_RESUME_MAX:-2})"
+  (
+    unset HETU_BOOT_RESTORE_ID HETU_AUTOMATIC_RECOVERY_ID HETU_SELFHEAL_RESTART HETU_START_CANCEL_TOKEN HETU_GMS_APPIDS HETU_PRIVATE_DNS_MODE
+    HETU_FAILOPEN_RESUME=1; export HETU_FAILOPEN_RESUME
+    set --
+    while IFS= read -r FRS_A || [ -n "$FRS_A" ]; do set -- "$@" "$FRS_A"; done < "$RUN/state/start.args"
+    exec "$0" start "$@"
+  ) </dev/null > "$RUN/.failopen-resume.out" 2>/dev/null
+  FRS_OUT=$(cat "$RUN/.failopen-resume.out" 2>/dev/null); rm -f "$RUN/.failopen-resume.out"
+  case "$FRS_OUT" in
+    *'"ok":true'*)
+      wd_log "auto-resume: proxy running again (core $(cat "$PIDFILE" 2>/dev/null || echo '?'))"
+      wd_notify "failopen-resume network-back" "网络已恢复，河图已自动重新启动代理。"
+      return 0;;
+  esac
+  wd_log "auto-resume: start failed: $(printf '%s' "$FRS_OUT" | tr -d '\n\r' | cut -c1-240); not trying again"
+  # The start's rollback restored the network; anything it could not confirm goes by force (bounded).
+  if pidcore "$(cat "$PIDFILE" 2>/dev/null)" || [ -s "$RUN/rollback-state" ] || [ -s "$SESSION" ]; then
+    force_stop_run failopen-resume >/dev/null 2>&1 || true
+  fi
+  # Automatic starts stay refused for this boot: the fail-open record outlives the failed attempt.
+  if [ -n "$FRS_RECORD" ] && ! failopen_current >/dev/null; then printf '%s\n' "$FRS_RECORD" > "$FAILOPEN_STATE" 2>/dev/null || true; fi
+  wd_notify "failopen-resume start-failed" "网络已恢复，但河图自动重新启动代理失败，系统网络保持直连。请在河图中手动启动代理。"
+  return 0
 }
 wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
 wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
@@ -4522,6 +4918,7 @@ watchdog(){
         case "$CNIP_STATE" in ipset|iptables|ebpf) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
       wd_lnet_tick
       wd_selfheal_tick
+      wd_softpass_tick
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
   done
@@ -4962,7 +5359,7 @@ start_selfheal_body(){
   [ -n "${HETU_SELFHEAL_RESTART:-}" ] || rm -f "$FAILOPEN_STATE" 2>/dev/null
   SSR_CG=$(tr '\n' ' ' < "/proc/$START_PID/cgroup" 2>/dev/null | cut -c1-400)
   printf 'shell=%s setsid=%s core=%s\n' "${START_CG_ESCAPED:-none}" "${SETSID:-no}" "$SSR_CG" > "$RUN/cgroup-escape" 2>/dev/null || true
-  wd_log "session start core=$START_PID cgroup-escape=${START_CG_ESCAPED:-none} setsid=${SETSID:-no}${HETU_SELFHEAL_RESTART:+ (self-heal restart)}"
+  wd_log "session start core=$START_PID cgroup-escape=${START_CG_ESCAPED:-none} setsid=${SETSID:-no}${HETU_SELFHEAL_RESTART:+ (self-heal restart)}${HETU_FAILOPEN_RESUME:+ (fail-open auto-resume)}"
   return 0
 }
 start(){
@@ -4983,6 +5380,7 @@ start(){
   mkdir -p "$RUN" || fail "无法创建运行目录"
   # 7.0.0: after a fail-open in this boot only a manual start runs (it clears the record when it succeeds):
   # App recovery, network match, the watchdog's restart and boot restore would start into the same outage.
+  # The fail-open auto-resume worker (HETU_FAILOPEN_RESUME) runs only after its own network checks and budget.
   if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}${HETU_SELFHEAL_RESTART:-}${HETU_BOOT_RESTORE_ID:-}" ] && FO_AT=$(failopen_current); then
     wd_log "start refused: fail-open at $FO_AT in this boot; only a manual start runs"
     fail "$FAILOPEN_TEXT；本次开机不再自动启动，网络恢复后请手动启动"
@@ -5607,6 +6005,8 @@ health_repair(){ (
   trap 'release_lock' EXIT
   H_PID="${1:-}"; H_CURRENT=$(cat "$PIDFILE" 2>/dev/null || true)
   [ -n "$H_PID" ] && [ "$H_PID" = "$H_CURRENT" ] && pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+  # 7.0.0: the watchdog's soft-pass lifted the DNS/DoT hooks on purpose; it restores them itself.
+  ! softpass_active "$H_PID" || exit 0
   # OEM blocks are outside our HETU-chain manifest and can exist while it is healthy.
   google_firewall_maintain "$H_PID"
   health_collect
@@ -6172,6 +6572,8 @@ case "${1:-status}" in
   # end of the post-stop fake-IP reset window.
   net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2"; wifi_heal "$2" flushed;;
   wifi-heal) [ "$#" = 2 ] || exit 0; root; wifi_heal "$2";;
+  # 7.0.0: the detached worker wd_failopen spawns (bounded auto-resume once the network is back).
+  failopen-resume) [ "$#" = 1 ] || exit 0; root; failopen_resume;;
   probe-urls) [ "$#" = 1 ] || fail "参数错误"; root; probe_urls;;
   # Kept for timers spawned by 3.0.0-3.3.3: no sleep, the legacy chain is removed at once.
   fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_remove || true;;

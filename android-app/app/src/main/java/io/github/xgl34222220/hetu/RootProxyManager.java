@@ -1877,12 +1877,32 @@ final class RootProxyManager {
     private void acknowledgeFailOpen(String at){
         if(at==null||at.isEmpty()||at.equals(prefs.getString("proxyRootFailOpenAt","")))return;
         prefs.edit().putString("proxyRootFailOpenAt",at).putBoolean("proxyRootWanted",false)
+                .putBoolean("proxyRootFailOpenWasWanted",prefs.getBoolean("proxyRootWanted",false))
+                .putString("proxyRootFailOpenOwner",prefs.getString("proxyRootSessionOwner",""))
+                .putLong("proxyRootFailOpenStoppedGeneration",prefs.getLong("proxyRootStoppedManualGeneration",0L))
                 .putBoolean("proxyRootRuntimeRunning",false)
                 .putLong("proxyRootStoppedManualGeneration",prefs.getLong("proxyRootManualStartGeneration",0L))
                 .putString("proxyNetworkIntegrity","stopped").putString("proxyNetworkFault","fail-open")
                 .putString("proxyAutoRecoveryError",FAIL_OPEN_MESSAGE).remove("proxyRootSessionOwner").apply();
     }
+    /** 7.0.0: the watchdog's auto-resume restarted the core after a fail-open (record cleared, core running):
+     * restore the wanted intent and session owner the fail-open took away, so the App shows it running. */
+    private void adoptFailOpenResume(JSONObject state){
+        if(!state.optBoolean("running",false)||!state.optString("failOpen","").isEmpty())return;
+        if(prefs.getString("proxyRootFailOpenAt","").isEmpty()||prefs.getBoolean("proxyRootWanted",false))return;
+        if(!prefs.getBoolean("proxyRootFailOpenWasWanted",false))return;
+        SharedPreferences.Editor e=prefs.edit().remove("proxyRootFailOpenAt").remove("proxyRootFailOpenWasWanted")
+                .putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true)
+                .putLong("proxyRootStoppedManualGeneration",prefs.getLong("proxyRootFailOpenStoppedGeneration",0L))
+                .remove("proxyRootFailOpenStoppedGeneration");
+        String owner=prefs.getString("proxyRootFailOpenOwner","");
+        if(owner!=null&&!owner.isEmpty())e.putString("proxyRootSessionOwner",owner);
+        e.remove("proxyRootFailOpenOwner").apply();
+        clearFailOpenMessage();
+    }
     private void clearFailOpenMessage(){
+        prefs.edit().remove("proxyRootFailOpenWasWanted").remove("proxyRootFailOpenOwner")
+                .remove("proxyRootFailOpenStoppedGeneration").apply();
         if(FAIL_OPEN_MESSAGE.equals(prefs.getString("proxyAutoRecoveryError","")))prefs.edit().remove("proxyAutoRecoveryError").apply();
     }
 
@@ -1980,6 +2000,7 @@ final class RootProxyManager {
                 prefs.edit().putInt("proxyControllerPort",livePort).apply();
             // 7.0.0: never inside a control transaction (a manual start reads status before it clears the record).
             if(!controlOwned&&!state.optBoolean("running",false))acknowledgeFailOpen(state.optString("failOpen",""));
+            if(!controlOwned)adoptFailOpenResume(state);
             current[0]=true;
         };
         // Existing operation-owned reads stay inside their original lock. A

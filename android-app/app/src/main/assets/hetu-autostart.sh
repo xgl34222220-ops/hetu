@@ -87,7 +87,10 @@ route_ready(){
 }
 # Android selected a default network (netd's 22000 default-network rule).
 default_net(){
-  { ip -4 rule show; ip -6 rule show; } 2>/dev/null | grep -Eq '^22000:.*lookup '
+  DN_RULES=$({ ip -4 rule show; ip -6 rule show; } 2>/dev/null)
+  printf '%s\n' "$DN_RULES" | grep -Eq '^22000:.*lookup ' && return 0
+  # Android 17 ColorOS: pref 31000 "fwmark 0x0/0xffff iif lo lookup <if>" (no uidrange).
+  printf '%s\n' "$DN_RULES" | grep -v uidrange | grep -Eq 'fwmark 0x0/0xffff( iif lo)? lookup [A-Za-z0-9_.-]+'
 }
 # Terminal failure: a core this worker started that is still unverified must not keep the
 # phone's traffic. Give the network back (bounded stop) so the system is clean, then report.

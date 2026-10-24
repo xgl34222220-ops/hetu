@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "9b7690d4eeee799872e6db7cae8aec712f7b5bdba9cc22edaba28d3735b3042c",
+  "patchSha256": "aa6d08c0c74ebfa726fcf0983cd2982c1d03ed5181f2c36d12e322110d235eae",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -484,11 +484,11 @@
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "ae3595a898db86376081a6b9bf9a4a3f4e9d009750973791f5eaeab5d947e1a8",
     "android-app/app/proguard-rules.pro": "9b458c761f6b8f9b2d2b60fa2ec1bdd691fe53ec1899f77cdc84aba962b16f75",
-    "android-app/app/src/main/assets/hetu-autostart.sh": "867f3c9050d9082f7753f2d57c24b4c36342162f68d58b282fe214ff8279154a",
+    "android-app/app/src/main/assets/hetu-autostart.sh": "d92b042d228ef10b9300d58fd8f3080db8a4d8e6422cf42ef4756d94eaa79df1",
     "android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf": "dc671038dc008f468ff69a68c83fffc925207c8565f319ca9ce23891d166fa08",
     "android-app/app/src/main/assets/hetu-bpf/hetu_match.o": "096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de",
     "android-app/app/src/main/assets/hetu-bpf/x86_64/hetu-bpf": "ed3f241d2d8ad9b4867325083090d6b580c15d36b3873e44a61a389e887ae779",
-    "android-app/app/src/main/assets/hetu-root.sh": "46d5445ac3c9e7097d5f04f4d5dfbbf0f06166eb60c99147e006c3b2864f6db6",
+    "android-app/app/src/main/assets/hetu-root.sh": "1bc41648b7b686610a1d950d243675596d99a17442c15d65a3f53ab440879ed8",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "a7357e8b7dc27bfde749eedfdfa13aa8547c0287a3b1f1dd3830e6c0a4683c22",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "0212634c3ca8d17c3b00a1a74457b1a088c6001473c2ad6e06d22c3b256540db",
@@ -529,7 +529,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt": "6aa568dc059fcac303684e23aac44dd6816fdc57aac2cecc8225d683b32e6b65",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt": "db70b95412518d54d3a09da6dec1b107ec1c89a0c009007036e35cf1b5c72e54",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "b5caeb52e63c7bafe5d2760dfde643a523afe87bf904a8114eb643b169c362c7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "7549b5ac317b3bde9ac01bb6718d1431b5f62fda4a72986961f3f2dae94150cd",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java": "10300a0e8d162cf209988ed4ac9a39053503ccf0f841d07e84c2241b9d12edb5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java": "f7c0f8e9734614f98dad0f6e9fd1e76172b99052cec076febe9650e771de0217",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java": "47ce0f0006a5e9696437d14182290d850c2396e70fbc51ebf75d5c00ef6008e1",
@@ -1058,16 +1058,16 @@
     "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
   },
   "runtimePayloadCount": 23,
-  "rootScriptSha256": "46d5445ac3c9e7097d5f04f4d5dfbbf0f06166eb60c99147e006c3b2864f6db6",
-  "autostartScriptSha256": "867f3c9050d9082f7753f2d57c24b4c36342162f68d58b282fe214ff8279154a",
+  "rootScriptSha256": "1bc41648b7b686610a1d950d243675596d99a17442c15d65a3f53ab440879ed8",
+  "autostartScriptSha256": "d92b042d228ef10b9300d58fd8f3080db8a4d8e6422cf42ef4756d94eaa79df1",
   "authorizedRootPayloadDeltas": {
     "android-app/app/src/main/assets/hetu-root.sh": {
       "before": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
-      "after": "46d5445ac3c9e7097d5f04f4d5dfbbf0f06166eb60c99147e006c3b2864f6db6"
+      "after": "1bc41648b7b686610a1d950d243675596d99a17442c15d65a3f53ab440879ed8"
     },
     "android-app/app/src/main/assets/hetu-autostart.sh": {
       "before": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
-      "after": "867f3c9050d9082f7753f2d57c24b4c36342162f68d58b282fe214ff8279154a"
+      "after": "d92b042d228ef10b9300d58fd8f3080db8a4d8e6422cf42ef4756d94eaa79df1"
     }
   },
   "runtimeRevision": 154,
