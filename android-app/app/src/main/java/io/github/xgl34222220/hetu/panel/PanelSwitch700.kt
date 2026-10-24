@@ -37,15 +37,16 @@ internal const val RETRY_DELAY_TIMEOUT_MS_700 = 6000
 internal const val RETRY_DELAY_CONCURRENCY_700 = 6
 
 /**
- * Nodes whose first group-test reading was a failure (0, timeout -1, error -2, any non-positive)
- * or absent, in target order. Each is retested exactly once with a single per-proxy probe.
+ * Nodes whose first group-test reading was an explicit failure (0, timeout -1, error -2, any
+ * non-positive), in target order. Each is retested exactly once with a single per-proxy probe.
+ * Absent / malformed entries are not failures: they keep their earlier reading untouched.
  */
 internal fun retryCandidates700(targets: List<String>, results: Map<String, Long>): List<String> =
-    targets.distinct().filter { (results[it] ?: 0L) <= 0L }
+    targets.distinct().filter { node -> results[node]?.let { it <= 0L } == true }
 
 /** A retry only replaces the first reading when it measured a real delay. */
 internal fun mergeRetry700(first: Map<String, Long>, retry: Map<String, Long>): Map<String, Long> {
     val out = LinkedHashMap(first)
-    retry.forEach { (node, value) -> if (value > 0L || node !in out) out[node] = value }
+    retry.forEach { (node, value) -> if (value > 0L && node in out) out[node] = value }
     return out
 }

@@ -188,6 +188,25 @@ final class MihomoControllerClient {
         return delayPath("/proxies/"+Uri.encode(node)+"/delay",preferredUrl,expected);
     }
 
+    /**
+     * 7.0.0: one per-proxy delay request with an explicit timeout, used to retest nodes whose
+     * first group-test reading failed. Returns the delay, -1 for a core timeout (504) or -2 for
+     * another core-reported failure; controller transport errors are thrown.
+     */
+    long delayOnce(String node,String url,String expected,int timeoutMs)throws Exception{
+        String test=URLEncoder.encode(url,"UTF-8");
+        String status=URLEncoder.encode((expected==null||expected.trim().isEmpty())?"200-399":expected.trim(),"UTF-8");
+        try{
+            JSONObject v=request("GET","/proxies/"+Uri.encode(node)+"/delay?timeout="+timeoutMs+"&url="+test+"&expected="+status,null,timeoutMs+1500);
+            long d=v.optLong("delay",-1);
+            return d>0?d:-2L;
+        }catch(ControllerHttpException error){
+            if(error.statusCode==504||error.statusCode==408)return -1L;
+            if(error.statusCode==503)return -2L;
+            throw error;
+        }
+    }
+
     long providerDelay(String provider,String node,String preferredUrl,String expected)throws Exception{
         return delayPath("/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck",preferredUrl,expected);
     }

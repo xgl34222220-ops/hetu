@@ -14,7 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.xgl34222220.hetu.panel.RETRY_DELAY_CONCURRENCY_700
+import io.github.xgl34222220.hetu.panel.mergeRetry700
+import io.github.xgl34222220.hetu.panel.retryCandidates700
 import io.github.xgl34222220.hetu.panel.SELECT_CONFIRM_INTERVAL_MS_700
 import io.github.xgl34222220.hetu.panel.SELECT_CONFIRM_POLLS_700
 import io.github.xgl34222220.hetu.panel.SelectionOutcome700
@@ -1213,6 +1214,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             val landed = Channel<Pair<String, Long>>(Channel.UNLIMITED)
             val progress = launch {
                 for ((node, value) in landed) {
+                    // 7.0.0: a failed first reading keeps its spinner until the one retry settles it.
+                    if (value <= 0L) continue
                     applyNodeProbe(request, owner, node, value, SystemClock.elapsedRealtime())
                     releaseNodeProbes(owner, listOf(node))
                 }
@@ -1221,7 +1224,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 // Selector groups retain the parallel core endpoint. Unpinned automatic groups
                 // use it too and stream each member as the core records it; a pinned one keeps
                 // bounded leaf probes because that endpoint silently clears its fixed choice.
-                val result = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
+                val first = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
+                // 7.0.0: first-test false failures. Nodes that came back 0 / timeout / error (or
+                // not at all) are retested once each through the per-proxy endpoint.
+                val retryNodes = retryCandidates700(targets, first)
+                val retried = if (retryNodes.isEmpty() || !currentRuntimeRequest(request) ||
+                    groupProbeOwners[group.name] != owner) emptyMap()
+                else try { repo.retryDelays(group, retryNodes) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { emptyMap() }
+                val result = mergeRetry700(first, retried)
                 if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
                     toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                 val stamp = SystemClock.elapsedRealtime()

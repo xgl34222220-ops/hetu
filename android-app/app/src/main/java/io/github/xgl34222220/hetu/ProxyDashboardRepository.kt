@@ -11,6 +11,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import io.github.xgl34222220.hetu.panel.SingBoxPanelStore
 import java.io.IOException
 import org.json.JSONArray
@@ -564,6 +565,29 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         }
         requireCurrentProbe(snapshot.identity)
         synchronized(results) { results.toMap() }
+    }
+
+    /**
+     * 7.0.0: retests nodes whose first group-test reading failed, once each, with a per-proxy
+     * /proxies/{name}/delay against the group's test URL (the configured custom URL wins, as in
+     * the group wave). At most [RETRY_DELAY_CONCURRENCY_700] in flight, [RETRY_DELAY_TIMEOUT_MS_700]
+     * each. A node whose retry request itself failed is absent from the result.
+     */
+    suspend fun retryDelays(group: ProxyGroupUi, nodes: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
+        if (nodes.isEmpty()) return@withContext emptyMap()
+        val url = api.waveDelayUrl(group.testUrl)
+        val slots = kotlinx.coroutines.sync.Semaphore(io.github.xgl34222220.hetu.panel.RETRY_DELAY_CONCURRENCY_700)
+        coroutineScope {
+            nodes.distinct().map { node ->
+                async {
+                    slots.withPermit {
+                        try { node to api.delayOnce(node, url, "200-399", io.github.xgl34222220.hetu.panel.RETRY_DELAY_TIMEOUT_MS_700) }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (_: Exception) { null }
+                    }
+                }
+            }.awaitAll().filterNotNull().toMap()
+        }
     }
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */
