@@ -1105,12 +1105,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 // pinned node tests alive, so a fixed match is a pin, not a failure.
                 var outcome = SelectionOutcome700.Unconfirmed
                 var lastNow = ""
+                var anyRead = false
                 for (attempt in 0 until SELECT_CONFIRM_POLLS_700) {
                     val live = try { repo.readSelection(group, ticket) }
                         catch (cancel: CancellationException) { throw cancel }
                         catch (_: Exception) { null }
                     if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
                     if (live != null) {
+                        anyRead = true
                         lastNow = live.first
                         outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
                         if (outcome == SelectionOutcome700.Confirmed) break
@@ -1118,7 +1120,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     if (attempt < SELECT_CONFIRM_POLLS_700 - 1)
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { delay(SELECT_CONFIRM_INTERVAL_MS_700) }
                 }
-                val fresh = refreshNow()
+                // An unreadable controller gives no fresh state; a failed refresh here would only
+                // overwrite newer visible state, and the regular poll recovers it anyway.
+                val fresh = if (anyRead) refreshNow() else null
                 if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
                 if (outcome == SelectionOutcome700.Unconfirmed) {
                     val readback = fresh?.takeIf { it.running && it.panelReady }?.groups?.firstOrNull { it.name == group }
