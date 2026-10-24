@@ -79,7 +79,7 @@ index 0000000..daa410d
 +-dontwarn com.oracle.svm.**
 +-ignorewarnings
 diff --git a/android-app/app/src/main/assets/hetu-autostart.sh b/android-app/app/src/main/assets/hetu-autostart.sh
-index 4d17a16..303e13a 100644
+index 4d17a16..194edca 100644
 --- a/android-app/app/src/main/assets/hetu-autostart.sh
 +++ b/android-app/app/src/main/assets/hetu-autostart.sh
 @@ -15,10 +15,35 @@ LOCK="$BOOT/restore.lock"
@@ -127,13 +127,14 @@ index 4d17a16..303e13a 100644
  state(){
    printf '%s %s\n' "$BOOT_ID" "$1" > "$BOOT/status.new.$$" && mv -f "$BOOT/status.new.$$" "$BOOT/status"
  }
-@@ -43,11 +68,18 @@ alive(){
+@@ -43,11 +68,40 @@ alive(){
    EXE=$(readlink "/proc/$PID/exe" 2>/dev/null)
    [ "$EXE" = "$BASE/bin/core" ] || [ "$EXE" = "$BASE/bin/core (deleted)" ]
  }
 +healthy(){
 +  alive || return 1
-+  HEALTH=$(timeout -s TERM -k 2 12 /system/bin/sh "$BASE/hetu-root.sh" network-health 2>/dev/null) || return 1
++  # Early boot: netd still holds the xtables lock for long stretches; 12 s timed out a healthy session.
++  HEALTH=$(timeout -s TERM -k 2 25 /system/bin/sh "$BASE/hetu-root.sh" network-health 2>/dev/null) || return 1
 +  printf '%s\n' "$HEALTH" | grep -q '"networkIntegrity":"healthy"' &&
 +    printf '%s\n' "$HEALTH" | grep -q '"dataPlaneHealthy":true'
 +}
@@ -142,26 +143,56 @@ index 4d17a16..303e13a 100644
    am start-foreground-service --user 0 -n io.github.xgl34222220.hetu/.ProxyNetworkMatchService \
      -a io.github.xgl34222220.hetu.ROOT_BOOT_RUNNING >/dev/null 2>&1 || true
  }
++# A usable uplink: a real interface route (never unreachable/prohibit/lo) for either family.
++route_ready(){
++  ROUTE=$(ip -4 route get 1.1.1.1 2>/dev/null; ip -6 route get 2606:4700:4700::1111 2>/dev/null)
++  printf '%s\n' "$ROUTE" | grep -Ev '^(unreachable|prohibit|blackhole|throw)' | grep ' dev ' | grep -Evq ' dev lo( |$)'
++}
++# Android selected a default network (netd's 22000 default-network rule).
++default_net(){
++  { ip -4 rule show; ip -6 rule show; } 2>/dev/null | grep -Eq '^22000:.*lookup '
++}
++# Terminal failure: a core this worker started that is still unverified must not keep the
++# phone's traffic. Give the network back (bounded stop) so the system is clean, then report.
++give_up(){
++  if [ "$ATTEMPTS" -gt 0 ] && alive; then
++    if allowed && healthy; then state running; notify_app; exit 0; fi
++    PREV_STOP=$(cat "$BOOT/stopped-boot" 2>/dev/null)
++    timeout -s TERM -k 2 45 /system/bin/sh "$BASE/hetu-root.sh" stop >> "$BOOT/restore.log" 2>&1 || true
++    # stop records an explicit stop for this boot; this was a failed restore, not a user stop.
++    if [ -n "$PREV_STOP" ]; then printf '%s\n' "$PREV_STOP" > "$BOOT/stopped-boot"; else rm -f "$BOOT/stopped-boot"; fi
++  fi
++  state "$1"; exit 1
++}
 +command -v timeout >/dev/null 2>&1 || { state executor-missing; exit 1; }
  state waiting-system
  N=0
  while [ "$(getprop sys.boot_completed)" != 1 ]; do
-@@ -57,22 +89,24 @@ while [ "$(getprop sys.boot_completed)" != 1 ]; do
+@@ -57,25 +111,33 @@ while [ "$(getprop sys.boot_completed)" != 1 ]; do
  done
  # Native state/config is in /data/adb and needs no app launch or credential storage.
  # Wait for a route rather than assuming network exists at BOOT_COMPLETED.
 -N=0
-+N=0; ATTEMPTS=0
++# A route alone is not a ready network at boot: netd is still installing the new network's rules
++# (xtables lock busy, a start then fails half-way) and the default network may not be selected yet.
++# Require the route on two consecutive checks, then up to 6 more checks for the default network.
++N=0; ATTEMPTS=0; SEEN=0; DN_WAIT=0
  while allowed; do
 -  if alive; then state running; notify_app; exit 0; fi
+-  ROUTE=$(ip -4 route get 1.1.1.1 2>/dev/null; ip -6 route get 2606:4700:4700::1111 2>/dev/null)
+-  if ! printf '%s\n' "$ROUTE" | grep -q ' dev '; then
+-    state waiting-network
 +  if healthy; then allowed || { state cancelled; exit 0; }; state running; notify_app; exit 0; fi
-   ROUTE=$(ip -4 route get 1.1.1.1 2>/dev/null; ip -6 route get 2606:4700:4700::1111 2>/dev/null)
-   if ! printf '%s\n' "$ROUTE" | grep -q ' dev '; then
-     state waiting-network
++  if ! route_ready; then
++    SEEN=0; state waiting-network
    elif [ ! -r "$BOOT/start.sh" ]; then
      state missing-plan; exit 1
++  elif [ "$SEEN" -lt 1 ]; then
++    SEEN=1; state waiting-network
++  elif [ "$ATTEMPTS" = 0 ] && [ "$DN_WAIT" -lt 6 ] && ! default_net; then
++    DN_WAIT=$((DN_WAIT+1)); state waiting-network
    else
-+    [ "$ATTEMPTS" -lt 3 ] || { state restore-timeout; exit 1; }
++    [ "$ATTEMPTS" -lt 3 ] || give_up restore-timeout
 +    ATTEMPTS=$((ATTEMPTS+1))
      state restoring
      export HETU_BOOT_RESTORE_ID="$BOOT_ID"
@@ -173,7 +204,11 @@ index 4d17a16..303e13a 100644
 +    if [ "$RC" = 0 ] && healthy; then allowed || { state cancelled; exit 0; }; state running; notify_app; exit 0; fi
      state retrying
    fi
-   N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
+-  N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
++  N=$((N+1)); [ "$N" -le 120 ] || give_up restore-timeout
+   sleep 10
+ done
+ state cancelled
 diff --git a/android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf b/android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf
 new file mode 100644
 index 0000000000000000000000000000000000000000..eaa336f890d4321a9ad61baf974272743f1f1f7d
@@ -36617,7 +36652,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..befb010 100755
+index ae832da..0e1cb65 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36680,7 +36715,7 @@ index ae832da..befb010 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -67,17 +98,237 @@ WRFWD=HETU_WRFWD
+@@ -67,17 +98,245 @@ WRFWD=HETU_WRFWD
  V6OUT=HETU_V6OUT
  V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
@@ -36848,6 +36883,14 @@ index ae832da..befb010 100755
 +WD_FAILOPEN_FAST=60
 +WD_FAILOPEN_AFTER=150
 +WD_FAILOPEN_HEAL_MAX=240
++# Boot grace: an automatic start early in a boot (service.d restore or App boot recovery, uptime below
++# WD_BOOT_WINDOW s) records BOOT_GRACE_STATE. Its watchdog then neither runs the Wi-Fi heal nor fails open
++# for WD_BOOT_GRACE s unless this session already saw the network work once: a network that is still
++# associating / validating right after boot is not a whole-phone outage caused by Hetu, and a fail-open
++# there would also block every further automatic start for the whole boot.
++BOOT_GRACE_STATE="$RUN/state/boot-grace"
++WD_BOOT_GRACE=300
++WD_BOOT_WINDOW=600
 +# Bounded stop: the normal stop transaction gets STOP_FORCE_AFTER s, then force_teardown takes over
 +# regardless of locks. Every force step is a single command under FORCE_STEP_TIMEOUT s; chains are only
 +# flushed/deleted while FORCE_BUDGET s last (unhooked leftover chains carry no traffic; the next start
@@ -36921,7 +36964,7 @@ index ae832da..befb010 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +340,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +348,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -37045,7 +37088,7 @@ index ae832da..befb010 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +462,53 @@ acquire_lock(){
+@@ -99,10 +470,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -37101,7 +37144,7 @@ index ae832da..befb010 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +594,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +602,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -37125,7 +37168,7 @@ index ae832da..befb010 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -227,13 +637,15 @@ unhook(){
+@@ -227,13 +645,15 @@ unhook(){
    "$BIN" -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true; "$BIN" -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
  }
  cleanup4(){
@@ -37143,7 +37186,7 @@ index ae832da..befb010 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -241,20 +653,725 @@ cleanup4(){
+@@ -241,20 +661,725 @@ cleanup4(){
  }
  cleanup6(){
    has ip6tables || return 0
@@ -37872,7 +37915,7 @@ index ae832da..befb010 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +1403,21 @@ findcorepid(){
+@@ -286,8 +1411,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -37895,7 +37938,7 @@ index ae832da..befb010 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +1426,8 @@ stopcore(){
+@@ -296,6 +1434,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -37904,7 +37947,7 @@ index ae832da..befb010 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,8 +1452,65 @@ stopcore(){
+@@ -320,8 +1460,65 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -37970,7 +38013,7 @@ index ae832da..befb010 100755
 
  # procfs reports a zero stat size even when this file contains IPv6 addresses.
  # Install the selected IPv6 policy whenever the kernel supports IPv6, including
-@@ -362,6 +1551,138 @@ v6disabled(){
+@@ -362,6 +1559,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -38109,7 +38152,7 @@ index ae832da..befb010 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1777,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1785,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -38207,7 +38250,7 @@ index ae832da..befb010 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1885,8 @@ core_return(){
+@@ -473,8 +1893,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -38218,7 +38261,7 @@ index ae832da..befb010 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1910,14 @@ append_scoped(){
+@@ -498,12 +1918,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -38235,7 +38278,7 @@ index ae832da..befb010 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1925,21 @@ scoped_redirect(){
+@@ -511,17 +1933,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -38260,7 +38303,7 @@ index ae832da..befb010 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,59 +1951,570 @@ bypass4(){
+@@ -533,59 +1959,570 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -38869,7 +38912,7 @@ index ae832da..befb010 100755
    # netfilter modes install Hetu's separate DNS REDIRECT chains.
    if [ "$M" != tun ] && [ "$M" != ebpf ] && [ "$DNS" != off ]; then
      NEED_DNS_REDIRECT=1
-@@ -710,8 +2639,12 @@ local_destination_return(){
+@@ -710,8 +2647,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -38883,7 +38926,7 @@ index ae832da..befb010 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +2664,23 @@ install_mangle4(){
+@@ -731,22 +2672,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -38916,7 +38959,7 @@ index ae832da..befb010 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +2695,45 @@ install_mangle6(){
+@@ -761,40 +2703,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -38976,7 +39019,7 @@ index ae832da..befb010 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +2761,12 @@ remove_dot_guard(){
+@@ -822,12 +2769,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -38991,7 +39034,7 @@ index ae832da..befb010 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +2780,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2788,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -39013,7 +39056,7 @@ index ae832da..befb010 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +2805,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2813,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -39057,7 +39100,7 @@ index ae832da..befb010 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -910,129 +2853,1696 @@ install_v6_disable(){
+@@ -910,129 +2861,1722 @@ install_v6_disable(){
      xt6 -t filter -I FORWARD 1 -j "$V6FWD" || return 1
    fi
  }
@@ -39509,6 +39552,12 @@ index ae832da..befb010 100755
 +  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BAD_NAMES=""
 +  WD_OFF_N=0; WD_OFF_NEXT=0; WD_OFF_SINCE=0; WD_OFF_LAST=0; WD_OFF_HEAL_AT=0; WD_FO_HELD=0; WD_CACHE_SEEN=0; WD_STALL_AT=$((WD_NOW+WD_STALL_EVERY)); WD_PIN_TTL="$WD_STALL_PIN_TTL"
 +  WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
++  WD_BOOT_GRACE_UNTIL=0; WD_BOOT_GRACE_LOGGED=0
++  WD_BG_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
++  if [ -n "$WD_BG_BOOT" ] && [ "$(cat "${BOOT_GRACE_STATE:-$RUN/state/boot-grace}" 2>/dev/null)" = "$WD_BG_BOOT" ]; then
++    WD_BOOT_GRACE_UNTIL=$((WD_NOW+${WD_BOOT_GRACE:-300}))
++    [ "$WD_BOOT_GRACE_UNTIL" -le $((${WD_BOOT_WINDOW:-600}+${WD_BOOT_GRACE:-300})) ] || WD_BOOT_GRACE_UNTIL=$((${WD_BOOT_WINDOW:-600}+${WD_BOOT_GRACE:-300}))
++  fi
 +  WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
 +  if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
 +    [ "$(sed -n 's/^TCP=//p' "$SESSION" 2>/dev/null | head -n 1)" = 1 ]; then
@@ -39763,7 +39812,7 @@ index ae832da..befb010 100755
 +  wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
 +  case "$WET_RC" in
 +    0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
-+       WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; return 0;;
++       WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; WD_NODE_NOTIFIED=0; WD_BOOT_GRACE_UNTIL=0; return 0;;
 +    2) WD_EG_TARGET=""; return 0;;
 +  esac
 +  # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
@@ -40079,6 +40128,11 @@ index ae832da..befb010 100755
 +# probes the Wi-Fi outside Hetu and escalates (flushnet + reevaluate, reconnect, Wi-Fi off/on; rate-limited there).
 +# A new check at most every WIFI_HEAL_GAP/2 s while the outage lasts.
 +wd_offline_seen(){
++  # Boot grace (BOOT_GRACE_STATE): the network of a boot-time start was never seen working yet.
++  if [ "${WD_BOOT_GRACE_UNTIL:-0}" -gt "$WD_NOW" ]; then
++    [ "${WD_BOOT_GRACE_LOGGED:-0}" = 1 ] || { WD_BOOT_GRACE_LOGGED=1; wd_log "boot grace: no network yet ($1); no Wi-Fi heal or fail-open before uptime $WD_BOOT_GRACE_UNTIL s"; }
++    WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_LAST=0; WD_OFF_HEAL_AT=0; return 0
++  fi
 +  # One outage = offline verdicts at most 300 s apart; an older start belongs to an outage that ended.
 +  if [ "${WD_OFF_SINCE:-0}" = 0 ] || [ $((WD_NOW-${WD_OFF_LAST:-0})) -gt 300 ]; then WD_OFF_SINCE="$WD_NOW"; WD_OFF_HEAL_AT=0; fi
 +  WD_OFF_LAST="$WD_NOW"
@@ -40131,6 +40185,21 @@ index ae832da..befb010 100755
 +  WFD_PID=$(cat "$RUN/wifi-heal.lock/pid" 2>/dev/null)
 +  if [ -n "$WFD_PID" ] && kill -0 "$WFD_PID" 2>/dev/null && [ $((WD_NOW-WD_OFF_HEAL_AT)) -lt "${WD_FAILOPEN_HEAL_MAX:-240}" ]; then return 1; fi
 +  WD_FO_WHY="still offline ${WFD_AGE}s after the outage began, after the Wi-Fi heal"
++  return 0
++}
++# Boot grace marker for this session's watchdog (see BOOT_GRACE_STATE). A self-heal restart keeps the
++# session's marker as it is; a manual start never gets one.
++boot_grace_mark(){
++  [ -z "${HETU_SELFHEAL_RESTART:-}" ] || return 0
++  BGM_FILE="${BOOT_GRACE_STATE:-$RUN/state/boot-grace}"
++  rm -f "$BGM_FILE" 2>/dev/null
++  [ -n "${HETU_BOOT_RESTORE_ID:-}${HETU_AUTOMATIC_RECOVERY_ID:-}" ] || return 0
++  BGM_UP=""; read -r BGM_UP BGM_UNUSED < /proc/uptime 2>/dev/null || return 0
++  BGM_UP=${BGM_UP%%.*}; case "$BGM_UP" in ''|*[!0-9]*) return 0;; esac
++  [ "$BGM_UP" -lt "${WD_BOOT_WINDOW:-600}" ] || return 0
++  BGM_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); [ -n "$BGM_BOOT" ] || return 0
++  mkdir -p "$RUN/state" 2>/dev/null || return 0
++  printf '%s\n' "$BGM_BOOT" > "$BGM_FILE" 2>/dev/null || true
 +  return 0
 +}
 +# Records why Hetu ended itself; the App and diagnostics read it, automatic starts refuse while it holds
@@ -40733,7 +40802,7 @@ index ae832da..befb010 100755
 +    ok)
 +      if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
 +      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_NODE_NOTIFIED=0; WD_ROUTE_NOTIFIED=0; WD_FAKEIP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
-+      WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0
++      WD_OFF_N=0; WD_OFF_SINCE=0; WD_OFF_HEAL_AT=0; WD_BOOT_GRACE_UNTIL=0
 +      wd_egress_state ok; return 0;;
 +    offline)
 +      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL)"
@@ -40861,7 +40930,7 @@ index ae832da..befb010 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +4555,45 @@ probe_core_owner(){
+@@ -1045,9 +4589,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -40908,7 +40977,7 @@ index ae832da..befb010 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +4604,29 @@ core_identity_prepare(){
+@@ -1058,14 +4638,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -40942,7 +41011,7 @@ index ae832da..befb010 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +4640,9 @@ core_launch(){
+@@ -1079,8 +4674,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -40954,7 +41023,7 @@ index ae832da..befb010 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,26 +4709,82 @@ core_tune(){
+@@ -1147,26 +4743,82 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -41038,7 +41107,7 @@ index ae832da..befb010 100755
    GF_FILE="$RUN/.google-firewall.$$"
    for GF_TOOL in xt4q xt6q; do
      for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
-@@ -1176,8 +4794,8 @@ google_firewall_cleanup(){
+@@ -1176,8 +4828,8 @@ google_firewall_cleanup(){
        while IFS= read -r GF_RULE; do
          # Quotes/comments and inverted/range UID matches are deliberately left intact.
          case "$GF_RULE" in *\"*|*\'*) continue;; esac
@@ -41049,7 +41118,7 @@ index ae832da..befb010 100755
            $1=="-A" && $2==c {
              uid="";target="";inverted=0
              for(i=3;i<=NF;i++) {
-@@ -1208,33 +4826,136 @@ google_firewall_cleanup(){
+@@ -1208,33 +4860,136 @@ google_firewall_cleanup(){
      tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
    fi
  }
@@ -41190,7 +41259,7 @@ index ae832da..befb010 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +4963,16 @@ start(){
+@@ -1242,8 +4997,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -41208,7 +41277,7 @@ index ae832da..befb010 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +4982,98 @@ start(){
+@@ -1253,75 +5016,98 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -41345,7 +41414,7 @@ index ae832da..befb010 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +5085,94 @@ start(){
+@@ -1333,19 +5119,95 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -41374,6 +41443,7 @@ index ae832da..befb010 100755
    start_stage "start-watchdog"
 -  rm -f "$RUN/google-firewall-at"
 +  start_selfheal_record "$@"
++  boot_grace_mark
 +  rm -f "$RUN/google-firewall-at" "$RUN/google-firewall-ebpf" "$RUN/google-firewall-uids"
    if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
 -  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
@@ -41446,7 +41516,7 @@ index ae832da..befb010 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +5185,8 @@ status(){
+@@ -1358,6 +5220,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -41455,7 +41525,7 @@ index ae832da..befb010 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1375,6 +5204,7 @@ status(){
+@@ -1375,6 +5239,7 @@ status(){
    DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
    PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
    GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
@@ -41463,7 +41533,7 @@ index ae832da..befb010 100755
    TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
    CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
    case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
-@@ -1407,6 +5237,12 @@ status(){
+@@ -1407,6 +5272,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -41476,7 +41546,7 @@ index ae832da..befb010 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +5323,36 @@ status(){
+@@ -1487,13 +5358,36 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -41515,7 +41585,7 @@ index ae832da..befb010 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +5476,8 @@ health_collect(){
+@@ -1617,6 +5511,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -41524,7 +41594,7 @@ index ae832da..befb010 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +5527,18 @@ health_restore_table(){
+@@ -1666,16 +5562,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -41545,7 +41615,7 @@ index ae832da..befb010 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +5587,7 @@ health_repair(){ (
+@@ -1724,7 +5622,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -41554,7 +41624,7 @@ index ae832da..befb010 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +5620,481 @@ health_json(){ (
+@@ -1757,6 +5655,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -42036,7 +42106,7 @@ index ae832da..befb010 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +6112,38 @@ case "${1:-status}" in
+@@ -1774,10 +6147,38 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -53072,6 +53142,24 @@ index 0000000..e2968c4
 +    private static int indent(String s) { int n = 0; while (n < s.length() && (s.charAt(n) == ' ' || s.charAt(n) == '\t')) n++; return n; }
 +    private static String spaces(int n) { StringBuilder b = new StringBuilder(n); for (int i = 0; i < n; i++) b.append(' '); return b.toString(); }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
+index 077cade..f9e3aca 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
+@@ -29,6 +29,13 @@ public final class BootReceiver extends BroadcastReceiver {
+
+         boolean bootOrUnlock=Intent.ACTION_BOOT_COMPLETED.equals(action)||Intent.ACTION_USER_UNLOCKED.equals(action);
+         if (!bootOrUnlock) return;
++        if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
++            // The persisted running flag describes the previous boot. Left set, the UI and the
++            // status notification showed "running" with no network while Root was not ready yet,
++            // and a boot start with an unconfirmable probe treated it as an unverified live core
++            // ("核心存活但网络接管未通过完整验证"). Only a live probe or native adoption sets it again.
++            prefs.edit().putBoolean("proxyRootRuntimeRunning", false).apply();
++        }
+         if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartInstalled",false)
+                 &&!prefs.getBoolean("proxyRootWanted",false)){
+             // Native service.d can restore before credential storage unlock. This
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java
 new file mode 100644
 index 0000000..c7473f3
@@ -54149,63 +54237,33 @@ index 0000000..fa5d493
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java
 new file mode 100644
-index 0000000..fea3c08
+index 0000000..d7a575f
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,25 @@
 +package io.github.xgl34222220.hetu;
 +
-+import java.net.URI;
-+import java.util.ArrayList;
 +import java.util.List;
-+import java.util.Locale;
 +
 +/**
 + * 7.0.0: delay-URL choice. Cloudflare-Worker (edgetunnel) VLESS-WS nodes cannot reach
 + * Cloudflare-hosted targets, so a group/health-check URL such as cp.cloudflare.com reports a
-+ * live node as a timeout. When no custom URL is set and the effective URL is a Cloudflare test
-+ * target, gstatic is tried after it. Pure Java (no Android types) so it is unit-testable.
++ * live node as a timeout. The implementation lives in MihomoControllerClient (nested) so the
++ * controller compiles standalone; this facade keeps the package-level API.
 + */
 +final class DelayUrlChoice700 {
-+    static final String NEUTRAL_URL = "https://www.gstatic.com/generate_204";
++    static final String NEUTRAL_URL = MihomoControllerClient.DelayUrlChoice700.NEUTRAL_URL;
 +
 +    private DelayUrlChoice700() {}
 +
-+    static boolean isCloudflareTarget(String url) {
-+        if (url == null) return false;
-+        String host;
-+        try { host = new URI(url.trim()).getHost(); } catch (Exception ignored) { return false; }
-+        if (host == null) return false;
-+        host = host.toLowerCase(Locale.ROOT);
-+        if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
-+        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
-+        return host.equals("cloudflare.com") || host.endsWith(".cloudflare.com")
-+            || host.equals("1.1.1.1") || host.equals("1.0.0.1")
-+            || host.equals("2606:4700:4700::1111") || host.equals("2606:4700:4700:0:0:0:0:1111");
-+    }
++    static boolean isCloudflareTarget(String url) { return MihomoControllerClient.DelayUrlChoice700.isCloudflareTarget(url); }
 +
-+    /** Ordered per-node delay URLs: custom only when set; else preferred (+gstatic after a Cloudflare target); else defaults. */
 +    static List<String> delayUrls(String custom, String preferred, String[] defaults) {
-+        ArrayList<String> urls = new ArrayList<>();
-+        String c = custom == null ? "" : custom.trim();
-+        if (!c.isEmpty()) urls.add(c);
-+        String p = preferred == null ? "" : preferred.trim();
-+        if (!p.isEmpty()) {
-+            if (!urls.contains(p)) urls.add(p);
-+            if (c.isEmpty() && isCloudflareTarget(p) && !urls.contains(NEUTRAL_URL)) urls.add(NEUTRAL_URL);
-+        } else {
-+            for (String item : defaults) if (!urls.contains(item)) urls.add(item);
-+        }
-+        return urls;
++        return MihomoControllerClient.DelayUrlChoice700.delayUrls(custom, preferred, defaults);
 +    }
 +
-+    /** URL for the one failed-node retry: custom wins; a Cloudflare group URL is swapped for gstatic. */
 +    static String retryUrl(String custom, String groupUrl, String fallback) {
-+        String c = custom == null ? "" : custom.trim();
-+        if (!c.isEmpty()) return c;
-+        String g = groupUrl == null ? "" : groupUrl.trim();
-+        if (g.isEmpty()) return fallback;
-+        return isCloudflareTarget(g) ? NEUTRAL_URL : g;
++        return MihomoControllerClient.DelayUrlChoice700.retryUrl(custom, groupUrl, fallback);
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java
@@ -54743,7 +54801,7 @@ index 34494b0..2a315f4 100644
 
      static Set<String> subscriptionExceptions(Collection<String> userBlocks) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-index f104cef..c2518aa 100644
+index f104cef..ad536b2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 @@ -74,6 +74,14 @@ final class MihomoControllerClient {
@@ -54984,6 +55042,55 @@ index f104cef..c2518aa 100644
      }
 
      private static String readLine(InputStream in)throws IOException{
+@@ -298,4 +390,48 @@ final class MihomoControllerClient {
+         return out.toByteArray();
+     }
+     private static String compact(String s){s=s.replace('\n',' ').replace('\r',' ').trim();return s.length()>220?s.substring(0,220)+"…":s;}
++
++    /** 7.0.0 delay-URL choice, nested so the verbatim network-soak host compiles this file alone. */
++    static final class DelayUrlChoice700 {
++        static final String NEUTRAL_URL = "https://www.gstatic.com/generate_204";
++
++        private DelayUrlChoice700() {}
++
++        static boolean isCloudflareTarget(String url) {
++            if (url == null) return false;
++            String host;
++            try { host = new URI(url.trim()).getHost(); } catch (Exception ignored) { return false; }
++            if (host == null) return false;
++            host = host.toLowerCase(Locale.ROOT);
++            if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
++            if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
++            return host.equals("cloudflare.com") || host.endsWith(".cloudflare.com")
++                || host.equals("1.1.1.1") || host.equals("1.0.0.1")
++                || host.equals("2606:4700:4700::1111") || host.equals("2606:4700:4700:0:0:0:0:1111");
++        }
++
++        /** Ordered per-node delay URLs: custom only when set; else preferred (+gstatic after a Cloudflare target); else defaults. */
++        static List<String> delayUrls(String custom, String preferred, String[] defaults) {
++            ArrayList<String> urls = new ArrayList<>();
++            String c = custom == null ? "" : custom.trim();
++            if (!c.isEmpty()) urls.add(c);
++            String p = preferred == null ? "" : preferred.trim();
++            if (!p.isEmpty()) {
++                if (!urls.contains(p)) urls.add(p);
++                if (c.isEmpty() && isCloudflareTarget(p) && !urls.contains(NEUTRAL_URL)) urls.add(NEUTRAL_URL);
++            } else {
++                for (String item : defaults) if (!urls.contains(item)) urls.add(item);
++            }
++            return urls;
++        }
++
++        /** URL for the one failed-node retry: custom wins; a Cloudflare group URL is swapped for gstatic. */
++        static String retryUrl(String custom, String groupUrl, String fallback) {
++            String c = custom == null ? "" : custom.trim();
++            if (!c.isEmpty()) return c;
++            String g = groupUrl == null ? "" : groupUrl.trim();
++            if (g.isEmpty()) return fallback;
++            return isCloudflareTarget(g) ? NEUTRAL_URL : g;
++        }
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 index 71d5484..58c3db8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java

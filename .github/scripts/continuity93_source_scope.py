@@ -97,7 +97,7 @@ AUTHORIZED_FILES = frozenset((
     PACKAGE + 'StartupConfigViewer.kt', PACKAGE + 'ProxyDashboardRepository.kt',
     PACKAGE + 'DelayUrlChoice700.java', PACKAGE + 'PanelExtras19.kt',
     PACKAGE + 'MihomoControllerClient.java', PACKAGE + 'LatencyProbeBudget.java',
-    PACKAGE + 'LatencyProbeOperation.kt',
+    PACKAGE + 'LatencyProbeOperation.kt', PACKAGE + 'BootReceiver.java',
     PACKAGE + 'ProxyScriptsActivity.kt',
     PACKAGE + 'ProxyComposeController.kt', PACKAGE + 'ProxyStatusBridge.kt',
     # 2026-10-11 release-build authorization: every downloadable core must run or be disabled

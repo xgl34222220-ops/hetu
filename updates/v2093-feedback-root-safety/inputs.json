@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "3a5a275b4b0e020d6f2195c45250515e586988a134235920d3b9ce50833bae81",
+  "patchSha256": "2e8ea89a2dc8ff7fba05043d21347776c4cf254f2aee7a7ef1c22b9bfecd2d8d",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -224,6 +224,7 @@
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt",
     "android-app/app/src/main/baseline-prof.txt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java",
@@ -483,26 +484,27 @@
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "ae3595a898db86376081a6b9bf9a4a3f4e9d009750973791f5eaeab5d947e1a8",
     "android-app/app/proguard-rules.pro": "9b458c761f6b8f9b2d2b60fa2ec1bdd691fe53ec1899f77cdc84aba962b16f75",
-    "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
+    "android-app/app/src/main/assets/hetu-autostart.sh": "867f3c9050d9082f7753f2d57c24b4c36342162f68d58b282fe214ff8279154a",
     "android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf": "dc671038dc008f468ff69a68c83fffc925207c8565f319ca9ce23891d166fa08",
     "android-app/app/src/main/assets/hetu-bpf/hetu_match.o": "096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de",
     "android-app/app/src/main/assets/hetu-bpf/x86_64/hetu-bpf": "ed3f241d2d8ad9b4867325083090d6b580c15d36b3873e44a61a389e887ae779",
-    "android-app/app/src/main/assets/hetu-root.sh": "fd45a338f30acf0ef2bec46d5b992175e7332c7cbbd492100634ee6a993f6999",
+    "android-app/app/src/main/assets/hetu-root.sh": "46d5445ac3c9e7097d5f04f4d5dfbbf0f06166eb60c99147e006c3b2864f6db6",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "a7357e8b7dc27bfde749eedfdfa13aa8547c0287a3b1f1dd3830e6c0a4683c22",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "0212634c3ca8d17c3b00a1a74457b1a088c6001473c2ad6e06d22c3b256540db",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "1986ff45b95d9e44e3c9c9c1205edb5f87b24868474abeb93c65c9f6f18b07cf",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java": "959505c17ac7bfe28f4a88c5b54e3323c11090c27e9e30b43a5b775bfabdc6f6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java": "70200799653d3ef32ff9cbbf1208858804317abc6caf37191b67c37f847617ad",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java": "7e3f1b5995259b94e9fcf8fca0924b452d9d8d1b1d4dadd33cb19b31ab711fb6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreResourceLimits.java": "9754331163e28e9e71fcfd567e028d172d8dcb979b94270008b82446a00ffea5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DaemonMonitorPolicy.java": "b09057b77022e1dd09af5b0fe29a7ec3726027d98a3d6697ba8fd7eaf9ac6ebf",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java": "9dd25b441c190d84a1cb716c4c3029ce2d49ec719d8315bdb7acc48e6c4cf66f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java": "950edce78c5d860346a22978ca185d8f4f3a5d9b3bc55255208efc5372ee4bc9",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java": "211676730863ee1979e56f2c8f18a79749e5e3eebcac043cf4ead14071e0e917",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt": "d19c0e59d3463c22f4c556699694bc79892d7afa820714fa68199a5b27bcd105",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "290cfd6c3e6516d60587685846d7a6f4287e2fd2ce519b46361bd6a9619c7d8c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "1c5044a075945a5c9f8c8335b57e1a57dfd1fb3fa0953ff9d1580173b82c9a23",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java": "0bf4b1c3eba055d8c598493546331d988ae622aec04bddf1c242b8943de0577f",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "dfaf5af40ac5c4a32aad9c79bc27284cdbdfa68a104c774ef2e56a7f44a7b2cd",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "4da161ebe9b7a2a489d2969e0a319f57fc9c202754dedf286c73e16e8b61aedb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "5d220b3e038caef894b4672e071d788368e0945cdecfef664fc88168303bef51",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java": "7862107a5c1f879917dca20fb108d8779139bf2eaec8ff0727ef715c4fd54ed2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelExtras19.kt": "94015ad47d607848174cbdfbf2b5aa9c0d608d909a0bf65e4d5eaadc2285d5d8",
@@ -776,7 +778,6 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AlignedInstrumentPanel.kt": "613c25ea6ae8f9b6425487cf4624dcca1555f50583a585f7608cc1b53ce540e9",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AppCrashReport.java": "dd2b282e6bf054fa12bdd7db5d3857fb54e2aa27c157142cc2a2d310b3d80d39",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AutoMirroredIconCompat.kt": "054d0c7a683d882f1b79ac109173a30d25e649dce17b6ccba15f2cb3679fbc16",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "0629cc38c2eda4c9e0a43a5fa3cca80b5f82e027d8e953e29eafad715f12928d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BoxProxyExactPanel17.kt": "510e7e2035f32c54629d5314c701310e987b9b80d74e1c22610f9d866c216e17",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfig.java": "5630164af1eced3c9cfc516295c23e32a0925594c6aac7b91305f675653890fe",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData1.java": "984cdc8c82d5b62577ff4e2ae315f422325ca727a62aaef4b17670e3a9f51e4c",
@@ -1057,16 +1058,16 @@
     "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
   },
   "runtimePayloadCount": 23,
-  "rootScriptSha256": "fd45a338f30acf0ef2bec46d5b992175e7332c7cbbd492100634ee6a993f6999",
-  "autostartScriptSha256": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
+  "rootScriptSha256": "46d5445ac3c9e7097d5f04f4d5dfbbf0f06166eb60c99147e006c3b2864f6db6",
+  "autostartScriptSha256": "867f3c9050d9082f7753f2d57c24b4c36342162f68d58b282fe214ff8279154a",
   "authorizedRootPayloadDeltas": {
     "android-app/app/src/main/assets/hetu-root.sh": {
       "before": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
-      "after": "fd45a338f30acf0ef2bec46d5b992175e7332c7cbbd492100634ee6a993f6999"
+      "after": "46d5445ac3c9e7097d5f04f4d5dfbbf0f06166eb60c99147e006c3b2864f6db6"
     },
     "android-app/app/src/main/assets/hetu-autostart.sh": {
       "before": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
-      "after": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4"
+      "after": "867f3c9050d9082f7753f2d57c24b4c36342162f68d58b282fe214ff8279154a"
     }
   },
   "runtimeRevision": 154,
@@ -1118,7 +1119,7 @@
   },
   "evidenceSourcesSha256": {
     ".github/scripts/continuity93_ci_config.py": "683509722dda5b159f26c2eb8859d40e7326f8cd5268bcee0546f15933d74044",
-    ".github/scripts/continuity93_source_scope.py": "06783794f5ee76287ceb14e2ccf42ec9c87dd4113bc7884c7daa7409613c5aa5",
+    ".github/scripts/continuity93_source_scope.py": "c317d90784bd045dbc619edfa902a0eb258610b80289bf4f5c52c9374fcb2be4",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/profile_release_continuity93.py": "96b94e3fd145432812a08ef08699ab7a3a851dc564ff34800d3d083e4eca0e17",
