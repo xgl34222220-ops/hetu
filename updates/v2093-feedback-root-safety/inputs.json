@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "2e8ea89a2dc8ff7fba05043d21347776c4cf254f2aee7a7ef1c22b9bfecd2d8d",
+  "patchSha256": "9b7690d4eeee799872e6db7cae8aec712f7b5bdba9cc22edaba28d3735b3042c",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -492,7 +492,7 @@
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "a7357e8b7dc27bfde749eedfdfa13aa8547c0287a3b1f1dd3830e6c0a4683c22",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "0212634c3ca8d17c3b00a1a74457b1a088c6001473c2ad6e06d22c3b256540db",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "1986ff45b95d9e44e3c9c9c1205edb5f87b24868474abeb93c65c9f6f18b07cf",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "4f8ec43cf607cf4a00a2fd226e1c0e91eda28dcb7c0e912bf1b6ed74386f2c4b",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java": "959505c17ac7bfe28f4a88c5b54e3323c11090c27e9e30b43a5b775bfabdc6f6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java": "70200799653d3ef32ff9cbbf1208858804317abc6caf37191b67c37f847617ad",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java": "7e3f1b5995259b94e9fcf8fca0924b452d9d8d1b1d4dadd33cb19b31ab711fb6",

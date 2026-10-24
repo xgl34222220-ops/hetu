@@ -34,7 +34,16 @@ public final class BootReceiver extends BroadcastReceiver {
             // status notification showed "running" with no network while Root was not ready yet,
             // and a boot start with an unconfirmable probe treated it as an unverified live core
             // ("核心存活但网络接管未通过完整验证"). Only a live probe or native adoption sets it again.
-            prefs.edit().putBoolean("proxyRootRuntimeRunning", false).apply();
+            // Android 15+ also delivers BOOT_COMPLETED when a stopped app is first launched in the
+            // same boot (install, force-stop), so clear only when the boot count really changed.
+            int bootCount=-1;
+            try { bootCount=android.provider.Settings.Global.getInt(context.getContentResolver(),android.provider.Settings.Global.BOOT_COUNT,-1); }
+            catch (Exception ignored) {}
+            int seenBoot=prefs.getInt("hetuLastSeenBootCount700",-1);
+            if (bootCount>=0&&seenBoot>=0&&bootCount!=seenBoot)
+                prefs.edit().putBoolean("proxyRootRuntimeRunning", false).putInt("hetuLastSeenBootCount700",bootCount).apply();
+            else if (bootCount>=0&&bootCount!=seenBoot)
+                prefs.edit().putInt("hetuLastSeenBootCount700",bootCount).apply();
         }
         if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartInstalled",false)
                 &&!prefs.getBoolean("proxyRootWanted",false)){

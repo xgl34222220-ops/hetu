@@ -53143,10 +53143,10 @@ index 0000000..e2968c4
 +    private static String spaces(int n) { StringBuilder b = new StringBuilder(n); for (int i = 0; i < n; i++) b.append(' '); return b.toString(); }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
-index 077cade..f9e3aca 100644
+index 077cade..288b9b6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
-@@ -29,6 +29,13 @@ public final class BootReceiver extends BroadcastReceiver {
+@@ -29,6 +29,22 @@ public final class BootReceiver extends BroadcastReceiver {
 
          boolean bootOrUnlock=Intent.ACTION_BOOT_COMPLETED.equals(action)||Intent.ACTION_USER_UNLOCKED.equals(action);
          if (!bootOrUnlock) return;
@@ -53155,7 +53155,16 @@ index 077cade..f9e3aca 100644
 +            // status notification showed "running" with no network while Root was not ready yet,
 +            // and a boot start with an unconfirmable probe treated it as an unverified live core
 +            // ("核心存活但网络接管未通过完整验证"). Only a live probe or native adoption sets it again.
-+            prefs.edit().putBoolean("proxyRootRuntimeRunning", false).apply();
++            // Android 15+ also delivers BOOT_COMPLETED when a stopped app is first launched in the
++            // same boot (install, force-stop), so clear only when the boot count really changed.
++            int bootCount=-1;
++            try { bootCount=android.provider.Settings.Global.getInt(context.getContentResolver(),android.provider.Settings.Global.BOOT_COUNT,-1); }
++            catch (Exception ignored) {}
++            int seenBoot=prefs.getInt("hetuLastSeenBootCount700",-1);
++            if (bootCount>=0&&seenBoot>=0&&bootCount!=seenBoot)
++                prefs.edit().putBoolean("proxyRootRuntimeRunning", false).putInt("hetuLastSeenBootCount700",bootCount).apply();
++            else if (bootCount>=0&&bootCount!=seenBoot)
++                prefs.edit().putInt("hetuLastSeenBootCount700",bootCount).apply();
 +        }
          if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartInstalled",false)
                  &&!prefs.getBoolean("proxyRootWanted",false)){
