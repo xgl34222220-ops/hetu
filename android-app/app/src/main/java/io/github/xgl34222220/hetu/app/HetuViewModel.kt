@@ -1107,12 +1107,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 var lastNow = ""
                 var anyRead = false
                 for (attempt in 0 until SELECT_CONFIRM_POLLS_700) {
+                    var readOk = true
                     val live = try { repo.readSelection(group, ticket) }
                         catch (cancel: CancellationException) { throw cancel }
-                        catch (_: Exception) { null }
+                        catch (_: Exception) { readOk = false; null }
+                    // A readable controller without the group is a fresh answer too (group removed).
+                    if (readOk) anyRead = true
                     if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
                     if (live != null) {
-                        anyRead = true
                         lastNow = live.first
                         outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
                         if (outcome == SelectionOutcome700.Confirmed) break

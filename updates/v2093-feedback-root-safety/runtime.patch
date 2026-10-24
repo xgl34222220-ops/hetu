@@ -68582,7 +68582,7 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..8fa643a 100644
+index 250b8a8..532731f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -14,13 +14,24 @@ import androidx.compose.runtime.mutableStateOf
@@ -69216,7 +69216,7 @@ index 250b8a8..8fa643a 100644
          val ticket = repo.captureSelection()
          val owner = ++requestSequence
          selectionOwners[group] = owner
-@@ -801,11 +1100,43 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -801,11 +1100,45 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false), ticket)
                  // The already-sent PUT cannot be revoked, but must not revive a stopped UI.
                  if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
@@ -69228,12 +69228,14 @@ index 250b8a8..8fa643a 100644
 +                var lastNow = ""
 +                var anyRead = false
 +                for (attempt in 0 until SELECT_CONFIRM_POLLS_700) {
++                    var readOk = true
 +                    val live = try { repo.readSelection(group, ticket) }
 +                        catch (cancel: CancellationException) { throw cancel }
-+                        catch (_: Exception) { null }
++                        catch (_: Exception) { readOk = false; null }
++                    // A readable controller without the group is a fresh answer too (group removed).
++                    if (readOk) anyRead = true
 +                    if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
 +                    if (live != null) {
-+                        anyRead = true
 +                        lastNow = live.first
 +                        outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
 +                        if (outcome == SelectionOutcome700.Confirmed) break
@@ -69264,7 +69266,7 @@ index 250b8a8..8fa643a 100644
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
-@@ -820,6 +1151,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -820,6 +1153,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -69303,7 +69305,7 @@ index 250b8a8..8fa643a 100644
      private suspend fun probe(node: String, request: RuntimeRequest, owner: Long) {
          try {
              applyNodeProbe(request, owner, node, repo.delay(node), SystemClock.elapsedRealtime())
-@@ -827,13 +1190,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,13 +1192,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -69325,7 +69327,7 @@ index 250b8a8..8fa643a 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1211,45 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1213,45 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -69375,7 +69377,7 @@ index 250b8a8..8fa643a 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1257,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1259,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -69396,7 +69398,7 @@ index 250b8a8..8fa643a 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1279,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1281,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -69452,7 +69454,7 @@ index 250b8a8..8fa643a 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,22 +1355,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,22 +1357,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -69568,7 +69570,7 @@ index 250b8a8..8fa643a 100644
      fun measureSites() {
          val request = activeRuntimeRequest() ?: return
          if (siteTesting) return
-@@ -964,7 +1479,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1481,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69577,7 +69579,7 @@ index 250b8a8..8fa643a 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1496,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1498,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69586,7 +69588,7 @@ index 250b8a8..8fa643a 100644
              }
          }
      }
-@@ -995,7 +1510,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1512,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69595,7 +69597,7 @@ index 250b8a8..8fa643a 100644
              }
          }
      }
-@@ -1014,7 +1529,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1531,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69604,7 +69606,7 @@ index 250b8a8..8fa643a 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1548,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1550,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69613,7 +69615,7 @@ index 250b8a8..8fa643a 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1556,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1558,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -69622,7 +69624,7 @@ index 250b8a8..8fa643a 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1588,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1590,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -69631,7 +69633,7 @@ index 250b8a8..8fa643a 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1649,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1651,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69640,7 +69642,7 @@ index 250b8a8..8fa643a 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1153,18 +1668,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1153,18 +1670,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val fresh = repo.providers()
                  if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                      providers = fresh
@@ -69662,7 +69664,7 @@ index 250b8a8..8fa643a 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1175,7 +1691,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1175,7 +1693,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                  beginProviderRead()
                  if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
@@ -69672,7 +69674,7 @@ index 250b8a8..8fa643a 100644
                  refreshNow()
              } catch (cancel: CancellationException) {
                  if (providerTaskOwners[name] == owner) providerTasks.remove(name)
-@@ -1193,7 +1711,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1713,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -69681,7 +69683,7 @@ index 250b8a8..8fa643a 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1216,7 +1734,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1216,7 +1736,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                              async {
                                  if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
                                  try {
@@ -69701,7 +69703,7 @@ index 250b8a8..8fa643a 100644
                                      if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
                                          providerTasks[item.name] = HxTask(ok = true, message = "已更新")
                                          ok++
-@@ -1239,14 +1768,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1239,14 +1770,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                  if (readOwner == latestProviderRead) {
                      providers = fresh
@@ -69719,7 +69721,7 @@ index 250b8a8..8fa643a 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1257,12 +1788,35 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1257,12 +1790,35 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
