@@ -271,6 +271,8 @@ jobs:
 
         python3 tools/qa/test_failopen700.py -v 2>&1 | tee out/verification/failopen700-tests.txt
 
+        python3 tools/qa/test_lnet_refresh.py -v 2>&1 | tee out/verification/lnet-refresh-tests.txt
+
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter
       run: python3 tools/qa/test_filter_export.py --before out/verification/v2075-adblock.java
