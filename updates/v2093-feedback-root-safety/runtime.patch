@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..694d342 100644
+index 8a43698..6dcffba 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -8,8 +8,8 @@ index 8a43698..694d342 100644
          targetSdk = 35
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
-+        versionCode = 2105
-+        versionName = "6.6.6"
++        versionCode = 2106
++        versionName = "7.0.0"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -36617,7 +36617,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..0f05597 100755
+index ae832da..befb010 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36680,8 +36680,13 @@ index ae832da..0f05597 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +100,232 @@ V6FWD=HETU_V6FWD
+@@ -67,17 +98,237 @@ WRFWD=HETU_WRFWD
+ V6OUT=HETU_V6OUT
+ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
++# 7.0.0: on-link networks of the current Wi-Fi / Ethernet that the static LAN list does not cover
++# (global IPv6 prefixes, public-IPv4 LANs). Rebuilt per command by `lnet-sync` after a network change.
++LNET=HETU_LNET
  KFWD=HETU_KFWD
 
 +# CNIP kernel bypass (ipset). The App writes $BASE/policy/cnip (V4=0|1, V6=0|1, FORCE=uid ranges);
@@ -36916,7 +36921,7 @@ index ae832da..0f05597 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +337,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +340,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -37040,7 +37045,7 @@ index ae832da..0f05597 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +459,53 @@ acquire_lock(){
+@@ -99,10 +462,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -37096,7 +37101,7 @@ index ae832da..0f05597 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +591,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +594,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -37120,7 +37125,14 @@ index ae832da..0f05597 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +640,9 @@ cleanup4(){
+@@ -227,13 +637,15 @@ unhook(){
+   "$BIN" -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true; "$BIN" -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
+ }
+ cleanup4(){
+-  unhook xt4 mangle OUTPUT "$MOUT"; unhook xt4 mangle PREROUTING "$MPRE"
++  unhook xt4 mangle OUTPUT "$LNET"; unhook xt4 mangle OUTPUT "$MOUT"; unhook xt4 mangle PREROUTING "$MPRE"
+   unhook xt4 nat OUTPUT "$DNSOUT"; unhook xt4 nat PREROUTING "$DNSPRE"
+   unhook xt4 nat OUTPUT "$NOUT"; unhook xt4 nat PREROUTING "$NPRE"
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -37131,7 +37143,15 @@ index ae832da..0f05597 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +657,718 @@ cleanup6(){
+@@ -241,20 +653,725 @@ cleanup4(){
+ }
+ cleanup6(){
+   has ip6tables || return 0
+-  unhook xt6 mangle OUTPUT "$MOUT"; unhook xt6 mangle PREROUTING "$MPRE"
++  unhook xt6 mangle OUTPUT "$LNET"; unhook xt6 mangle OUTPUT "$MOUT"; unhook xt6 mangle PREROUTING "$MPRE"
+   unhook xt6 nat OUTPUT "$DNSOUT"; unhook xt6 nat PREROUTING "$DNSPRE"
+   unhook xt6 nat OUTPUT "$NOUT"; unhook xt6 nat PREROUTING "$NPRE"
+   unhook xt6 filter OUTPUT "$QUICOUT"; unhook xt6 filter FORWARD "$QUICFWD"
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -37372,7 +37392,7 @@ index ae832da..0f05597 100755
 +# Hooks to try when a table cannot be listed: every Hetu hook is a plain "-j <chain>" in a builtin chain.
 +force_known(){
 +  case "$1" in
-+    mangle) printf '%s\n' OUTPUT:HETU_MOUT PREROUTING:HETU_MPRE OUTPUT:HETU_CNC PREROUTING:HETU_CNC OUTPUT:BICHEN_MOUT PREROUTING:BICHEN_MPRE;;
++    mangle) printf '%s\n' OUTPUT:HETU_LNET OUTPUT:HETU_MOUT PREROUTING:HETU_MPRE OUTPUT:HETU_CNC PREROUTING:HETU_CNC OUTPUT:BICHEN_MOUT PREROUTING:BICHEN_MPRE;;
 +    nat) printf '%s\n' OUTPUT:HETU_DNSOUT PREROUTING:HETU_DNSPRE OUTPUT:HETU_NOUT PREROUTING:HETU_NPRE OUTPUT:BICHEN_DNSOUT PREROUTING:BICHEN_DNSPRE OUTPUT:BICHEN_NOUT PREROUTING:BICHEN_NPRE;;
 +    filter) printf '%s\n' OUTPUT:HETU_QUICOUT FORWARD:HETU_QUICFWD OUTPUT:HETU_DOTOUT OUTPUT:HETU_WROUT FORWARD:HETU_WRFWD OUTPUT:HETU_V6OUT FORWARD:HETU_V6FWD \
 +      OUTPUT:HETU_KOUT FORWARD:HETU_KFWD "OUTPUT:$FAKE_REJECT_CHAIN" OUTPUT:BICHEN_QUICOUT FORWARD:BICHEN_QUICFWD OUTPUT:BICHEN_V6OUT FORWARD:BICHEN_V6FWD OUTPUT:BICHEN_KOUT FORWARD:BICHEN_KFWD;;
@@ -37852,7 +37872,7 @@ index ae832da..0f05597 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +1400,21 @@ findcorepid(){
+@@ -286,8 +1403,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -37875,7 +37895,7 @@ index ae832da..0f05597 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +1423,8 @@ stopcore(){
+@@ -296,6 +1426,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -37884,7 +37904,7 @@ index ae832da..0f05597 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,8 +1449,65 @@ stopcore(){
+@@ -320,8 +1452,65 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -37950,7 +37970,7 @@ index ae832da..0f05597 100755
 
  # procfs reports a zero stat size even when this file contains IPv6 addresses.
  # Install the selected IPv6 policy whenever the kernel supports IPv6, including
-@@ -362,6 +1548,138 @@ v6disabled(){
+@@ -362,6 +1551,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -38089,7 +38109,7 @@ index ae832da..0f05597 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1774,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1777,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -38187,7 +38207,7 @@ index ae832da..0f05597 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1882,8 @@ core_return(){
+@@ -473,8 +1885,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -38198,7 +38218,7 @@ index ae832da..0f05597 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1907,14 @@ append_scoped(){
+@@ -498,12 +1910,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -38215,7 +38235,7 @@ index ae832da..0f05597 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1922,21 @@ scoped_redirect(){
+@@ -511,17 +1925,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -38240,7 +38260,7 @@ index ae832da..0f05597 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,59 +1948,570 @@ bypass4(){
+@@ -533,59 +1951,570 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -38849,7 +38869,7 @@ index ae832da..0f05597 100755
    # netfilter modes install Hetu's separate DNS REDIRECT chains.
    if [ "$M" != tun ] && [ "$M" != ebpf ] && [ "$DNS" != off ]; then
      NEED_DNS_REDIRECT=1
-@@ -710,8 +2636,12 @@ local_destination_return(){
+@@ -710,8 +2639,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -38863,7 +38883,7 @@ index ae832da..0f05597 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +2661,23 @@ install_mangle4(){
+@@ -731,22 +2664,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -38896,7 +38916,7 @@ index ae832da..0f05597 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +2692,45 @@ install_mangle6(){
+@@ -761,40 +2695,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -38956,7 +38976,7 @@ index ae832da..0f05597 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +2758,12 @@ remove_dot_guard(){
+@@ -822,12 +2761,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -38971,7 +38991,7 @@ index ae832da..0f05597 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +2777,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +2780,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -38993,7 +39013,7 @@ index ae832da..0f05597 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +2802,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +2805,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -39037,7 +39057,7 @@ index ae832da..0f05597 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -910,129 +2850,1592 @@ install_v6_disable(){
+@@ -910,129 +2853,1696 @@ install_v6_disable(){
      xt6 -t filter -I FORWARD 1 -j "$V6FWD" || return 1
    fi
  }
@@ -39522,6 +39542,108 @@ index ae832da..0f05597 100755
 +  wd_log "network change (${WNW_SIG:-offline}): re-checking core liveness"
 +  WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
 +  WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
++}
++# ---- 7.0.0 local-network bypass refresh ----------------------------------------------------------
++# The static LAN_RETURN_V4/V6 lists already cover every private IPv4 subnet, so moving between
++# 192.168.x / 10.x / 172.16-31.x Wi-Fi networks needs nothing. Not covered: the global IPv6 prefix of
++# the current Wi-Fi/Ethernet and a LAN numbered from public IPv4 space. Those prefixes change with the
++# network, so they live in their own chain HETU_LNET (mangle OUTPUT, first): a hit sets the bypass mark,
++# and every Hetu chain already returns on that mark first. DNS (port 53) is never marked, so hijack
++# stays intact. HETU_LNET is outside the network manifest, so a sync never looks like rule drift.
++# Per command only (no iptables-restore, no ipset), each bounded, under one non-blocking lock attempt.
++lnet_x(){ LX_F="$1"; shift; LX_BIN=iptables; [ "$LX_F" = 4 ] || LX_BIN=ip6tables
++  if has timeout; then timeout -s TERM -k 1 3 "$LX_BIN" -w 1 "$@"; else "$LX_BIN" -w 1 "$@"; fi; }
++# Interfaces whose on-link networks are a local LAN. Cellular, VPN/TUN and loopback never are.
++lnet_iface(){ case "$1" in wlan*|eth*|swlan*|ap[0-9]*|rndis*|usb*|bt-pan*) return 0;; *) return 1;; esac; }
++# On-link prefixes of LAN interfaces, one per line, not already in the static list or the fake-IP
++# ranges, at most 16. IPv4 needs /16 or longer, IPv6 /48 or longer.
++lnet_wanted(){
++  LW_F="$1"
++  if [ "$LW_F" = 4 ]; then LW_ROWS=$(ip -o -4 route show table all 2>/dev/null) || return 1
++  else v6supported || return 0; LW_ROWS=$(ip -o -6 route show table all 2>/dev/null) || return 1; fi
++  printf '%s\n' "$LW_ROWS" | awk -v f="$LW_F" -v lan4="$LAN_RETURN_V4" -v fake4="$FAKE_IP_V4" -v fake6="$FAKE_IP_V6" '
++    function ip4(a,  p){ if (split(a, p, ".") != 4) return -1; return ((p[1]*256+p[2])*256+p[3])*256+p[4] }
++    function in4(net, list,  n, i, c, b, m, x, y){ split(net, x, "/"); n = split(list, c, ",")
++      for (i = 1; i <= n; i++) { if (split(c[i], y, "/") != 2) continue; b = y[2] + 0; if (b > x[2] + 0) continue
++        m = 2 ^ (32 - b); if (int(ip4(x[1]) / m) == int(ip4(y[1]) / m)) return 1 }
++      return 0 }
++    function iflan(d){ return d ~ /^(wlan|eth|swlan|rndis|usb|bt-pan)/ || d ~ /^ap[0-9]/ }
++    { net = $1; dev = ""; for (i = 2; i < NF; i++) if ($i == "dev") dev = $(i+1)
++      if (!iflan(dev) || net !~ /\// || net ~ /^(default|local|broadcast|unreachable|prohibit|blackhole|multicast|throw)$/) next
++      if (f == 4) {
++        if (net !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/) next
++        split(net, q, "/"); if (q[2] + 0 < 16 || q[2] + 0 > 32 || ip4(q[1]) < 0) next
++        if (in4(net, lan4) || (fake4 != "" && in4(net, fake4))) next
++      } else {
++        if (net !~ /^[0-9a-fA-F:]+\/[0-9]+$/) next
++        split(net, q, "/"); if (q[2] + 0 < 48 || q[2] + 0 > 128) next
++        l = tolower(q[1]); if (l ~ /^(fe[89ab]|f[cd]|ff)/ || l == "::1" || l == "::") next
++        if (fake6 != "" && index("," tolower(fake6) ",", "," tolower(net) ",")) next
++      }
++      if (!(net in seen)) { seen[net] = 1; if (++count <= 16) print net } }'
++}
++# Makes HETU_LNET for family $1 hold exactly the wanted prefixes. Returns 1 on any failed command.
++lnet_apply(){
++  LA_F="$1"; LA_WANT="$2"
++  if [ -z "$LA_WANT" ] && ! lnet_x "$LA_F" -t mangle -S "$LNET" >/dev/null 2>&1; then return 0; fi
++  if ! lnet_x "$LA_F" -t mangle -S "$LNET" >/dev/null 2>&1; then
++    lnet_x "$LA_F" -t mangle -N "$LNET" || return 1
++    lnet_x "$LA_F" -t mangle -A "$LNET" -p udp --dport 53 -j RETURN || return 1
++    lnet_x "$LA_F" -t mangle -A "$LNET" -p tcp --dport 53 -j RETURN || return 1
++  fi
++  LA_HAVE=$(lnet_x "$LA_F" -t mangle -S "$LNET" 2>/dev/null | awk -v c="$LNET" '$1=="-A" && $2==c && $3=="-d" {print $4}') || return 1
++  LA_RC=0
++  for LA_P in $LA_HAVE; do
++    printf '%s\n' "$LA_WANT" | grep -Fqx -- "$LA_P" && continue
++    LA_N=0
++    while lnet_x "$LA_F" -t mangle -C "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" >/dev/null 2>&1; do
++      lnet_x "$LA_F" -t mangle -D "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" || { LA_RC=1; break; }
++      LA_N=$((LA_N+1)); [ "$LA_N" -lt 4 ] || break
++    done
++  done
++  for LA_P in $LA_WANT; do
++    case "$LA_P" in *[!0-9a-fA-F:./]*|'') LA_RC=1; continue;; esac
++    lnet_x "$LA_F" -t mangle -C "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" >/dev/null 2>&1 && continue
++    lnet_x "$LA_F" -t mangle -A "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" || LA_RC=1
++  done
++  if ! lnet_x "$LA_F" -t mangle -C OUTPUT -j "$LNET" >/dev/null 2>&1; then
++    lnet_x "$LA_F" -t mangle -I OUTPUT 1 -j "$LNET" || LA_RC=1
++  fi
++  return "$LA_RC"
++}
++lnet_sync(){ (
++  trap 'release_lock' EXIT
++  [ -r "$SESSION" ] && [ -r "$PIDFILE" ] || exit 0
++  case "$(sed -n 's/^MODE=//p' "$SESSION" 2>/dev/null | head -n 1)" in tproxy|redirect|enhance|ebpf) ;; *) exit 0;; esac
++  # A start, stop or fail-open owns the rules right now: skip, the watchdog retries on its next tick.
++  try_lock_once || exit 3
++  [ -r "$SESSION" ] && [ -r "$PIDFILE" ] || exit 0
++  load_session_fake_ip_policy >/dev/null 2>&1 || true
++  LS_RC=0; LS_SUM=""
++  for LS_F in 4 6; do
++    if [ "$LS_F" = 6 ]; then has ip6tables && v6supported || continue; fi
++    LS_WANT=$(lnet_wanted "$LS_F") || { LS_RC=1; continue; }
++    lnet_apply "$LS_F" "$LS_WANT" || LS_RC=1
++    LS_SUM="$LS_SUM v$LS_F=[$(printf '%s' "$LS_WANT" | tr '\n' ' ' | sed 's/ $//')]"
++  done
++  printf '%s lnet-sync rc=%s%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$LS_RC" "$LS_SUM" >> "$RUN/lnet.log" 2>/dev/null || true
++  exit "$LS_RC"
++); }
++# Watchdog: LAN addresses of both families; a change must hold for two looks >= 4 s apart.
++wd_lnet_sig(){ { ip -o -4 addr show scope global; ip -o -6 addr show scope global; } 2>/dev/null |
++  awk '$2 ~ /^(wlan|eth|swlan|rndis|usb|bt-pan)/ || $2 ~ /^ap[0-9]/ {printf "%s=%s ", $2, $4}'; }
++wd_lnet_tick(){
++  WLT_SIG=$(wd_lnet_sig)
++  [ "$WLT_SIG" != "$WD_LNET_DONE" ] || { WD_LNET_SEEN=""; return 0; }
++  wd_now
++  if [ "$WLT_SIG" != "$WD_LNET_SEEN" ]; then WD_LNET_SEEN="$WLT_SIG"; WD_LNET_AT=$((WD_NOW+4)); return 0; fi
++  [ "$WD_NOW" -ge "${WD_LNET_AT:-0}" ] || return 0
++  if has timeout; then timeout -s TERM -k 1 10 "$0" lnet-sync >/dev/null 2>&1; else "$0" lnet-sync >/dev/null 2>&1; fi
++  case "$?" in
++    0) WD_LNET_DONE="$WLT_SIG"; WD_LNET_SEEN=""; wd_log "network change: local-network bypass refreshed (${WLT_SIG:-offline})";;
++    3) ;;
++    *) WD_LNET_AT=$((WD_NOW+20)); wd_log "network change: local-network bypass refresh failed; retrying in 20 s";;
++  esac
 +}
 +wd_liveness(){
 +  WD_LIVE_REASON=""
@@ -40665,6 +40787,7 @@ index ae832da..0f05597 100755
 +  cg_escape "$$"
 +  HETU_WATCHDOG_CALL=1; export HETU_WATCHDOG_CALL
 +  wd_selfheal_init
++  WD_LNET_DONE=""; WD_LNET_SEEN=""; WD_LNET_AT=0
 +  MISS=0; H_TICK=0
 +  while [ "$MISS" -lt 3 ]; do
 +    [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
@@ -40672,6 +40795,7 @@ index ae832da..0f05597 100755
 +      MISS=0; H_TICK=$((H_TICK+1))
 +      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
 +        case "$CNIP_STATE" in ipset|iptables|ebpf) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
++      wd_lnet_tick
 +      wd_selfheal_tick
 +      sleep 2
 +    else MISS=$((MISS+1)); sleep 0.20; fi
@@ -40737,7 +40861,7 @@ index ae832da..0f05597 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +4448,45 @@ probe_core_owner(){
+@@ -1045,9 +4555,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -40784,7 +40908,7 @@ index ae832da..0f05597 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +4497,29 @@ core_identity_prepare(){
+@@ -1058,14 +4604,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -40818,7 +40942,7 @@ index ae832da..0f05597 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +4533,9 @@ core_launch(){
+@@ -1079,8 +4640,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -40830,7 +40954,7 @@ index ae832da..0f05597 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,26 +4602,82 @@ core_tune(){
+@@ -1147,26 +4709,82 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -40914,7 +41038,7 @@ index ae832da..0f05597 100755
    GF_FILE="$RUN/.google-firewall.$$"
    for GF_TOOL in xt4q xt6q; do
      for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
-@@ -1176,8 +4687,8 @@ google_firewall_cleanup(){
+@@ -1176,8 +4794,8 @@ google_firewall_cleanup(){
        while IFS= read -r GF_RULE; do
          # Quotes/comments and inverted/range UID matches are deliberately left intact.
          case "$GF_RULE" in *\"*|*\'*) continue;; esac
@@ -40925,7 +41049,7 @@ index ae832da..0f05597 100755
            $1=="-A" && $2==c {
              uid="";target="";inverted=0
              for(i=3;i<=NF;i++) {
-@@ -1208,33 +4719,136 @@ google_firewall_cleanup(){
+@@ -1208,33 +4826,136 @@ google_firewall_cleanup(){
      tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
    fi
  }
@@ -41066,7 +41190,7 @@ index ae832da..0f05597 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +4856,16 @@ start(){
+@@ -1242,8 +4963,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -41084,7 +41208,7 @@ index ae832da..0f05597 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +4875,98 @@ start(){
+@@ -1253,75 +4982,98 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -41221,7 +41345,7 @@ index ae832da..0f05597 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +4978,94 @@ start(){
+@@ -1333,19 +5085,94 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -41322,7 +41446,7 @@ index ae832da..0f05597 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1358,6 +5078,8 @@ status(){
+@@ -1358,6 +5185,8 @@ status(){
      case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
    fi
 
@@ -41331,7 +41455,7 @@ index ae832da..0f05597 100755
    STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
    SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
    DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
-@@ -1375,6 +5097,7 @@ status(){
+@@ -1375,6 +5204,7 @@ status(){
    DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
    PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
    GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
@@ -41339,7 +41463,7 @@ index ae832da..0f05597 100755
    TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
    CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
    case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
-@@ -1407,6 +5130,12 @@ status(){
+@@ -1407,6 +5237,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -41352,7 +41476,7 @@ index ae832da..0f05597 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +5216,36 @@ status(){
+@@ -1487,13 +5323,36 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -41391,7 +41515,7 @@ index ae832da..0f05597 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +5369,8 @@ health_collect(){
+@@ -1617,6 +5476,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -41400,7 +41524,7 @@ index ae832da..0f05597 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +5420,18 @@ health_restore_table(){
+@@ -1666,16 +5527,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -41421,7 +41545,7 @@ index ae832da..0f05597 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +5480,7 @@ health_repair(){ (
+@@ -1724,7 +5587,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -41430,7 +41554,7 @@ index ae832da..0f05597 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +5513,481 @@ health_json(){ (
+@@ -1757,6 +5620,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -41912,7 +42036,7 @@ index ae832da..0f05597 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +6005,36 @@ case "${1:-status}" in
+@@ -1774,10 +6112,38 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -41936,6 +42060,8 @@ index ae832da..0f05597 100755
 +  ebpf-update) { [ "$#" = 1 ] || [ "$#" = 4 ]; } || fail "参数错误"; root; shift; ebpf_update "$@";;
 +  # Called by the App on every network change (and by the watchdog itself every ~12 s): an App call
 +  # also asks the watchdog to re-verify that the core answers, not only the rules.
++  # 7.0.0: re-derive the on-link bypass of the current Wi-Fi/Ethernet (watchdog, after a network change).
++  lnet-sync) [ "$#" = 1 ] || exit 1; root; lnet_sync;;
 +  repair-network) [ "$#" = 2 ] || exit 1; root; [ -n "${HETU_WATCHDOG_CALL:-}" ] || { : > "$RUN/liveness.kick"; } 2>/dev/null || true; health_repair "$2";;
 +  monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
 +  # 3.0.0 system-side recovery (stop/start spawn it detached), probe URL discovery for the App, and the
@@ -54021,6 +54147,67 @@ index 0000000..fa5d493
 +        return v;
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java
+new file mode 100644
+index 0000000..fea3c08
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DelayUrlChoice700.java
+@@ -0,0 +1,55 @@
++package io.github.xgl34222220.hetu;
++
++import java.net.URI;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++
++/**
++ * 7.0.0: delay-URL choice. Cloudflare-Worker (edgetunnel) VLESS-WS nodes cannot reach
++ * Cloudflare-hosted targets, so a group/health-check URL such as cp.cloudflare.com reports a
++ * live node as a timeout. When no custom URL is set and the effective URL is a Cloudflare test
++ * target, gstatic is tried after it. Pure Java (no Android types) so it is unit-testable.
++ */
++final class DelayUrlChoice700 {
++    static final String NEUTRAL_URL = "https://www.gstatic.com/generate_204";
++
++    private DelayUrlChoice700() {}
++
++    static boolean isCloudflareTarget(String url) {
++        if (url == null) return false;
++        String host;
++        try { host = new URI(url.trim()).getHost(); } catch (Exception ignored) { return false; }
++        if (host == null) return false;
++        host = host.toLowerCase(Locale.ROOT);
++        if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
++        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
++        return host.equals("cloudflare.com") || host.endsWith(".cloudflare.com")
++            || host.equals("1.1.1.1") || host.equals("1.0.0.1")
++            || host.equals("2606:4700:4700::1111") || host.equals("2606:4700:4700:0:0:0:0:1111");
++    }
++
++    /** Ordered per-node delay URLs: custom only when set; else preferred (+gstatic after a Cloudflare target); else defaults. */
++    static List<String> delayUrls(String custom, String preferred, String[] defaults) {
++        ArrayList<String> urls = new ArrayList<>();
++        String c = custom == null ? "" : custom.trim();
++        if (!c.isEmpty()) urls.add(c);
++        String p = preferred == null ? "" : preferred.trim();
++        if (!p.isEmpty()) {
++            if (!urls.contains(p)) urls.add(p);
++            if (c.isEmpty() && isCloudflareTarget(p) && !urls.contains(NEUTRAL_URL)) urls.add(NEUTRAL_URL);
++        } else {
++            for (String item : defaults) if (!urls.contains(item)) urls.add(item);
++        }
++        return urls;
++    }
++
++    /** URL for the one failed-node retry: custom wins; a Cloudflare group URL is swapped for gstatic. */
++    static String retryUrl(String custom, String groupUrl, String fallback) {
++        String c = custom == null ? "" : custom.trim();
++        if (!c.isEmpty()) return c;
++        String g = groupUrl == null ? "" : groupUrl.trim();
++        if (g.isEmpty()) return fallback;
++        return isCloudflareTarget(g) ? NEUTRAL_URL : g;
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java
 new file mode 100644
 index 0000000..a969d57
@@ -54556,7 +54743,7 @@ index 34494b0..2a315f4 100644
 
      static Set<String> subscriptionExceptions(Collection<String> userBlocks) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-index f104cef..2380e94 100644
+index f104cef..c5a45d9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 @@ -74,6 +74,14 @@ final class MihomoControllerClient {
@@ -54574,7 +54761,25 @@ index f104cef..2380e94 100644
          }
 
          private static String string(Map<String,?> values,String key,String fallback)throws IOException {
-@@ -123,13 +131,19 @@ final class MihomoControllerClient {
+@@ -93,14 +101,9 @@ final class MihomoControllerClient {
+     }
+
+     private void addDelayUrls(ArrayList<String> urls,String preferredUrl){
+-        String custom=customDelayUrl();
+-        if(!custom.isEmpty())urls.add(custom);
+-        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
+-            String preferred=preferredUrl.trim();
+-            if(!urls.contains(preferred))urls.add(preferred);
+-        }else{
+-            for(String item:DEFAULT_DELAY_URLS)if(!urls.contains(item))urls.add(item);
+-        }
++        // 7.0.0: a Cloudflare group URL gets gstatic after it (edgetunnel nodes cannot reach CF).
++        for(String item:DelayUrlChoice700.delayUrls(customDelayUrl(),preferredUrl,DEFAULT_DELAY_URLS))
++            if(!urls.contains(item))urls.add(item);
+     }
+
+     JSONObject proxies()throws Exception{
+@@ -123,13 +126,19 @@ final class MihomoControllerClient {
          return delayIpv6(node, "");
      }
      long delayIpv6(String node,String provider)throws Exception{
@@ -54596,7 +54801,43 @@ index f104cef..2380e94 100644
      }
 
      void reloadConfig(String path)throws Exception{
-@@ -174,23 +188,33 @@ final class MihomoControllerClient {
+@@ -141,6 +150,11 @@ final class MihomoControllerClient {
+         request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));
+     }
+
++    /** Releases a URLTest/Fallback pin (Mihomo DELETE /proxies/{group} clears `fixed`). */
++    void unfix(String group)throws Exception{
++        request("DELETE","/proxies/"+Uri.encode(group),null);
++    }
++
+     void updateRuleProvider(String name)throws Exception{
+         request("PUT","/providers/rules/"+Uri.encode(name),null,30000);
+     }
+@@ -169,28 +183,60 @@ final class MihomoControllerClient {
+         return delayPath("/proxies/"+Uri.encode(node)+"/delay",preferredUrl,expected);
+     }
+
++    /**
++     * 7.0.0: one per-proxy delay request with an explicit timeout, used to retest nodes whose
++     * first group-test reading failed. Returns the delay, -1 for a core timeout (504) or -2 for
++     * another core-reported failure; controller transport errors are thrown.
++     */
++    long delayOnce(String node,String url,String expected,int timeoutMs)throws Exception{
++        String test=URLEncoder.encode(url,"UTF-8");
++        String status=URLEncoder.encode((expected==null||expected.trim().isEmpty())?"200-399":expected.trim(),"UTF-8");
++        try{
++            JSONObject v=request("GET","/proxies/"+Uri.encode(node)+"/delay?timeout="+timeoutMs+"&url="+test+"&expected="+status,null,timeoutMs+1500);
++            long d=v.optLong("delay",-1);
++            return d>0?d:-2L;
++        }catch(ControllerHttpException error){
++            if(error.statusCode==504||error.statusCode==408)return -1L;
++            if(error.statusCode==503)return -2L;
++            throw error;
++        }
++    }
++
+     long providerDelay(String provider,String node,String preferredUrl,String expected)throws Exception{
+         return delayPath("/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck",preferredUrl,expected);
      }
 
      private long delayPath(String path,String preferredUrl,String expected)throws Exception{
@@ -54612,7 +54853,9 @@ index f104cef..2380e94 100644
              ArrayList<String> urls=new ArrayList<>();
              addDelayUrls(urls,preferredUrl);
              String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
-             for(String rawUrl:urls){
+-            for(String rawUrl:urls){
++            for(int urlIndex=0;urlIndex<urls.size();urlIndex++){
++                String rawUrl=urls.get(urlIndex);
 +                budget.check();
                  try{
                      String test=URLEncoder.encode(rawUrl,"UTF-8");
@@ -54629,11 +54872,13 @@ index f104cef..2380e94 100644
 -                    if(error.statusCode==504)last=new DelayFailure(true);
 +                    // A core-confirmed timeout already spent the whole 5 s window on this node.
 +                    // Retrying the next default URL only doubled the dead-node cost of a wave.
++                    // 7.0.0 exception: a Cloudflare target timing out still tries the gstatic fallback.
++                    if(error.statusCode==504&&urlIndex+1<urls.size()&&DelayUrlChoice700.isCloudflareTarget(rawUrl)){last=new DelayFailure(true);continue;}
 +                    if(error.statusCode==504)throw new DelayFailure(true);
                      else if(error.statusCode==503)last=new DelayFailure(false);
                      else throw error;
                  }
-@@ -198,8 +222,9 @@ final class MihomoControllerClient {
+@@ -198,8 +244,9 @@ final class MihomoControllerClient {
              if(last!=null)throw last;
              throw new IOException("没有可用的测速地址");
          }finally{
@@ -54644,7 +54889,7 @@ index f104cef..2380e94 100644
      }
 
      JSONObject groupDelay(String group)throws Exception{
-@@ -207,11 +232,16 @@ final class MihomoControllerClient {
+@@ -207,11 +254,16 @@ final class MihomoControllerClient {
      }
 
      JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
@@ -54661,7 +54906,7 @@ index f104cef..2380e94 100644
              try{
                  String test=URLEncoder.encode(rawUrl,"UTF-8");
                  String status=URLEncoder.encode(expectedRange,"UTF-8");
-@@ -228,6 +258,25 @@ final class MihomoControllerClient {
+@@ -228,6 +280,30 @@ final class MihomoControllerClient {
          }
          if(last!=null)throw last;
          throw new IOException("策略组延迟测试失败");
@@ -54669,6 +54914,11 @@ index f104cef..2380e94 100644
 +    }
 +
 +    /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
++    /** 7.0.0: URL for the failed-node retry (gstatic instead of a Cloudflare group URL). */
++    String retryDelayUrl(String groupUrl){
++        return DelayUrlChoice700.retryUrl(customDelayUrl(),groupUrl,DEFAULT_DELAY_URLS[0]);
++    }
++
 +    String waveDelayUrl(String groupUrl){
 +        String custom=customDelayUrl();
 +        if(!custom.isEmpty())return custom;
@@ -54687,7 +54937,7 @@ index f104cef..2380e94 100644
      }
 
      void closeAll()throws Exception{request("DELETE","/connections",null);}
-@@ -246,9 +295,12 @@ final class MihomoControllerClient {
+@@ -246,9 +322,12 @@ final class MihomoControllerClient {
          byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
          ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
          Socket socket=new Socket();
@@ -54702,7 +54952,7 @@ index f104cef..2380e94 100644
              OutputStream raw=socket.getOutputStream();
              StringBuilder head=new StringBuilder();
              head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-@@ -265,7 +317,10 @@ final class MihomoControllerClient {
+@@ -265,7 +344,10 @@ final class MihomoControllerClient {
              raw.flush();
 
              BufferedInputStream in=new BufferedInputStream(socket.getInputStream());
@@ -54714,7 +54964,7 @@ index f104cef..2380e94 100644
              String[] bits=status.split(" ",3);if(bits.length<2)throw new IOException("Mihomo 控制接口状态行无效");
              int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
              HashMap<String,String> headers=new HashMap<>();String line;
-@@ -281,8 +336,12 @@ final class MihomoControllerClient {
+@@ -281,8 +363,12 @@ final class MihomoControllerClient {
              }else bytes=readToEnd(in);
              String text=new String(bytes,StandardCharsets.UTF_8);
              if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
@@ -55180,6 +55430,19 @@ index 0000000..fe1a275
 +
 +    static final long STABLE_DELAY_MS = 2500L;
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelExtras19.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelExtras19.kt
+index 6d59b6c..5b2c826 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelExtras19.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelExtras19.kt
+@@ -311,7 +311,7 @@ internal fun RefApiConfigSheet19(
+                         keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("api-delay-url"),
+                         decorationBox = { inner ->
+-                            if (delayUrl.isEmpty()) Text("https://cp.cloudflare.com/generate_204", color = t.textSecondary.copy(alpha = .6f), fontSize = 15.sp)
++                            if (delayUrl.isEmpty()) Text("https://www.gstatic.com/generate_204", color = t.textSecondary.copy(alpha = .6f), fontSize = 15.sp)
+                             inner()
+                         },
+                     )
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java
 index d8b6925..5221074 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java
@@ -55710,10 +55973,21 @@ index 738ebf5..428a4cc 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..678eab5 100644
+index 4f004b9..fca691f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-@@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
+@@ -39,6 +39,10 @@ internal data class ProxyGroupUi(
+     val iconUrl: String = "",
+     val iconPath: String = "",
+     val hidden: Boolean = false,
++    /** Mihomo `fixed`: node pinned by PUT on URLTest/Fallback groups ("" when not pinned). */
++    val fixed: String = "",
++    /** Mihomo group `testUrl`, used for per-node delay retries ("" when absent). */
++    val testUrl: String = "",
+ )
+
+ internal data class ProxyConnectionUi(
+@@ -68,6 +72,8 @@ internal data class ProxyRuleUi(
      val size: Int = -1,
      val disabled: Boolean = false,
      val hitCount: Long = 0L,
@@ -55722,7 +55996,7 @@ index 4f004b9..678eab5 100644
  )
 
  internal data class ProxyRuleProviderUi(
-@@ -114,6 +116,8 @@ internal data class ProxyComposeState(
+@@ -114,6 +120,8 @@ internal data class ProxyComposeState(
      val watchdog: Boolean = false,
      val dataPlaneHealthy: Boolean = false,
      val healthObserved: Boolean = false,
@@ -55731,7 +56005,7 @@ index 4f004b9..678eab5 100644
      val trafficMode: String = "",
      // Ephemeral authority from this read only; cached UI/health hints never arm
      // Android service recovery. This is independent from dataPlaneHealthy.
-@@ -122,8 +126,31 @@ internal data class ProxyComposeState(
+@@ -122,8 +130,31 @@ internal data class ProxyComposeState(
      val continuityObservationTicket: Long = -1L,
      val continuityObservationSession: String = "",
      val continuityObservationNetworkEpoch: Long = 0L,
@@ -55763,7 +56037,7 @@ index 4f004b9..678eab5 100644
  internal class ProxyComposeController(context: Context) {
      private val app = context.applicationContext
      private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
-@@ -151,11 +178,35 @@ internal class ProxyComposeController(context: Context) {
+@@ -151,11 +182,35 @@ internal class ProxyComposeController(context: Context) {
              observation.continuityObservationTicket, observation.continuityObservationSession,
              observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
@@ -55801,7 +56075,7 @@ index 4f004b9..678eab5 100644
          } catch (cancel: CancellationException) { throw cancel }
          catch (_: Exception) { emptyMap() }
 
-@@ -208,6 +259,16 @@ internal class ProxyComposeController(context: Context) {
+@@ -208,6 +263,16 @@ internal class ProxyComposeController(context: Context) {
                      val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                          else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                      if (observedPid > 0) live.put("pid", observedPid)
@@ -55818,7 +56092,7 @@ index 4f004b9..678eab5 100644
                      freshStatus = true
                  }
              } catch (cancel: CancellationException) { throw cancel }
-@@ -229,6 +290,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -229,6 +294,7 @@ internal class ProxyComposeController(context: Context) {
                      .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                      .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                      .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
@@ -55826,7 +56100,7 @@ index 4f004b9..678eab5 100644
                  else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
              }
          } else {
-@@ -247,6 +309,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -247,6 +313,7 @@ internal class ProxyComposeController(context: Context) {
                  .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                  .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                  .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
@@ -55834,7 +56108,7 @@ index 4f004b9..678eab5 100644
          }
          // A completed status observation supersedes the cached fast hint, including
          // a confirmed stopped core. Missing/failed observations keep only the hint.
-@@ -275,15 +338,22 @@ internal class ProxyComposeController(context: Context) {
+@@ -275,15 +342,22 @@ internal class ProxyComposeController(context: Context) {
                      .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
                      .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
                      .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
@@ -55857,7 +56131,7 @@ index 4f004b9..678eab5 100644
                      .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
                  val livePort = status.optInt("controllerPort", 0)
                  if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
-@@ -299,13 +369,39 @@ internal class ProxyComposeController(context: Context) {
+@@ -299,13 +373,39 @@ internal class ProxyComposeController(context: Context) {
          var trafficMode = ""
          var controllerReadFailed = false
          var controllerError = ""
@@ -55902,7 +56176,7 @@ index 4f004b9..678eab5 100644
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
                  // selection or publish the absent counters as a fresh zero measurement.
-@@ -337,7 +433,8 @@ internal class ProxyComposeController(context: Context) {
+@@ -337,7 +437,8 @@ internal class ProxyComposeController(context: Context) {
          }
          val observed = ProxyComposeState(
              running = running,
@@ -55912,7 +56186,7 @@ index 4f004b9..678eab5 100644
              mode = profile.mode.label,
              ipv6 = profile.ipv6.id,
              effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
-@@ -362,6 +459,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -362,6 +463,7 @@ internal class ProxyComposeController(context: Context) {
                  else -> ""
              },
              panelReady = panelReady,
@@ -55920,7 +56194,7 @@ index 4f004b9..678eab5 100644
              controllerReadFailed = controllerReadFailed,
              controllerError = controllerError,
              groups = groups,
-@@ -384,6 +482,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -384,6 +486,7 @@ internal class ProxyComposeController(context: Context) {
              watchdog = status.optBoolean("watchdog", false),
              dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
              healthObserved = healthObserved,
@@ -55928,7 +56202,7 @@ index 4f004b9..678eab5 100644
              trafficMode = trafficMode,
              continuityRootObserved = continuityRootObserved,
              continuityAutomationOnly = continuityAutomationOnly,
-@@ -410,8 +509,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -410,8 +513,12 @@ internal class ProxyComposeController(context: Context) {
          LegacyAppMigrator.migrateIfNeeded(app)
          var profile = ProxyRuntimeProfile.load(prefs)
          if (!profile.capability().available) {
@@ -55943,7 +56217,7 @@ index 4f004b9..678eab5 100644
              profile = ProxyRuntimeProfile.load(prefs)
          }
          if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
-@@ -419,13 +522,47 @@ internal class ProxyComposeController(context: Context) {
+@@ -419,13 +526,47 @@ internal class ProxyComposeController(context: Context) {
              prefs.edit().putString("proxyBaseCore", "mihomo").apply()
              profile = ProxyRuntimeProfile.load(prefs)
          }
@@ -55997,7 +56271,7 @@ index 4f004b9..678eab5 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -435,10 +572,22 @@ internal class ProxyComposeController(context: Context) {
+@@ -435,10 +576,22 @@ internal class ProxyComposeController(context: Context) {
      suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
          LegacyAppMigrator.migrateIfNeeded(app)
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -56021,7 +56295,7 @@ index 4f004b9..678eab5 100644
          val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
          check(replaced) { "重启未完成，请等待当前操作结束后重试" }
          check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
-@@ -448,7 +597,8 @@ internal class ProxyComposeController(context: Context) {
+@@ -448,7 +601,8 @@ internal class ProxyComposeController(context: Context) {
      suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
          val selected = configs.selected(profile.core)
@@ -56031,7 +56305,7 @@ index 4f004b9..678eab5 100644
          onProgress("执行服务停止后脚本…")
          ProxyScriptHooks.run(app, "post-stop", profile.mode.id, selected?.name ?: "")
          result
-@@ -481,7 +631,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -481,7 +635,7 @@ internal class ProxyComposeController(context: Context) {
 
      suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -56040,7 +56314,7 @@ index 4f004b9..678eab5 100644
          val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
          var downloaded = 0
          for (chunk in urls.chunked(6)) {
-@@ -515,7 +665,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -515,7 +669,12 @@ internal class ProxyComposeController(context: Context) {
          "disable" to "禁用本机 IPv6",
      )
 
@@ -56054,7 +56328,7 @@ index 4f004b9..678eab5 100644
      fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
      fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
      fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
-@@ -532,13 +687,20 @@ internal class ProxyComposeController(context: Context) {
+@@ -532,13 +691,20 @@ internal class ProxyComposeController(context: Context) {
              ProxyConfigUi(
                  name = it.name,
                  selected = it.name == selected,
@@ -56077,7 +56351,7 @@ index 4f004b9..678eab5 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -551,8 +713,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -551,8 +717,10 @@ internal class ProxyComposeController(context: Context) {
          val profile = ProxyRuntimeProfile.load(prefs)
          val entry = configs.selected(profile.core)
          val name = entry?.name ?: "尚未选择配置"
@@ -56090,7 +56364,7 @@ index 4f004b9..678eab5 100644
          name to items
      }
 
-@@ -563,25 +727,25 @@ internal class ProxyComposeController(context: Context) {
+@@ -563,25 +731,25 @@ internal class ProxyComposeController(context: Context) {
 
      suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -56120,7 +56394,16 @@ index 4f004b9..678eab5 100644
          configs.deleteSubscription(entry, name)
      }
 
-@@ -683,6 +847,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -636,6 +804,8 @@ internal class ProxyComposeController(context: Context) {
+                 iconUrl = iconUrl,
+                 iconPath = icons.diskPath(iconUrl),
+                 hidden = group.optBoolean("hidden", false),
++                fixed = group.optString("fixed", ""),
++                testUrl = group.optString("testUrl", ""),
+             )
+         }
+         // GLOBAL.all carries configuration order; JSON object key order does not.
+@@ -683,6 +853,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -56131,7 +56414,7 @@ index 4f004b9..678eab5 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -789,6 +957,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +963,7 @@ internal class ProxyComposeController(context: Context) {
                  size = r.optInt("size", -1),
                  disabled = extra?.optBoolean("disabled", false) ?: false,
                  hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
@@ -56139,7 +56422,7 @@ index 4f004b9..678eab5 100644
              )
          }
          return out
-@@ -813,6 +982,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +988,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -56158,7 +56441,7 @@ index 4f004b9..678eab5 100644
      private var lastIconSource: String? = null
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
-@@ -824,19 +1005,4 @@ internal class ProxyComposeController(context: Context) {
+@@ -824,19 +1011,4 @@ internal class ProxyComposeController(context: Context) {
          return parsed
      }
 
@@ -59416,18 +59699,19 @@ index b914f23..543d203 100644
          private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
          private const val MAX_EXTRACTED = 128L * 1024L * 1024L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..ef67327 100644
+index 5ae93b3..e57bcdf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-@@ -11,6 +11,7 @@ import kotlinx.coroutines.ensureActive
+@@ -11,6 +11,8 @@ import kotlinx.coroutines.ensureActive
  import kotlinx.coroutines.withContext
  import kotlinx.coroutines.sync.Mutex
  import kotlinx.coroutines.sync.withLock
++import kotlinx.coroutines.sync.withPermit
 +import io.github.xgl34222220.hetu.panel.SingBoxPanelStore
  import java.io.IOException
  import org.json.JSONArray
  import org.json.JSONObject
-@@ -53,34 +54,51 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -53,34 +55,51 @@ internal class ProxyDashboardRepository(context: Context) {
          // Activities have independent repository/cache instances but mutate the
          // same core. A confirmed mutation must supersede observations in all of them.
          val probeMutationEpoch = AtomicLong()
@@ -59485,7 +59769,7 @@ index 5ae93b3..ef67327 100644
          val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
          val configKey = "proxySelectedConfig.${core.id}"
          val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
-@@ -91,11 +109,18 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -91,11 +110,18 @@ internal class ProxyDashboardRepository(context: Context) {
                  ProxyConfigLibrary.BUNDLED_NAME else ""
          }
          // Ordinary status/health reads do not change this nonblocking control epoch.
@@ -59506,7 +59790,7 @@ index 5ae93b3..ef67327 100644
              throw IOException("代理或控制接口已变化，请重新测速")
      }
 
-@@ -180,6 +205,8 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -180,6 +206,8 @@ internal class ProxyDashboardRepository(context: Context) {
 
 
      suspend fun state(): ProxyComposeState = controller.state()
@@ -59515,7 +59799,27 @@ index 5ae93b3..ef67327 100644
      suspend fun rules(): List<ProxyRuleUi> = controller.rules()
      suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false,
          ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
-@@ -259,14 +286,38 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -214,6 +242,19 @@ internal class ProxyDashboardRepository(context: Context) {
+             .putInt("proxyLastSelectionCloseFailed", failed)
+             .apply()
+     }
++    /** 7.0.0: live (now, fixed, type) of one group, read from the ticket's controller. */
++    suspend fun readSelection(group: String, ticket: SelectionTicket): Triple<String, String, String>? =
++        withContext(Dispatchers.IO) {
++            requireCurrentOrigin(ticket.identity)
++            val entry = ticket.client(app).proxies().optJSONObject(group) ?: return@withContext null
++            Triple(entry.optString("now", ""), entry.optString("fixed", ""), entry.optString("type", ""))
++        }
++    /** 7.0.0: releases an automatic group's pin so the core resumes its own choice. */
++    suspend fun unpin(group: String, ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
++        requireCurrentOrigin(ticket.identity)
++        ticket.client(app).unfix(group)
++        acknowledgeMutation(ticket)
++    }
+     suspend fun closeConnection(id: String) = controller.closeConnection(id)
+     /** V19: live Mihomo traffic mode (rule / global / direct); "rule" when unreadable. */
+     suspend fun trafficMode(): String = withContext(Dispatchers.IO) {
+@@ -259,14 +300,38 @@ internal class ProxyDashboardRepository(context: Context) {
 
      /** Only real remote HTTP providers belong on the subscription page. */
      suspend fun providers(): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
@@ -59556,7 +59860,7 @@ index 5ae93b3..ef67327 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
          val before = remoteProviders(operationApi.proxyProviders())
-@@ -291,6 +342,11 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -291,6 +356,11 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      suspend fun refreshRuleSets(ticket: SelectionTicket = captureSelection()): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
@@ -59568,7 +59872,7 @@ index 5ae93b3..ef67327 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
          val before = parseRuleSets(operationApi.ruleProviders())
-@@ -315,7 +371,7 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -315,7 +385,7 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
@@ -59577,7 +59881,7 @@ index 5ae93b3..ef67327 100644
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
              if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
-@@ -325,30 +381,65 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -325,30 +395,65 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
@@ -59654,7 +59958,7 @@ index 5ae93b3..ef67327 100644
          return results
      }
 
-@@ -366,35 +457,104 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -366,35 +471,127 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }.toList()
  }
 
@@ -59728,7 +60032,8 @@ index 5ae93b3..ef67327 100644
 +                coroutineContext.ensureActive()
 +                val landed = synchronized(results) { results.keys.toSet() }
 +                freshCoreWaveResults(live, url, baseline.filterKeys { it !in landed }).forEach { (node, value) -> land(node, value) }
-+            }
+             }
+-            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
 +        }
 +        val outcome = wave.await()
 +        poller?.cancel()
@@ -59738,8 +60043,7 @@ index 5ae93b3..ef67327 100644
 +                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
 +                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() }, pending.size)
 +                else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
-             }
--            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
++            }
 +        }
 +        val allFailed = outcome.isFailure
 +        requireCurrentProbe(snapshot.identity)
@@ -59765,6 +60069,29 @@ index 5ae93b3..ef67327 100644
          requireCurrentProbe(snapshot.identity)
 -        results
 +        synchronized(results) { results.toMap() }
++    }
++
++    /**
++     * 7.0.0: retests nodes whose first group-test reading failed, once each, with a per-proxy
++     * /proxies/{name}/delay against the group's test URL (the configured custom URL wins, as in
++     * the group wave). At most [RETRY_DELAY_CONCURRENCY_700] in flight, [RETRY_DELAY_TIMEOUT_MS_700]
++     * each. A node whose retry request itself failed is absent from the result.
++     */
++    suspend fun retryDelays(group: ProxyGroupUi, nodes: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
++        if (nodes.isEmpty()) return@withContext emptyMap()
++        val url = api.retryDelayUrl(group.testUrl)
++        val slots = kotlinx.coroutines.sync.Semaphore(io.github.xgl34222220.hetu.panel.RETRY_DELAY_CONCURRENCY_700)
++        coroutineScope {
++            nodes.distinct().map { node ->
++                async {
++                    slots.withPermit {
++                        try { node to api.delayOnce(node, url, "200-399", io.github.xgl34222220.hetu.panel.RETRY_DELAY_TIMEOUT_MS_700) }
++                        catch (cancel: CancellationException) { throw cancel }
++                        catch (_: Exception) { null }
++                    }
++                }
++            }.awaitAll().filterNotNull().toMap()
++        }
      }
 
      /** Core-parallel group latency probe used by strategy-card delay taps. */
@@ -59773,7 +60100,7 @@ index 5ae93b3..ef67327 100644
          // The Selector endpoint returns one complete wave. A successful selection
          // or provider update can supersede it without changing the API/settings.
          readCurrentProbe(probeIdentity()) {
-@@ -414,7 +574,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -414,7 +611,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          }
      }
 
@@ -59782,7 +60109,7 @@ index 5ae93b3..ef67327 100644
          val snapshot = probeSnapshot()
          val leaf = selectedProxyName(snapshot.proxies, node)
          readCurrentProbe(snapshot) {
-@@ -423,7 +583,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -423,7 +620,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
      suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -59791,7 +60118,7 @@ index 5ae93b3..ef67327 100644
          requireCurrentProbe(identity)
          val sites = ProxyLatencyTargets.load(app)
          // Hetu's UID is exempt from transparent Root interception. Explicitly enter
-@@ -444,7 +604,66 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -444,7 +641,66 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          measured
      }
 
@@ -59858,7 +60185,7 @@ index 5ae93b3..ef67327 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
          operationApi.updateProxyProvider(name)
-@@ -453,6 +672,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -453,6 +709,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
      suspend fun refreshRuleSet(name: String, ticket: SelectionTicket = captureSelection()): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
@@ -59866,7 +60193,7 @@ index 5ae93b3..ef67327 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
          operationApi.updateRuleProvider(name)
-@@ -478,7 +698,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -478,7 +735,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
              try {
                  val code = connection.responseCode
                  coroutineContext.ensureActive()
@@ -59876,7 +60203,7 @@ index 5ae93b3..ef67327 100644
              } finally {
                  runCatching { connection.inputStream?.close() }
                  connection.disconnect()
-@@ -564,3 +785,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -564,3 +822,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
  }
@@ -68219,11 +68546,21 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..c2f738a 100644
+index 250b8a8..b5a523f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-@@ -16,11 +16,14 @@ import androidx.lifecycle.AndroidViewModel
+@@ -14,13 +14,24 @@ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.setValue
+ import androidx.lifecycle.AndroidViewModel
  import androidx.lifecycle.viewModelScope
++import io.github.xgl34222220.hetu.panel.mergeRetry700
++import io.github.xgl34222220.hetu.panel.retryCandidates700
++import io.github.xgl34222220.hetu.panel.SELECT_CONFIRM_INTERVAL_MS_700
++import io.github.xgl34222220.hetu.panel.SELECT_CONFIRM_POLLS_700
++import io.github.xgl34222220.hetu.panel.SelectionOutcome700
++import io.github.xgl34222220.hetu.panel.isSelectorGroup700
++import io.github.xgl34222220.hetu.panel.selectionOutcome700
++import io.github.xgl34222220.hetu.panel.tapUnpins700
  import io.github.xgl34222220.hetu.ui.HetuComposeController
  import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.CoroutineScope
@@ -68237,7 +68574,7 @@ index 250b8a8..c2f738a 100644
  import kotlinx.coroutines.flow.MutableSharedFlow
  import kotlinx.coroutines.flow.SharedFlow
  import kotlinx.coroutines.isActive
-@@ -73,6 +76,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -73,6 +84,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          get() = tabState
          set(value) { tabState = value }
 
@@ -68253,7 +68590,7 @@ index 250b8a8..c2f738a 100644
      /** Open a live panel section from home cards, tools or deep links. */
      fun openPanel(section: String) {
          val requested = section.ifBlank { "overview" }
-@@ -80,6 +92,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -80,6 +100,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          tabState = HxTab.Panel
      }
 
@@ -68269,7 +68606,7 @@ index 250b8a8..c2f738a 100644
      fun setDefaultPanelSection(section: String) {
          val value = section.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
          prefs.edit().putString("defaultPanelSection", value).apply()
-@@ -142,10 +163,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -142,10 +171,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      /* ---------------- runtime state ---------------- */
@@ -68284,7 +68621,7 @@ index 250b8a8..c2f738a 100644
      var upRate by mutableLongStateOf(0L)
          private set
      var downRate by mutableLongStateOf(0L)
-@@ -212,15 +237,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -212,15 +245,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var providersUpdatingAll by mutableStateOf(false)
          private set
 
@@ -68309,13 +68646,13 @@ index 250b8a8..c2f738a 100644
 +        if (text.isBlank()) return
 +        explicitToastTones.remove(text)
 +        _messages.tryEmit(text)
-+    }
+     }
 +    /** Posts [text] with a fixed colour instead of reading it from the wording. */
 +    fun toastAs(tone: HxTone, text: String) {
 +        if (text.isBlank()) return
 +        explicitToastTones[text] = tone
 +        _messages.tryEmit(text)
-     }
++    }
 +    /** The tone of a posted toast: the caller's explicit tone, else the keyword fallback. */
 +    internal fun toastTone(text: String): HxTone = explicitToastTones[text] ?: hxToastTone(text)
 
@@ -68326,7 +68663,7 @@ index 250b8a8..c2f738a 100644
 
      /* ---------------- polling ---------------- */
      private var pollJob: Job? = null
-@@ -339,6 +387,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -339,6 +395,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          return request.takeIf { state.running && operation == null }
      }
 
@@ -68337,7 +68674,7 @@ index 250b8a8..c2f738a 100644
      private fun currentRuntimeRequest(request: RuntimeRequest, requireRunning: Boolean = true): Boolean {
          syncRequestSettings()
          return request.generation == runtimeRequestGeneration &&
-@@ -369,6 +421,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -369,6 +429,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              latestNodeProbe[node] = owner
              delays[node] = value
              measuredAt[node] = stamp
@@ -68361,7 +68698,7 @@ index 250b8a8..c2f738a 100644
          }
      }
 
-@@ -398,8 +467,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -398,8 +475,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -68389,7 +68726,7 @@ index 250b8a8..c2f738a 100644
              }
          }
          ProxyStatusNotificationService.refresh(app)
-@@ -412,20 +498,79 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,20 +506,79 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -68472,7 +68809,7 @@ index 250b8a8..c2f738a 100644
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
          rssBytes = prefs.getLong("proxyUiLastRss", 0L),
-@@ -449,15 +594,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +602,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -68508,7 +68845,7 @@ index 250b8a8..c2f738a 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +671,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +679,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -68536,7 +68873,7 @@ index 250b8a8..c2f738a 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -535,7 +716,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -535,7 +724,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
              lastProcessTicks = sampled.processTicks
              lastSystemTicks = sampled.systemTicks
@@ -68545,7 +68882,7 @@ index 250b8a8..c2f738a 100644
 
              if (!next.running) {
                  providers = emptyList()
-@@ -550,6 +731,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -550,6 +739,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                      if (owner == latestProviderRead && currentRuntimeRequest(request, requireRunning = false)) {
                          lastProviderRefreshAt = now
                          if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
@@ -68553,7 +68890,7 @@ index 250b8a8..c2f738a 100644
                      }
                  }
                  if (coreVersion.isBlank()) {
-@@ -560,17 +742,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +750,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -68571,7 +68908,7 @@ index 250b8a8..c2f738a 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +750,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +758,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -68579,7 +68916,7 @@ index 250b8a8..c2f738a 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +761,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +769,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -68590,7 +68927,7 @@ index 250b8a8..c2f738a 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -626,6 +799,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -626,6 +807,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              refreshing = true
              try {
                  refreshNow()
@@ -68598,7 +68935,7 @@ index 250b8a8..c2f738a 100644
                  val request = activeRuntimeRequest()
                  if (request != null) {
                      val providerOwner = beginProviderRead()
-@@ -636,6 +810,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -636,6 +818,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          p.await()?.let {
                              if (providerOwner == latestProviderRead && currentRuntimeRequest(request)) {
                                  providers = it
@@ -68606,7 +68943,7 @@ index 250b8a8..c2f738a 100644
                                  lastProviderRefreshAt = SystemClock.elapsedRealtime()
                              }
                          }
-@@ -664,7 +839,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -664,7 +847,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          viewModelScope.launch {
              try { toast(controller.setAutoStart(enabled)) }
              catch (cancel: CancellationException) { throw cancel }
@@ -68615,7 +68952,7 @@ index 250b8a8..c2f738a 100644
              finally { autoStartBusy = false; bumpSettings() }
          }
      }
-@@ -674,33 +849,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -674,33 +857,91 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          val stopping = state.running
          invalidateRuntimeRequests()
          operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
@@ -68715,7 +69052,7 @@ index 250b8a8..c2f738a 100644
                  }
              } finally {
                  operation = null
-@@ -727,14 +960,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -727,14 +968,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              operationText = "正在重启…"
              ProxyRuntimeSettings.beginApply(prefs)
              try {
@@ -68733,7 +69070,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -746,6 +979,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +987,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -68747,7 +69084,7 @@ index 250b8a8..c2f738a 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -755,7 +995,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -755,7 +1003,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -68756,7 +69093,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -764,8 +1004,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +1012,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -68791,7 +69128,7 @@ index 250b8a8..c2f738a 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,19 +1039,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,22 +1047,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -68826,8 +69163,96 @@ index 250b8a8..c2f738a 100644
 +        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-         if (current.now == node || current.nodes.none { it.name == node }) return
-@@ -827,13 +1106,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+-        if (current.now == node || current.nodes.none { it.name == node }) return
++        if (current.nodes.none { it.name == node }) return
++        // 7.0.0: tapping the node an automatic group is pinned to releases the pin.
++        if (tapUnpins700(current.type, current.fixed, node)) return unpin(group)
++        if (current.now == node && (isSelectorGroup700(current.type) || current.fixed == node)) return
+         val ticket = repo.captureSelection()
+         val owner = ++requestSequence
+         selectionOwners[group] = owner
+@@ -801,11 +1091,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false), ticket)
+                 // The already-sent PUT cannot be revoked, but must not revive a stopped UI.
+                 if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
++                // 7.0.0: poll the live group (now + fixed) instead of judging one readback.
++                // URLTest/Fallback store the PUT as `fixed` and only move `now` once the
++                // pinned node tests alive, so a fixed match is a pin, not a failure.
++                var outcome = SelectionOutcome700.Unconfirmed
++                var lastNow = ""
++                for (attempt in 0 until SELECT_CONFIRM_POLLS_700) {
++                    val live = try { repo.readSelection(group, ticket) }
++                        catch (cancel: CancellationException) { throw cancel }
++                        catch (_: Exception) { null }
++                    if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
++                    if (live != null) {
++                        lastNow = live.first
++                        outcome = selectionOutcome700(live.third.ifBlank { current.type }, live.first, live.second, node)
++                        if (outcome == SelectionOutcome700.Confirmed) break
++                    }
++                    if (attempt < SELECT_CONFIRM_POLLS_700 - 1) delay(SELECT_CONFIRM_INTERVAL_MS_700)
++                }
+                 val fresh = refreshNow()
+                 if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
+-                val actual = fresh?.takeIf { it.running && it.panelReady }
+-                    ?.groups?.firstOrNull { it.name == group }?.now
+-                check(actual == node) { "核心尚未确认所选节点，当前为 ${actual.orEmpty().ifBlank { "未知" }}" }
++                if (outcome == SelectionOutcome700.Unconfirmed) {
++                    val readback = fresh?.takeIf { it.running && it.panelReady }?.groups?.firstOrNull { it.name == group }
++                    if (readback != null) {
++                        lastNow = readback.now
++                        outcome = selectionOutcome700(readback.type, readback.now, readback.fixed, node)
++                    }
++                }
++                when (outcome) {
++                    SelectionOutcome700.Confirmed -> Unit
++                    SelectionOutcome700.Pinned -> toast("已固定，节点测通后核心会使用它")
++                    SelectionOutcome700.Unconfirmed ->
++                        error("核心尚未确认所选节点，当前为 ${lastNow.ifBlank { "未知" }}")
++                }
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+@@ -820,6 +1137,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         }
+     }
+
++    /** 7.0.0: releases a URLTest/Fallback pin (DELETE /proxies/{group}). */
++    fun unpin(group: String) {
++        if (refuseRestoredGroups()) return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
++        if (pendingSelection.containsKey(group)) return
++        val current = state.groups.firstOrNull { it.name == group } ?: return
++        if (current.fixed.isEmpty()) return
++        val ticket = repo.captureSelection()
++        val owner = ++requestSequence
++        selectionOwners[group] = owner
++        pendingSelection[group] = current.fixed
++        viewModelScope.launch {
++            try {
++                repo.unpin(group, ticket)
++                if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
++                refreshNow()
++                if (currentRuntimeRequest(request) && selectionOwners[group] == owner)
++                    toast("已取消固定，核心将自动选择节点")
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: Exception) {
++                if (currentRuntimeRequest(request) && selectionOwners[group] == owner)
++                    toast("取消固定失败：" + errorText(error, "未知错误"))
++            } finally {
++                if (selectionOwners[group] == owner) {
++                    selectionOwners.remove(group)
++                    pendingSelection.remove(group)
++                }
++            }
++        }
++    }
++
+     private suspend fun probe(node: String, request: RuntimeRequest, owner: Long) {
+         try {
+             applyNodeProbe(request, owner, node, repo.delay(node), SystemClock.elapsedRealtime())
+@@ -827,13 +1176,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -68849,7 +69274,7 @@ index 250b8a8..c2f738a 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1127,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1197,45 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -68871,6 +69296,8 @@ index 250b8a8..c2f738a 100644
 +            val landed = Channel<Pair<String, Long>>(Channel.UNLIMITED)
 +            val progress = launch {
 +                for ((node, value) in landed) {
++                    // 7.0.0: a failed first reading keeps its spinner until the one retry settles it.
++                    if (value <= 0L) continue
 +                    applyNodeProbe(request, owner, node, value, SystemClock.elapsedRealtime())
 +                    releaseNodeProbes(owner, listOf(node))
 +                }
@@ -68882,13 +69309,22 @@ index 250b8a8..c2f738a 100644
 +                // Selector groups retain the parallel core endpoint. Unpinned automatic groups
 +                // use it too and stream each member as the core records it; a pinned one keeps
 +                // bounded leaf probes because that endpoint silently clears its fixed choice.
-+                val result = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
++                val first = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
++                // 7.0.0: first-test false failures. Nodes that came back 0 / timeout / error (or
++                // not at all) are retested once each through the per-proxy endpoint.
++                val retryNodes = retryCandidates700(targets, first)
++                val retried = if (retryNodes.isEmpty() || !currentRuntimeRequest(request) ||
++                    groupProbeOwners[group.name] != owner) emptyMap()
++                else try { repo.retryDelays(group, retryNodes) }
++                    catch (cancel: CancellationException) { throw cancel }
++                    catch (_: Exception) { emptyMap() }
++                val result = mergeRetry700(first, retried)
 +                if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
 +                    toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1162,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1243,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -68909,7 +69345,7 @@ index 250b8a8..c2f738a 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1184,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1265,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -68965,7 +69401,7 @@ index 250b8a8..c2f738a 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,22 +1260,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,22 +1341,113 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -69081,7 +69517,7 @@ index 250b8a8..c2f738a 100644
      fun measureSites() {
          val request = activeRuntimeRequest() ?: return
          if (siteTesting) return
-@@ -964,7 +1384,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1465,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69090,7 +69526,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1401,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1482,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69099,7 +69535,7 @@ index 250b8a8..c2f738a 100644
              }
          }
      }
-@@ -995,7 +1415,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1496,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69108,7 +69544,7 @@ index 250b8a8..c2f738a 100644
              }
          }
      }
-@@ -1014,7 +1434,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1515,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69117,7 +69553,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1453,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1534,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69126,7 +69562,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1461,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1542,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -69135,7 +69571,7 @@ index 250b8a8..c2f738a 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1493,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1574,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -69144,7 +69580,7 @@ index 250b8a8..c2f738a 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1554,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1635,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -69153,7 +69589,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1153,18 +1573,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1153,18 +1654,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val fresh = repo.providers()
                  if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                      providers = fresh
@@ -69175,7 +69611,7 @@ index 250b8a8..c2f738a 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1175,7 +1596,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1175,7 +1677,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                  beginProviderRead()
                  if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
@@ -69185,7 +69621,7 @@ index 250b8a8..c2f738a 100644
                  refreshNow()
              } catch (cancel: CancellationException) {
                  if (providerTaskOwners[name] == owner) providerTasks.remove(name)
-@@ -1193,7 +1616,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1697,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -69194,7 +69630,7 @@ index 250b8a8..c2f738a 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1216,7 +1639,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1216,7 +1720,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                              async {
                                  if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
                                  try {
@@ -69214,7 +69650,7 @@ index 250b8a8..c2f738a 100644
                                      if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
                                          providerTasks[item.name] = HxTask(ok = true, message = "已更新")
                                          ok++
-@@ -1239,14 +1673,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1239,14 +1754,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                  if (readOwner == latestProviderRead) {
                      providers = fresh
@@ -69232,7 +69668,7 @@ index 250b8a8..c2f738a 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1257,12 +1693,35 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1257,12 +1774,35 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -79710,7 +80146,7 @@ index 0000000..bcd5c0c
 +    return state.isAtLeast(Lifecycle.State.STARTED)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-index 9f66ac0..62fc3b4 100644
+index 9f66ac0..b1b44cc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 @@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
@@ -80143,7 +80579,7 @@ index 9f66ac0..62fc3b4 100644
          testingGroups = vm.testingGroups.filterValues { it }.keys, testingAll = vm.testingAll,
          switching = vm.pendingSelection.toMap()).copy(
          refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
-@@ -685,9 +528,14 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -685,10 +528,15 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          },
          updatingAllSubscriptions = vm.providersUpdatingAll,
          updatingAllRuleSets = vm.ruleSetsUpdatingAll,
@@ -80152,13 +80588,15 @@ index 9f66ac0..62fc3b4 100644
      )
      val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
 -    val actions = PanelActions(
+-        onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
 +    // One actions instance per page: rebuilding it on every 1 s traffic sample handed each
 +    // visible group/node card fresh lambdas and recomposed the whole list while scrolling.
 +    val currentTab by rememberUpdatedState(tab)
 +    val actions = remember(vm, context) { PanelActions(
-         onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
++        onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode, onUnpin = vm::unpin,
          onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
          onTestAll = vm::testAll,
+         onUpdateSubscription = vm::updateProvider, onUpdateAllSubscriptions = vm::updateAllProviders,
 @@ -704,29 +552,29 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
          onCopy = { label, text -> copyToClipboard(context, label, text) },
@@ -80215,7 +80653,7 @@ index 9f66ac0..62fc3b4 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-index b187a2f..dd0369e 100644
+index b187a2f..5873a68 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 @@ -1,9 +1,18 @@
@@ -80304,7 +80742,7 @@ index b187a2f..dd0369e 100644
   */
  @Composable
 -internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false) {
-+internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速") {
++internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速", compact: Boolean = false) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      val motion = LocalHomeMotionEnabled.current
@@ -80351,7 +80789,8 @@ index b187a2f..dd0369e 100644
 +    }
      val capsule: @Composable () -> Unit = {
          Row(
-             Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = 10.dp),
+-            Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = 10.dp),
++            Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = if (compact) 7.dp else 10.dp),
              verticalAlignment = Alignment.CenterVertically,
              horizontalArrangement = Arrangement.spacedBy(5.dp),
          ) {
@@ -80495,7 +80934,7 @@ index 0000000..d281a26
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
 new file mode 100644
-index 0000000..15ff606
+index 0000000..edff3d1
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
 @@ -0,0 +1,273 @@
@@ -80727,7 +81166,7 @@ index 0000000..15ff606
 +        val names = source.mapTo(HashSet()) { it.name }
 +        val delays = HashMap<String, PanelDelay>()
 +        val groups = source.map { g ->
-+            PanelGroup(name = g.name, type = groupType(g.type), now = g.now, hidden = g.hidden,
++            PanelGroup(name = g.name, type = groupType(g.type), now = g.now, hidden = g.hidden, fixed = g.fixed,
 +                availableCount = g.nodes.count { (it.lastDelay ?: -1L) > 0L },
 +                nodes = g.nodes.map { n ->
 +                    if (n.name !in names && n.lastDelay != null) delays[n.name] = panelDelayOf(n.lastDelay)
@@ -80819,7 +81258,7 @@ index 0000000..99b3b19
 +            }
 +        }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-index c95890c..84680fb 100644
+index c95890c..4975be3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 @@ -1,6 +1,8 @@
@@ -80831,10 +81270,23 @@ index c95890c..84680fb 100644
  import androidx.compose.animation.core.spring
  import androidx.compose.animation.core.tween
  import androidx.compose.foundation.ExperimentalFoundationApi
-@@ -30,8 +32,10 @@ import androidx.compose.runtime.remember
+@@ -22,16 +24,23 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.lazy.LazyListScope
+ import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.PushPin
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.setValue
+ import androidx.compose.runtime.remember
  import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.clip
++import androidx.compose.ui.draw.drawWithContent
 +import androidx.compose.ui.graphics.graphicsLayer
  import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.lerp
@@ -80842,7 +81294,7 @@ index c95890c..84680fb 100644
  import androidx.compose.ui.platform.testTag
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.selected
-@@ -53,7 +57,10 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+@@ -53,7 +62,10 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
  import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
  import io.github.xgl34222220.hetu.home.fill
  import io.github.xgl34222220.hetu.home.homeEnter
@@ -80853,7 +81305,7 @@ index c95890c..84680fb 100644
  import io.github.xgl34222220.hetu.ui.HetuStaggerState
  import io.github.xgl34222220.hetu.ui.hetuPressScale
  import io.github.xgl34222220.hetu.ui.ht
-@@ -112,6 +119,7 @@ internal fun LazyListScope.panelGroupsTab(
+@@ -112,6 +124,7 @@ internal fun LazyListScope.panelGroupsTab(
                          GroupCard(
                              group = group, data = data, view = view, wide = columns == 1,
                              modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onToggleGroup(group.name) },
@@ -80861,7 +81313,15 @@ index c95890c..84680fb 100644
                          )
                      }
                      repeat(columns - row.groups.size) { Spacer(Modifier.weight(1f)) }
-@@ -152,51 +160,83 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
+@@ -125,6 +138,7 @@ internal fun LazyListScope.panelGroupsTab(
+                         row.nodes.forEach { node ->
+                             NodeCard(
+                                 node = node, selected = row.group.now == node.name, switching = data.switching[row.group.name] == node.name,
++                                pinned = row.group.fixed.isNotEmpty() && row.group.fixed == node.name,
+                                 delay = data.delayOf(node.name), view = view,
+                                 modifier = Modifier.weight(1f).fillMaxHeight(),
+                                 onSelect = { onSelectNode(row.group.name, node.name) }, onTest = { onTestNode(node.name) }, onInfo = { onNodeInfo(node.name) },
+@@ -152,51 +166,83 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
  /* ------------------------------------------------------------------ */
 
  @Composable
@@ -80908,8 +81368,10 @@ index c95890c..84680fb 100644
      val title: @Composable (Modifier) -> Unit = { m ->
          Column(m) {
 -            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-            Text(group.summary, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = if (compact || wide) 1 else 2, overflow = TextOverflow.Ellipsis)
-             Text(group.summary, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            // 7.0.0: type · count is never cut to "URLTe…"; it fades out only when it truly overflows.
++            PanelFadingLine(group.summary, c.t2, PanelType.groupSummary)
          }
      }
      val current: @Composable (Modifier) -> Unit = { m ->
@@ -80924,15 +81386,14 @@ index c95890c..84680fb 100644
 -            if (pending != null) HomeSpinner(size = 16.dp)
 -            else PanelDelayLabel(data.delayOf(group.now), onCard = true)
 +        val nodeName: @Composable (Modifier) -> Unit = { nameModifier ->
-+            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
++            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
 +                HomeFlag(region, height = 16.dp)
-+                Text(
-+                    panelHighlight(currentName, view.needle), Modifier.weight(1f, fill = !wide || separateCurrent),
-+                    color = c.t1, style = PanelType.groupNow, maxLines = 1, overflow = TextOverflow.Ellipsis,
-+                )
++                // 7.0.0: the current node takes all remaining width and fades at the edge
++                // instead of an early ellipsis; the latency pill next to it is compact.
++                PanelFadingLine(panelHighlight(currentName, view.needle), c.t1, PanelType.groupNow, Modifier.weight(1f))
 +                if (!separateCurrent) PanelSwapFade(pending != null, motion) { busy ->
 +                    if (busy) Box(Modifier.size(40.dp), contentAlignment = Alignment.BottomEnd) { HomeSpinner(size = 16.dp) }
-+                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
++                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组", compact = true)
 +                }
 +            }
 +        }
@@ -80955,7 +81416,8 @@ index c95890c..84680fb 100644
          Row(shell, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
              GroupTile(group)
              title(Modifier.weight(1f))
-             current(Modifier.weight(1f, fill = false))
+-            current(Modifier.weight(1f, fill = false))
++            current(Modifier.weight(1.25f))
          }
      } else {
 -        Column(shell, verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 12.dp)) {
@@ -80963,7 +81425,45 @@ index c95890c..84680fb 100644
              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                  title(Modifier.weight(1f))
                  GroupTile(group)
-@@ -240,6 +280,9 @@ private fun GroupTile(group: PanelGroup) {
+@@ -206,6 +252,37 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState,
+     }
+ }
+
++/**
++ * One line that is clipped with a short trailing fade, only when it really overflows, instead of
++ * an ellipsis that ate the end of short labels. The full text stays in semantics.
++ */
++@Composable
++private fun PanelFadingLine(text: androidx.compose.ui.text.AnnotatedString, color: Color, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) {
++    var overflow by remember(text) { mutableStateOf(false) }
++    Text(
++        text, modifier.then(if (overflow) Modifier.panelTrailingFade() else Modifier),
++        color = color, style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
++        onTextLayout = { layout -> overflow = layout.hasVisualOverflow },
++    )
++}
++
++@Composable
++private fun PanelFadingLine(text: String, color: Color, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier) =
++    PanelFadingLine(androidx.compose.ui.text.AnnotatedString(text), color, style, modifier)
++
++private fun Modifier.panelTrailingFade(width: androidx.compose.ui.unit.Dp = 18.dp): Modifier = this
++    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
++    .drawWithContent {
++        drawContent()
++        val fade = width.toPx().coerceAtMost(size.width / 2f)
++        drawRect(
++            androidx.compose.ui.graphics.Brush.horizontalGradient(
++                listOf(Color.Black, Color.Transparent), startX = size.width - fade, endX = size.width,
++            ),
++            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
++        )
++    }
++
+ /** The configured image supplied by the adapter takes precedence over the region flag and the type mark. */
+ @Composable
+ private fun GroupTile(group: PanelGroup) {
+@@ -240,6 +317,9 @@ private fun GroupTile(group: PanelGroup) {
  private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (String) -> Unit) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
@@ -80973,7 +81473,7 @@ index c95890c..84680fb 100644
      Row(
          Modifier.panelGutter().fillMaxWidth()
              .background(c.surface, RoundedCornerShape(topStart = PanelDims.nodesShape, topEnd = PanelDims.nodesShape))
-@@ -253,12 +296,15 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
+@@ -253,12 +333,15 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
          Row(
              Modifier.heightIn(min = 44.dp).clip(PanelDims.tabShape)
                  .homeTap(enabled = !testing, onClickLabel = ht("测试该组全部节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onTestGroup(group.name) }
@@ -80992,7 +81492,15 @@ index c95890c..84680fb 100644
          }
      }
  }
-@@ -292,7 +338,7 @@ private fun NodeCard(
+@@ -280,6 +363,7 @@ private fun NodeCard(
+     node: PanelNode,
+     selected: Boolean,
+     switching: Boolean,
++    pinned: Boolean = false,
+     delay: PanelDelay?,
+     view: PanelViewState,
+     modifier: Modifier,
+@@ -292,20 +376,22 @@ private fun NodeCard(
      val compact = view.layout.compactNodes
      val source = remember { MutableInteractionSource() }
      val motion = LocalHomeMotionEnabled.current
@@ -81001,14 +81509,16 @@ index c95890c..84680fb 100644
      val fill by animateColorAsState(if (selected) lerp(rest, c.accent, if (c.dark) .20f else .09f) else rest, HomeMotion.fade(motion), label = "nodeFill")
      val outline by animateColorAsState(
          when { selected -> c.accent.copy(alpha = .62f); switching -> c.accent.copy(alpha = .28f); else -> Color.Transparent },
-@@ -300,12 +346,13 @@ private fun NodeCard(
+         HomeMotion.fade(motion), label = "nodeOutline",
      )
      val info = ht("节点信息")
++    val pinnedLabel = ht("已固定（再次点按取消固定）")
      val shell = modifier
 -        .heightIn(min = if (compact) 64.dp else 92.dp)
 +        .heightIn(min = if (compact) 80.dp else 92.dp)
          .testTag("panel-node:${node.name}")
-         .semantics { this.selected = selected }
+-        .semantics { this.selected = selected }
++        .semantics { this.selected = selected; if (pinned) stateDescription = pinnedLabel }
          .hetuPressScale(source, pressedScale = .975f, motion = motion)
          .clip(PanelDims.nodeShape)
          .background(fill)
@@ -81016,7 +81526,7 @@ index c95890c..84680fb 100644
          .border(1.5.dp, outline, PanelDims.nodeShape)
          .combinedClickable(
              interactionSource = source,
-@@ -316,20 +363,24 @@ private fun NodeCard(
+@@ -316,20 +402,29 @@ private fun NodeCard(
              onClick = { haptics(HomeHaptic.Confirm); onSelect() },
          )
          .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 8.dp)
@@ -81029,6 +81539,11 @@ index c95890c..84680fb 100644
 -                maxLines = if (view.layout.wrapNames) 3 else if (compact) 1 else 2, overflow = TextOverflow.Ellipsis,
 +                label, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
 +                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis, inlineContent = flag,
++            )
++            // 7.0.0: the node an automatic group is pinned to carries a pin; tapping it again unpins.
++            if (pinned && !switching) Icon(
++                Icons.Filled.PushPin, null,
++                Modifier.padding(top = 2.dp).size(16.dp).testTag("panel-node-pin:${node.name}"), tint = c.accent,
              )
 -            if (switching) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)
 -            else HomePop(selected, Modifier.padding(end = 2.dp)) { HomeCheckMark(true, size = 20.dp) }
@@ -81048,7 +81563,7 @@ index c95890c..84680fb 100644
          }
      } else {
          Column(shell) {
-@@ -345,3 +396,13 @@ private fun NodeCard(
+@@ -345,3 +440,13 @@ private fun NodeCard(
          }
      }
  }
@@ -81418,7 +81933,7 @@ index 253b603..d3102d8 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
-index 3e938c4..6e5de7f 100644
+index 3e938c4..36c92ed 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 @@ -38,9 +38,17 @@ internal sealed interface PanelDelay {
@@ -81439,7 +81954,16 @@ index 3e938c4..6e5de7f 100644
  internal enum class PanelNodeKind { Proxy, Group, Direct }
 
  internal data class PanelNode(
-@@ -166,6 +174,14 @@ internal data class PanelRuleSet(
+@@ -65,6 +73,8 @@ internal data class PanelGroup(
+     val now: String,
+     val hidden: Boolean = false,
+     val availableCount: Int = nodes.size,
++    /** URLTest/Fallback pin (Mihomo `fixed`); "" when the core chooses on its own. */
++    val fixed: String = "",
+ ) {
+     val isGlobal: Boolean get() = name == "GLOBAL"
+     val summary: String get() = "$type · $availableCount/${nodes.size}"
+@@ -166,6 +176,14 @@ internal data class PanelRuleSet(
      val update: PanelUpdate = PanelUpdate.Idle,
  ) {
      val meta: String get() = listOf(behavior, format, vehicle).filter { it.isNotBlank() }.joinToString(" / ")
@@ -81454,7 +81978,7 @@ index 3e938c4..6e5de7f 100644
  }
 
  internal enum class PanelLogLevel(val label: String) { Debug("DEBUG"), Info("INFO"), Warn("WARN"), Error("ERROR") }
-@@ -198,6 +214,11 @@ internal data class PanelData(
+@@ -198,6 +216,11 @@ internal data class PanelData(
      val readError: String = "",
      /** Running, but the first controller snapshot has not arrived yet: tabs show placeholders. */
      val loading: Boolean = false,
@@ -81466,7 +81990,7 @@ index 3e938c4..6e5de7f 100644
      /** Groups whose 测速 is in flight. */
      val testingGroups: Set<String> = emptySet(),
      /** A whole-profile latency test is in flight. */
-@@ -207,6 +228,10 @@ internal data class PanelData(
+@@ -207,6 +230,10 @@ internal data class PanelData(
      /** “全部更新” is running for subscriptions / rule sets, including while single items have already finished. */
      val updatingAllSubscriptions: Boolean = false,
      val updatingAllRuleSets: Boolean = false,
@@ -81477,7 +82001,7 @@ index 3e938c4..6e5de7f 100644
  ) {
      val running: Boolean get() = status == PanelStatus.Running
 
-@@ -221,8 +246,22 @@ internal data class PanelData(
+@@ -221,8 +248,22 @@ internal data class PanelData(
      /** Latency to show next to [node]; null when a figure makes no sense (DIRECT). */
      fun delayOf(node: String): PanelDelay? {
          if (node.equals("DIRECT", ignoreCase = true) || node.equals("REJECT", ignoreCase = true)) return null
@@ -81500,7 +82024,7 @@ index 3e938c4..6e5de7f 100644
  }
 
  /* ------------------------------------------------------------------ */
-@@ -265,7 +304,8 @@ internal data class PanelApiSettings(
+@@ -265,7 +306,8 @@ internal data class PanelApiSettings(
  internal enum class PanelConnFilter(val label: String) { All("全部"), Proxy("代理"), Direct("直连") }
  internal enum class PanelConnSort(val label: String) { Host("主机"), Rule("规则"), Type("类型"), Time("连接时间"), Down("下行"), Up("上行") }
  internal enum class PanelRankMode(val label: String) { Connections("按连接数"), Total("按总流量") }
@@ -81510,7 +82034,7 @@ index 3e938c4..6e5de7f 100644
  internal enum class PanelLogOrder(val label: String) { Newest("最新在前"), Oldest("最早在前") }
 
  internal data class PanelViewState(
-@@ -288,6 +328,10 @@ internal data class PanelViewState(
+@@ -288,6 +330,10 @@ internal data class PanelViewState(
      val logFilter: PanelLogFilter = PanelLogFilter.All,
      val logOrder: PanelLogOrder = PanelLogOrder.Newest,
      val openLogs: Set<Int> = emptySet(),
@@ -81521,7 +82045,16 @@ index 3e938c4..6e5de7f 100644
  ) {
      /** Effective search text: empty unless the search field is open. */
      val needle: String get() = if (searching) query.trim() else ""
-@@ -385,7 +429,9 @@ internal object PanelLogic {
+@@ -336,6 +382,8 @@ internal class PanelActions(
+     val onStart: () -> Unit = {},
+     val onSelectNode: (group: String, node: String) -> Unit = { _, _ -> },
+     val onTestNode: (node: String) -> Unit = {},
++    /** Releases a URLTest/Fallback pin (DELETE /proxies/{group}). */
++    val onUnpin: (group: String) -> Unit = {},
+     val onTestGroup: (group: String) -> Unit = {},
+     /** 排序与布局 › 测试全部节点. */
+     val onTestAll: () -> Unit = {},
+@@ -385,7 +433,9 @@ internal object PanelLogic {
          val groupWidth = (widthDp - 32f - 8f) / 2f
          val nodeWidth = (widthDp - 32f - 16f - 8f) / 2f
          return layout.copy(
@@ -81532,7 +82065,7 @@ index 3e938c4..6e5de7f 100644
              nodeColumns = if (nodeWidth < 148f * scale) 1 else layout.nodeColumns,
          )
      }
-@@ -447,6 +493,7 @@ internal object PanelLogic {
+@@ -447,6 +497,7 @@ internal object PanelLogic {
          val q = view.needle
          val filtered = data.connections.filter { c ->
              (view.connFilter == PanelConnFilter.All || (view.connFilter == PanelConnFilter.Direct) == c.isDirect) &&
@@ -81540,7 +82073,7 @@ index 3e938c4..6e5de7f 100644
                  (q.isEmpty() || c.host.contains(q, ignoreCase = true) || c.app.contains(q, ignoreCase = true))
          }
          return when (view.connSort) {
-@@ -464,11 +511,26 @@ internal object PanelLogic {
+@@ -464,11 +515,26 @@ internal object PanelLogic {
 
      /** Number next to “连接详情”: the core's total, or the visible count once a filter or search narrows the list. */
      fun connectionCount(data: PanelData, view: PanelViewState, visible: Int): Int =
@@ -81569,7 +82102,7 @@ index 3e938c4..6e5de7f 100644
      }
 
      fun ruleSets(data: PanelData, view: PanelViewState): List<PanelRuleSet> =
-@@ -502,15 +564,6 @@ internal object PanelLogic {
+@@ -502,15 +568,6 @@ internal object PanelLogic {
          if ('\r' in settings.secret || '\n' in settings.secret) put("secret", "Secret 不能包含换行")
      }
 
@@ -81777,7 +82310,7 @@ index e7112d0..2b444df 100644
      BackHandler(enabled = view.searching) { view = view.toggleSearch() }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-index fb308a8..b87853b 100644
+index fb308a8..cf18c51 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 @@ -1,5 +1,6 @@
@@ -81821,7 +82354,7 @@ index fb308a8..b87853b 100644
  import io.github.xgl34222220.hetu.home.HomeType
  import io.github.xgl34222220.hetu.home.LocalHomeColors
  import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
-@@ -102,6 +111,11 @@ internal fun PanelScreen(
+@@ -102,6 +111,14 @@ internal fun PanelScreen(
      val density = LocalDensity.current
      val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
      val bottomPad = contentPadding.calculateBottomPadding()
@@ -81829,11 +82362,14 @@ index fb308a8..b87853b 100644
 +    // reserves that room too, so the right column's delays and the last row can scroll clear of it.
 +    var fabStack by remember { mutableStateOf(0.dp) }
 +    val fabShown = view.tab == PanelTab.Groups && data.running && view.expandedGroups.isNotEmpty() && data.readError.isBlank() && !data.loading && data.core.supports(PanelTab.Groups)
-+    val listBottom = if (fabShown && fabStack > 0.dp) maxOf(bottomPad, bottomPad.coerceAtLeast(16.dp) + fabStack + 12.dp) else bottomPad
++    val measuredBottom = if (fabShown && fabStack > 0.dp) maxOf(bottomPad, bottomPad.coerceAtLeast(16.dp) + fabStack + 12.dp) else bottomPad
++    // 7.0.0: with a group open, the last node rows must clear the dock, 定位当前节点 and the group
++    // capsule even before (or while) the floating stack is measured / popping in.
++    val listBottom = if (fabShown) maxOf(measuredBottom, bottomPad + PanelFabClearance700) else measuredBottom
      // The title block follows the font scale, so a large system font never spills into the tabs.
      val titleHeight = with(density) { HomeType.largeTitle.lineHeight.toDp() } + 8.dp
      val titlePx = with(density) { titleHeight.toPx() }
-@@ -113,9 +127,19 @@ internal fun PanelScreen(
+@@ -113,9 +130,19 @@ internal fun PanelScreen(
      val running = data.running
      val configuration = LocalConfiguration.current
      val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
@@ -81855,7 +82391,7 @@ index fb308a8..b87853b 100644
      val headerItems = panelHeaderItemCount(data, view)
      // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
      val stagger = key(view.tab) { rememberHomeStagger() }
-@@ -134,7 +158,7 @@ internal fun PanelScreen(
+@@ -134,7 +161,7 @@ internal fun PanelScreen(
          LazyColumn(
              modifier = Modifier.fillMaxSize().homeGlassSource(glass),
              state = listState,
@@ -81864,7 +82400,7 @@ index fb308a8..b87853b 100644
          ) {
              // The header itself is drawn above the list; these two items only reserve its room.
              item(key = "panel-title") { Spacer(Modifier.height(titleHeight)) }
-@@ -147,6 +171,21 @@ internal fun PanelScreen(
+@@ -147,6 +174,21 @@ internal fun PanelScreen(
                  }
                  return@LazyColumn
              }
@@ -81886,7 +82422,7 @@ index fb308a8..b87853b 100644
              if (data.readError.isNotBlank()) {
                  item(key = "panel-read-error") {
                      PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError, verbatimSubtitle = true) {
-@@ -171,14 +210,14 @@ internal fun PanelScreen(
+@@ -171,14 +213,14 @@ internal fun PanelScreen(
              }
              when (view.tab) {
                  PanelTab.Groups -> panelGroupsTab(
@@ -81903,7 +82439,7 @@ index fb308a8..b87853b 100644
                          onView(next)
                          if (anchor != null && at >= 0) {
                              // Apply with the new rows on the next measure, retaining the tapped
-@@ -199,7 +238,7 @@ internal fun PanelScreen(
+@@ -199,7 +241,7 @@ internal fun PanelScreen(
                  )
                  PanelTab.Subscriptions -> panelSubscriptionsTab(PanelLogic.subscriptions(data, view), view.needle, stagger, actions.onUpdateSubscription)
                  PanelTab.Connections -> panelConnectionsTab(data, view, stagger, onView, onOpen = { onOverlay(PanelOverlay.ConnectionDetail(it)) }, onCloseAll = { onOverlay(PanelOverlay.CloseAllDialog) })
@@ -81912,7 +82448,7 @@ index fb308a8..b87853b 100644
                  PanelTab.RuleSets -> panelRuleSetsTab(PanelLogic.ruleSets(data, view), view.needle, stagger, actions.onUpdateRuleSet)
                  PanelTab.Logs -> panelLogsTab(PanelLogic.logs(data, view), view, stagger, onView, onOrderMenu = { onOverlay(PanelOverlay.LogOrderMenu) }, orderMenu = { menu(PanelOverlay.LogOrderMenu) })
              }
-@@ -208,12 +247,13 @@ internal fun PanelScreen(
+@@ -208,12 +250,15 @@ internal fun PanelScreen(
          PanelHeader(data, view, overlay, actions, glass, collapse, titleHeight, statusTop, listState, onView, onOverlay, menu)
 
          // 策略: once a group is open, “定位当前节点” and a collapse capsule float above the dock.
@@ -81923,12 +82459,14 @@ index fb308a8..b87853b 100644
          val shownGroup = openGroup ?: lastOpen
          Column(
 -            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp)),
-+            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp))
++            // 7.0.0: the stack hugs the screen edge (inside the gutter) rather than the card edge,
++            // so it covers less of the right node column's names and delay pills.
++            Modifier.align(Alignment.BottomEnd).padding(end = PanelFabEdge700, bottom = bottomPad.coerceAtLeast(16.dp))
 +                .onSizeChanged { size -> fabStack = with(density) { size.height.toDp() } },
              horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp),
          ) {
              HomePop(openGroup != null) {
-@@ -281,7 +321,13 @@ private fun BoxScope.PanelHeader(
+@@ -281,7 +326,13 @@ private fun BoxScope.PanelHeader(
              alpha = (1f - moved / (titlePx * .62f)).coerceIn(0f, 1f)
          },
          contentAlignment = Alignment.CenterStart,
@@ -81943,7 +82481,7 @@ index fb308a8..b87853b 100644
 
      // The strip floats above the list, so a vertical drag that starts on it is handed to the
      // list by hand; horizontal drags still scroll the strip itself.
-@@ -306,9 +352,9 @@ private fun BoxScope.PanelHeader(
+@@ -306,9 +357,9 @@ private fun BoxScope.PanelHeader(
                  alpha = shown
                  translationY = (1f - shown) * 8.dp.toPx()
              },
@@ -81955,7 +82493,7 @@ index fb308a8..b87853b 100644
              val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
                  Box {
                      HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint, glyph = 26.dp)
-@@ -413,3 +459,19 @@ private fun PanelInlineOverlay(
+@@ -413,3 +464,24 @@ private fun PanelInlineOverlay(
          }
      }
  }
@@ -81974,6 +82512,69 @@ index fb308a8..b87853b 100644
 +        HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
 +        Text(ht("同步中"), color = c.accentText, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +    }
++}
++
++/** 7.0.0: minimum list clearance above the dock while the 策略 floating stack is shown. */
++internal val PanelFabClearance700 = 140.dp
++/** 7.0.0: end inset of the 策略 floating stack. */
++internal val PanelFabEdge700 = 6.dp
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelSwitch700.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelSwitch700.kt
+new file mode 100644
+index 0000000..5583f42
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelSwitch700.kt
+@@ -0,0 +1,52 @@
++package io.github.xgl34222220.hetu.panel
++
++/**
++ * 7.0.0 panel switching: pure decision logic, kept free of Android types so it is unit-testable.
++ */
++internal enum class SelectionOutcome700 {
++    /** The core is routing through the requested node. */
++    Confirmed,
++    /** URLTest/Fallback stored the pin (`fixed`) but keeps another node until the pin tests alive. */
++    Pinned,
++    /** Nothing in the readback reflects the request yet. */
++    Unconfirmed,
++}
++
++internal fun isSelectorGroup700(type: String): Boolean = type.equals("Selector", ignoreCase = true)
++
++/**
++ * Selector: success when `now` follows. Automatic groups (URLTest/Fallback): Mihomo stores the
++ * PUT as `fixed` and only moves `now` once that node is alive for the group's test URL, so a
++ * `fixed` match is a successful pin, not a failure.
++ */
++internal fun selectionOutcome700(type: String, now: String?, fixed: String?, node: String): SelectionOutcome700 = when {
++    isSelectorGroup700(type) && now == node -> SelectionOutcome700.Confirmed
++    !isSelectorGroup700(type) && now == node && (fixed.isNullOrEmpty() || fixed == node) -> SelectionOutcome700.Confirmed
++    fixed == node -> SelectionOutcome700.Pinned
++    now == node -> SelectionOutcome700.Confirmed
++    else -> SelectionOutcome700.Unconfirmed
++}
++
++/** Tapping the node an automatic group is already pinned to releases the pin. */
++internal fun tapUnpins700(type: String, fixed: String, node: String): Boolean =
++    !isSelectorGroup700(type) && fixed.isNotEmpty() && fixed == node
++
++internal const val SELECT_CONFIRM_POLLS_700 = 6
++internal const val SELECT_CONFIRM_INTERVAL_MS_700 = 350L
++internal const val RETRY_DELAY_TIMEOUT_MS_700 = 6000
++internal const val RETRY_DELAY_CONCURRENCY_700 = 6
++
++/**
++ * Nodes whose first group-test reading was an explicit failure (0, timeout -1, error -2, any
++ * non-positive), in target order. Each is retested exactly once with a single per-proxy probe.
++ * Absent / malformed entries are not failures: they keep their earlier reading untouched.
++ */
++internal fun retryCandidates700(targets: List<String>, results: Map<String, Long>): List<String> =
++    targets.distinct().filter { node -> results[node]?.let { it <= 0L } == true }
++
++/** A retry only replaces the first reading when it measured a real delay. */
++internal fun mergeRetry700(first: Map<String, Long>, retry: Map<String, Long>): Map<String, Long> {
++    val out = LinkedHashMap(first)
++    retry.forEach { (node, value) -> if (value > 0L && node in out) out[node] = value }
++    return out
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/SingBoxPanelStore.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/SingBoxPanelStore.kt
 new file mode 100644
@@ -84290,7 +84891,7 @@ index 9841062..4f452b7 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..900b368 100644
+index 578ce9d..5482e34 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -84366,7 +84967,7 @@ index 578ce9d..900b368 100644
  没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
  本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
  本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
-@@ -969,16 +998,473 @@ private val vocabularyConnection = """
+@@ -969,16 +998,480 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -84820,7 +85421,14 @@ index 578ce9d..900b368 100644
 +重启请求已被停止取代|The restart was superseded by a stop|重新啟動請求已被停止取代|Перезапуск отменён остановкой
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700).joinToString("\n")
++private val vocabularyPanelFix700 = """
++已固定，节点测通后核心会使用它|Pinned. The core will use it once the node passes its test|已固定，節點測通後核心會使用它|Закреплено. Ядро начнёт использовать узел, когда он пройдёт проверку
++已取消固定，核心将自动选择节点|Unpinned. The core will choose the node automatically|已取消固定，核心將自動選擇節點|Закрепление снято. Ядро будет выбирать узел автоматически
++取消固定失败|Could not unpin|取消固定失敗|Не удалось снять закрепление
++已固定（再次点按取消固定）|Pinned (tap again to unpin)|已固定（再次點按取消固定）|Закреплено (нажмите ещё раз, чтобы открепить)
++""".trimIndent()
++
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyAudit5, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func, vocabularyHomeProbe333, vocabularyFunc400, vocabularyTiktokStop, vocabularyCnipSpeed, vocabularyFailOpen700, vocabularyPanelFix700).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -92248,6 +92856,51 @@ index 0000000..285d615
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/DelayUrlChoice700Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DelayUrlChoice700Test.kt
+new file mode 100644
+index 0000000..a1a074c
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DelayUrlChoice700Test.kt
+@@ -0,0 +1,39 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** 7.0.0: edgetunnel (Cloudflare Worker) nodes cannot reach Cloudflare test URLs; gstatic is the fallback. */
++class DelayUrlChoice700Test {
++    private val gstatic = "https://www.gstatic.com/generate_204"
++    private val cf = "https://cp.cloudflare.com/generate_204"
++    private val defaults = arrayOf(gstatic, cf)
++
++    @Test fun recognisesCloudflareTestTargets() {
++        listOf(cf, "http://cp.cloudflare.com/", "https://speed.cloudflare.com/__down", "https://CP.CLOUDFLARE.COM./generate_204",
++            "http://1.1.1.1/generate_204", "https://1.0.0.1", "http://[2606:4700:4700::1111]/generate_204")
++            .forEach { assertTrue(it, DelayUrlChoice700.isCloudflareTarget(it)) }
++        listOf(gstatic, "https://notcloudflare.com/x", "https://cloudflare.com.evil.net/", "http://1.1.1.2/", "", "not a url")
++            .forEach { assertFalse(it, DelayUrlChoice700.isCloudflareTarget(it)) }
++    }
++
++    @Test fun cloudflareGroupUrlGetsGstaticAfterItWithoutCustomUrl() {
++        assertEquals(listOf(cf, gstatic), DelayUrlChoice700.delayUrls("", cf, defaults))
++        assertEquals(listOf("http://1.1.1.1/generate_204", gstatic), DelayUrlChoice700.delayUrls(null, "http://1.1.1.1/generate_204", defaults))
++    }
++
++    @Test fun nonCloudflareAndCustomUrlsAreUnchanged() {
++        assertEquals(listOf("https://example.com/204"), DelayUrlChoice700.delayUrls("", "https://example.com/204", defaults))
++        assertEquals(listOf("https://my.custom/204", cf), DelayUrlChoice700.delayUrls("https://my.custom/204", cf, defaults))
++        assertEquals(listOf(gstatic, cf), DelayUrlChoice700.delayUrls("", "", defaults))
++    }
++
++    @Test fun retryUsesGstaticInsteadOfACloudflareGroupUrl() {
++        assertEquals(gstatic, DelayUrlChoice700.retryUrl("", cf, gstatic))
++        assertEquals("https://example.com/204", DelayUrlChoice700.retryUrl("", "https://example.com/204", gstatic))
++        assertEquals("https://my.custom/204", DelayUrlChoice700.retryUrl("https://my.custom/204", cf, gstatic))
++        assertEquals(gstatic, DelayUrlChoice700.retryUrl(null, "", gstatic))
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/EbpfMatcherApp105Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/EbpfMatcherApp105Test.kt
 new file mode 100644
 index 0000000..82721cc
@@ -97067,6 +97720,69 @@ index 0000000..0312cfe
 +    val value = raw.trim()
 +    if (value.isEmpty()) return null
 +    return if (value.length >= 16 && value[4] == '-' && value[7] == '-') value.substring(5, 16).replace('T', ' ') else value.replace('T', ' ')
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelSwitch700Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelSwitch700Test.kt
+new file mode 100644
+index 0000000..3fdd49b
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelSwitch700Test.kt
+@@ -0,0 +1,57 @@
++package io.github.xgl34222220.hetu
++
++import io.github.xgl34222220.hetu.panel.SelectionOutcome700
++import io.github.xgl34222220.hetu.panel.mergeRetry700
++import io.github.xgl34222220.hetu.panel.retryCandidates700
++import io.github.xgl34222220.hetu.panel.selectionOutcome700
++import io.github.xgl34222220.hetu.panel.tapUnpins700
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** 7.0.0 panel switching confirmation and first-test retry selection (pure logic). */
++class PanelSwitch700Test {
++    @Test fun selectorConfirmsOnlyWhenNowFollows() {
++        assertEquals(SelectionOutcome700.Confirmed, selectionOutcome700("Selector", "B", "", "B"))
++        assertEquals(SelectionOutcome700.Unconfirmed, selectionOutcome700("Selector", "A", "", "B"))
++        assertEquals(SelectionOutcome700.Unconfirmed, selectionOutcome700("Selector", null, null, "B"))
++    }
++
++    @Test fun urlTestWithFixedButOtherNowIsAPinNotAFailure() {
++        assertEquals(SelectionOutcome700.Pinned, selectionOutcome700("URLTest", "A", "B", "B"))
++        assertEquals(SelectionOutcome700.Pinned, selectionOutcome700("Fallback", "A", "B", "B"))
++    }
++
++    @Test fun urlTestConfirmsWhenNowAndFixedAgree() {
++        assertEquals(SelectionOutcome700.Confirmed, selectionOutcome700("URLTest", "B", "B", "B"))
++        assertEquals(SelectionOutcome700.Confirmed, selectionOutcome700("URLTest", "B", "", "B"))
++        assertEquals(SelectionOutcome700.Confirmed, selectionOutcome700("urltest", "B", null, "B"))
++    }
++
++    @Test fun urlTestPinnedElsewhereIsUnconfirmed() {
++        assertEquals(SelectionOutcome700.Unconfirmed, selectionOutcome700("URLTest", "A", "A", "B"))
++        assertEquals(SelectionOutcome700.Unconfirmed, selectionOutcome700("Fallback", "A", "", "B"))
++    }
++
++    @Test fun tappingThePinnedNodeOfAnAutomaticGroupUnpins() {
++        assertTrue(tapUnpins700("URLTest", "B", "B"))
++        assertTrue(tapUnpins700("Fallback", "B", "B"))
++        assertFalse(tapUnpins700("URLTest", "B", "A"))
++        assertFalse(tapUnpins700("URLTest", "", "B"))
++        assertFalse(tapUnpins700("Selector", "B", "B"))
++    }
++
++    @Test fun retryPicksOnlyExplicitFailuresInTargetOrder() {
++        val targets = listOf("a", "b", "c", "d", "e", "a")
++        val first = mapOf("a" to 120L, "b" to 0L, "c" to -1L, "d" to -2L)
++        assertEquals(listOf("b", "c", "d"), retryCandidates700(targets, first))
++        assertEquals(emptyList<String>(), retryCandidates700(targets, mapOf("a" to 1L)))
++    }
++
++    @Test fun retryOnlyReplacesFailuresWithRealMeasurements() {
++        val first = mapOf("a" to 120L, "b" to 0L, "c" to -1L, "d" to -2L)
++        val retry = mapOf("b" to 340L, "c" to -1L, "d" to -2L, "z" to 50L)
++        assertEquals(mapOf("a" to 120L, "b" to 340L, "c" to -1L, "d" to -2L), mergeRetry700(first, retry))
++    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelSyncPolish97Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelSyncPolish97Test.kt
 new file mode 100644

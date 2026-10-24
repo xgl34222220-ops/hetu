@@ -271,6 +271,8 @@ jobs:
 
         python3 tools/qa/test_failopen700.py -v 2>&1 | tee out/verification/failopen700-tests.txt
 
+        python3 tools/qa/test_lnet_refresh.py -v 2>&1 | tee out/verification/lnet-refresh-tests.txt
+
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter
       run: python3 tools/qa/test_filter_export.py --before out/verification/v2075-adblock.java
@@ -473,7 +475,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2105'' versionName=''6.6.6''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2106'' versionName=''7.0.0''" out/apk-transfer/apk-metadata.txt
 
         if grep -q "application-debuggable" out/apk-transfer/apk-metadata.txt; then echo "Shipped APK is debuggable"; exit 1; fi
 
@@ -667,7 +669,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2105'
+        HETU_EXPECTED_VERSION: '2106'
         HETU_EXPECT_NEW_UI: '1'
         HETU_RELEASE_SMOKE: '1'
         # Real baseline profile: ART-recorded journeys on the release APK, retraced with its R8 mapping.

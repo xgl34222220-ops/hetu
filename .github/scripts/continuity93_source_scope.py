@@ -32,7 +32,8 @@ ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-20: 6.6.6 (versionCode 2105; user: 做6.6.6 自动组不就是自动切走的吗？而且我测试都有延迟啊) = 6.0.0 + stalled-node
 # watchdog (a node that answers delay tests but returns nothing: auto groups pinned elsewhere, timed return),
 # connection chains with "]" in node names matched again, Google vendor-chain cleanup with One True Awk.
-VERSION_CODE, VERSION_NAME = 2105, '6.6.6'
+# 2026-10-23: 7.0.0 (versionCode 2106) = 6.6.6 + whole-phone outage fail-open, bounded force stop, full-colour network-test brand logos
+VERSION_CODE, VERSION_NAME = 2106, '7.0.0'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -94,6 +95,7 @@ AUTHORIZED_FILES = frozenset((
     PACKAGE + 'ProxyNetworkMatchService.java', PACKAGE + 'ProxyLatencyHistory.kt',
     PACKAGE + 'ProxyRuntimeSettings.java', PACKAGE + 'ProxyControlEpoch.java',
     PACKAGE + 'StartupConfigViewer.kt', PACKAGE + 'ProxyDashboardRepository.kt',
+    PACKAGE + 'DelayUrlChoice700.java', PACKAGE + 'PanelExtras19.kt',
     PACKAGE + 'MihomoControllerClient.java', PACKAGE + 'LatencyProbeBudget.java',
     PACKAGE + 'LatencyProbeOperation.kt',
     PACKAGE + 'ProxyScriptsActivity.kt',
@@ -427,8 +429,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2105', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "6.6.6"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2106', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "7.0.0"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'

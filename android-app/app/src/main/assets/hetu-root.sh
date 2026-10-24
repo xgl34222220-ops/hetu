@@ -98,6 +98,9 @@ WRFWD=HETU_WRFWD
 V6OUT=HETU_V6OUT
 V6FWD=HETU_V6FWD
 KOUT=HETU_KOUT
+# 7.0.0: on-link networks of the current Wi-Fi / Ethernet that the static LAN list does not cover
+# (global IPv6 prefixes, public-IPv4 LANs). Rebuilt per command by `lnet-sync` after a network change.
+LNET=HETU_LNET
 KFWD=HETU_KFWD
 
 # CNIP kernel bypass (ipset). The App writes $BASE/policy/cnip (V4=0|1, V6=0|1, FORCE=uid ranges);
@@ -634,7 +637,7 @@ unhook(){
   "$BIN" -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true; "$BIN" -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
 }
 cleanup4(){
-  unhook xt4 mangle OUTPUT "$MOUT"; unhook xt4 mangle PREROUTING "$MPRE"
+  unhook xt4 mangle OUTPUT "$LNET"; unhook xt4 mangle OUTPUT "$MOUT"; unhook xt4 mangle PREROUTING "$MPRE"
   unhook xt4 nat OUTPUT "$DNSOUT"; unhook xt4 nat PREROUTING "$DNSPRE"
   unhook xt4 nat OUTPUT "$NOUT"; unhook xt4 nat PREROUTING "$NPRE"
   unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
@@ -650,7 +653,7 @@ cleanup4(){
 }
 cleanup6(){
   has ip6tables || return 0
-  unhook xt6 mangle OUTPUT "$MOUT"; unhook xt6 mangle PREROUTING "$MPRE"
+  unhook xt6 mangle OUTPUT "$LNET"; unhook xt6 mangle OUTPUT "$MOUT"; unhook xt6 mangle PREROUTING "$MPRE"
   unhook xt6 nat OUTPUT "$DNSOUT"; unhook xt6 nat PREROUTING "$DNSPRE"
   unhook xt6 nat OUTPUT "$NOUT"; unhook xt6 nat PREROUTING "$NPRE"
   unhook xt6 filter OUTPUT "$QUICOUT"; unhook xt6 filter FORWARD "$QUICFWD"
@@ -892,7 +895,7 @@ force_plan(){
 # Hooks to try when a table cannot be listed: every Hetu hook is a plain "-j <chain>" in a builtin chain.
 force_known(){
   case "$1" in
-    mangle) printf '%s\n' OUTPUT:HETU_MOUT PREROUTING:HETU_MPRE OUTPUT:HETU_CNC PREROUTING:HETU_CNC OUTPUT:BICHEN_MOUT PREROUTING:BICHEN_MPRE;;
+    mangle) printf '%s\n' OUTPUT:HETU_LNET OUTPUT:HETU_MOUT PREROUTING:HETU_MPRE OUTPUT:HETU_CNC PREROUTING:HETU_CNC OUTPUT:BICHEN_MOUT PREROUTING:BICHEN_MPRE;;
     nat) printf '%s\n' OUTPUT:HETU_DNSOUT PREROUTING:HETU_DNSPRE OUTPUT:HETU_NOUT PREROUTING:HETU_NPRE OUTPUT:BICHEN_DNSOUT PREROUTING:BICHEN_DNSPRE OUTPUT:BICHEN_NOUT PREROUTING:BICHEN_NPRE;;
     filter) printf '%s\n' OUTPUT:HETU_QUICOUT FORWARD:HETU_QUICFWD OUTPUT:HETU_DOTOUT OUTPUT:HETU_WROUT FORWARD:HETU_WRFWD OUTPUT:HETU_V6OUT FORWARD:HETU_V6FWD \
       OUTPUT:HETU_KOUT FORWARD:HETU_KFWD "OUTPUT:$FAKE_REJECT_CHAIN" OUTPUT:BICHEN_QUICOUT FORWARD:BICHEN_QUICFWD OUTPUT:BICHEN_V6OUT FORWARD:BICHEN_V6FWD OUTPUT:BICHEN_KOUT FORWARD:BICHEN_KFWD;;
@@ -3323,6 +3326,108 @@ wd_net_watch(){
   WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
   WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
 }
+# ---- 7.0.0 local-network bypass refresh ----------------------------------------------------------
+# The static LAN_RETURN_V4/V6 lists already cover every private IPv4 subnet, so moving between
+# 192.168.x / 10.x / 172.16-31.x Wi-Fi networks needs nothing. Not covered: the global IPv6 prefix of
+# the current Wi-Fi/Ethernet and a LAN numbered from public IPv4 space. Those prefixes change with the
+# network, so they live in their own chain HETU_LNET (mangle OUTPUT, first): a hit sets the bypass mark,
+# and every Hetu chain already returns on that mark first. DNS (port 53) is never marked, so hijack
+# stays intact. HETU_LNET is outside the network manifest, so a sync never looks like rule drift.
+# Per command only (no iptables-restore, no ipset), each bounded, under one non-blocking lock attempt.
+lnet_x(){ LX_F="$1"; shift; LX_BIN=iptables; [ "$LX_F" = 4 ] || LX_BIN=ip6tables
+  if has timeout; then timeout -s TERM -k 1 3 "$LX_BIN" -w 1 "$@"; else "$LX_BIN" -w 1 "$@"; fi; }
+# Interfaces whose on-link networks are a local LAN. Cellular, VPN/TUN and loopback never are.
+lnet_iface(){ case "$1" in wlan*|eth*|swlan*|ap[0-9]*|rndis*|usb*|bt-pan*) return 0;; *) return 1;; esac; }
+# On-link prefixes of LAN interfaces, one per line, not already in the static list or the fake-IP
+# ranges, at most 16. IPv4 needs /16 or longer, IPv6 /48 or longer.
+lnet_wanted(){
+  LW_F="$1"
+  if [ "$LW_F" = 4 ]; then LW_ROWS=$(ip -o -4 route show table all 2>/dev/null) || return 1
+  else v6supported || return 0; LW_ROWS=$(ip -o -6 route show table all 2>/dev/null) || return 1; fi
+  printf '%s\n' "$LW_ROWS" | awk -v f="$LW_F" -v lan4="$LAN_RETURN_V4" -v fake4="$FAKE_IP_V4" -v fake6="$FAKE_IP_V6" '
+    function ip4(a,  p){ if (split(a, p, ".") != 4) return -1; return ((p[1]*256+p[2])*256+p[3])*256+p[4] }
+    function in4(net, list,  n, i, c, b, m, x, y){ split(net, x, "/"); n = split(list, c, ",")
+      for (i = 1; i <= n; i++) { if (split(c[i], y, "/") != 2) continue; b = y[2] + 0; if (b > x[2] + 0) continue
+        m = 2 ^ (32 - b); if (int(ip4(x[1]) / m) == int(ip4(y[1]) / m)) return 1 }
+      return 0 }
+    function iflan(d){ return d ~ /^(wlan|eth|swlan|rndis|usb|bt-pan)/ || d ~ /^ap[0-9]/ }
+    { net = $1; dev = ""; for (i = 2; i < NF; i++) if ($i == "dev") dev = $(i+1)
+      if (!iflan(dev) || net !~ /\// || net ~ /^(default|local|broadcast|unreachable|prohibit|blackhole|multicast|throw)$/) next
+      if (f == 4) {
+        if (net !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/) next
+        split(net, q, "/"); if (q[2] + 0 < 16 || q[2] + 0 > 32 || ip4(q[1]) < 0) next
+        if (in4(net, lan4) || (fake4 != "" && in4(net, fake4))) next
+      } else {
+        if (net !~ /^[0-9a-fA-F:]+\/[0-9]+$/) next
+        split(net, q, "/"); if (q[2] + 0 < 48 || q[2] + 0 > 128) next
+        l = tolower(q[1]); if (l ~ /^(fe[89ab]|f[cd]|ff)/ || l == "::1" || l == "::") next
+        if (fake6 != "" && index("," tolower(fake6) ",", "," tolower(net) ",")) next
+      }
+      if (!(net in seen)) { seen[net] = 1; if (++count <= 16) print net } }'
+}
+# Makes HETU_LNET for family $1 hold exactly the wanted prefixes. Returns 1 on any failed command.
+lnet_apply(){
+  LA_F="$1"; LA_WANT="$2"
+  if [ -z "$LA_WANT" ] && ! lnet_x "$LA_F" -t mangle -S "$LNET" >/dev/null 2>&1; then return 0; fi
+  if ! lnet_x "$LA_F" -t mangle -S "$LNET" >/dev/null 2>&1; then
+    lnet_x "$LA_F" -t mangle -N "$LNET" || return 1
+    lnet_x "$LA_F" -t mangle -A "$LNET" -p udp --dport 53 -j RETURN || return 1
+    lnet_x "$LA_F" -t mangle -A "$LNET" -p tcp --dport 53 -j RETURN || return 1
+  fi
+  LA_HAVE=$(lnet_x "$LA_F" -t mangle -S "$LNET" 2>/dev/null | awk -v c="$LNET" '$1=="-A" && $2==c && $3=="-d" {print $4}') || return 1
+  LA_RC=0
+  for LA_P in $LA_HAVE; do
+    printf '%s\n' "$LA_WANT" | grep -Fqx -- "$LA_P" && continue
+    LA_N=0
+    while lnet_x "$LA_F" -t mangle -C "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" >/dev/null 2>&1; do
+      lnet_x "$LA_F" -t mangle -D "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" || { LA_RC=1; break; }
+      LA_N=$((LA_N+1)); [ "$LA_N" -lt 4 ] || break
+    done
+  done
+  for LA_P in $LA_WANT; do
+    case "$LA_P" in *[!0-9a-fA-F:./]*|'') LA_RC=1; continue;; esac
+    lnet_x "$LA_F" -t mangle -C "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" >/dev/null 2>&1 && continue
+    lnet_x "$LA_F" -t mangle -A "$LNET" -d "$LA_P" -j MARK --set-xmark "$BYPASS_MARK/$BYPASS_MASK" || LA_RC=1
+  done
+  if ! lnet_x "$LA_F" -t mangle -C OUTPUT -j "$LNET" >/dev/null 2>&1; then
+    lnet_x "$LA_F" -t mangle -I OUTPUT 1 -j "$LNET" || LA_RC=1
+  fi
+  return "$LA_RC"
+}
+lnet_sync(){ (
+  trap 'release_lock' EXIT
+  [ -r "$SESSION" ] && [ -r "$PIDFILE" ] || exit 0
+  case "$(sed -n 's/^MODE=//p' "$SESSION" 2>/dev/null | head -n 1)" in tproxy|redirect|enhance|ebpf) ;; *) exit 0;; esac
+  # A start, stop or fail-open owns the rules right now: skip, the watchdog retries on its next tick.
+  try_lock_once || exit 3
+  [ -r "$SESSION" ] && [ -r "$PIDFILE" ] || exit 0
+  load_session_fake_ip_policy >/dev/null 2>&1 || true
+  LS_RC=0; LS_SUM=""
+  for LS_F in 4 6; do
+    if [ "$LS_F" = 6 ]; then has ip6tables && v6supported || continue; fi
+    LS_WANT=$(lnet_wanted "$LS_F") || { LS_RC=1; continue; }
+    lnet_apply "$LS_F" "$LS_WANT" || LS_RC=1
+    LS_SUM="$LS_SUM v$LS_F=[$(printf '%s' "$LS_WANT" | tr '\n' ' ' | sed 's/ $//')]"
+  done
+  printf '%s lnet-sync rc=%s%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$LS_RC" "$LS_SUM" >> "$RUN/lnet.log" 2>/dev/null || true
+  exit "$LS_RC"
+); }
+# Watchdog: LAN addresses of both families; a change must hold for two looks >= 4 s apart.
+wd_lnet_sig(){ { ip -o -4 addr show scope global; ip -o -6 addr show scope global; } 2>/dev/null |
+  awk '$2 ~ /^(wlan|eth|swlan|rndis|usb|bt-pan)/ || $2 ~ /^ap[0-9]/ {printf "%s=%s ", $2, $4}'; }
+wd_lnet_tick(){
+  WLT_SIG=$(wd_lnet_sig)
+  [ "$WLT_SIG" != "$WD_LNET_DONE" ] || { WD_LNET_SEEN=""; return 0; }
+  wd_now
+  if [ "$WLT_SIG" != "$WD_LNET_SEEN" ]; then WD_LNET_SEEN="$WLT_SIG"; WD_LNET_AT=$((WD_NOW+4)); return 0; fi
+  [ "$WD_NOW" -ge "${WD_LNET_AT:-0}" ] || return 0
+  if has timeout; then timeout -s TERM -k 1 10 "$0" lnet-sync >/dev/null 2>&1; else "$0" lnet-sync >/dev/null 2>&1; fi
+  case "$?" in
+    0) WD_LNET_DONE="$WLT_SIG"; WD_LNET_SEEN=""; wd_log "network change: local-network bypass refreshed (${WLT_SIG:-offline})";;
+    3) ;;
+    *) WD_LNET_AT=$((WD_NOW+20)); wd_log "network change: local-network bypass refresh failed; retrying in 20 s";;
+  esac
+}
 wd_liveness(){
   WD_LIVE_REASON=""
   if wd_core_frozen "$COREPID"; then
@@ -4373,6 +4478,7 @@ watchdog(){
   cg_escape "$$"
   HETU_WATCHDOG_CALL=1; export HETU_WATCHDOG_CALL
   wd_selfheal_init
+  WD_LNET_DONE=""; WD_LNET_SEEN=""; WD_LNET_AT=0
   MISS=0; H_TICK=0
   while [ "$MISS" -lt 3 ]; do
     [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
@@ -4380,6 +4486,7 @@ watchdog(){
       MISS=0; H_TICK=$((H_TICK+1))
       if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
         case "$CNIP_STATE" in ipset|iptables|ebpf) "$0" cnip-reload auto >/dev/null 2>&1 || true;; esac; wd_net_watch; fi
+      wd_lnet_tick
       wd_selfheal_tick
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
@@ -6022,6 +6129,8 @@ case "${1:-status}" in
   ebpf-update) { [ "$#" = 1 ] || [ "$#" = 4 ]; } || fail "参数错误"; root; shift; ebpf_update "$@";;
   # Called by the App on every network change (and by the watchdog itself every ~12 s): an App call
   # also asks the watchdog to re-verify that the core answers, not only the rules.
+  # 7.0.0: re-derive the on-link bypass of the current Wi-Fi/Ethernet (watchdog, after a network change).
+  lnet-sync) [ "$#" = 1 ] || exit 1; root; lnet_sync;;
   repair-network) [ "$#" = 2 ] || exit 1; root; [ -n "${HETU_WATCHDOG_CALL:-}" ] || { : > "$RUN/liveness.kick"; } 2>/dev/null || true; health_repair "$2";;
   monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
   # 3.0.0 system-side recovery (stop/start spawn it detached), probe URL discovery for the App, and the
