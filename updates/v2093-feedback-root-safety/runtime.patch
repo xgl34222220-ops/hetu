@@ -54743,7 +54743,7 @@ index 34494b0..2a315f4 100644
 
      static Set<String> subscriptionExceptions(Collection<String> userBlocks) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-index f104cef..c5a45d9 100644
+index f104cef..c2518aa 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 @@ -74,6 +74,14 @@ final class MihomoControllerClient {
@@ -54906,7 +54906,7 @@ index f104cef..c5a45d9 100644
              try{
                  String test=URLEncoder.encode(rawUrl,"UTF-8");
                  String status=URLEncoder.encode(expectedRange,"UTF-8");
-@@ -228,6 +280,30 @@ final class MihomoControllerClient {
+@@ -228,6 +280,36 @@ final class MihomoControllerClient {
          }
          if(last!=null)throw last;
          throw new IOException("策略组延迟测试失败");
@@ -54915,6 +54915,12 @@ index f104cef..c5a45d9 100644
 +
 +    /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
 +    /** 7.0.0: URL for the failed-node retry (gstatic instead of a Cloudflare group URL). */
++    boolean firstRoundUsedCloudflare(String groupUrl,boolean selector){
++        String custom=customDelayUrl();
++        if(!custom.isEmpty())return DelayUrlChoice700.isCloudflareTarget(custom);
++        return !selector&&DelayUrlChoice700.isCloudflareTarget(waveDelayUrl(groupUrl));
++    }
++
 +    String retryDelayUrl(String groupUrl){
 +        return DelayUrlChoice700.retryUrl(customDelayUrl(),groupUrl,DEFAULT_DELAY_URLS[0]);
 +    }
@@ -54937,7 +54943,7 @@ index f104cef..c5a45d9 100644
      }
 
      void closeAll()throws Exception{request("DELETE","/connections",null);}
-@@ -246,9 +322,12 @@ final class MihomoControllerClient {
+@@ -246,9 +328,12 @@ final class MihomoControllerClient {
          byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
          ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
          Socket socket=new Socket();
@@ -54952,7 +54958,7 @@ index f104cef..c5a45d9 100644
              OutputStream raw=socket.getOutputStream();
              StringBuilder head=new StringBuilder();
              head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-@@ -265,7 +344,10 @@ final class MihomoControllerClient {
+@@ -265,7 +350,10 @@ final class MihomoControllerClient {
              raw.flush();
 
              BufferedInputStream in=new BufferedInputStream(socket.getInputStream());
@@ -54964,7 +54970,7 @@ index f104cef..c5a45d9 100644
              String[] bits=status.split(" ",3);if(bits.length<2)throw new IOException("Mihomo 控制接口状态行无效");
              int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
              HashMap<String,String> headers=new HashMap<>();String line;
-@@ -281,8 +363,12 @@ final class MihomoControllerClient {
+@@ -281,8 +369,12 @@ final class MihomoControllerClient {
              }else bytes=readToEnd(in);
              String text=new String(bytes,StandardCharsets.UTF_8);
              if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
@@ -59699,7 +59705,7 @@ index b914f23..543d203 100644
          private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
          private const val MAX_EXTRACTED = 128L * 1024L * 1024L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..e57bcdf 100644
+index 5ae93b3..e04c754 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -11,6 +11,8 @@ import kotlinx.coroutines.ensureActive
@@ -59958,7 +59964,7 @@ index 5ae93b3..e57bcdf 100644
          return results
      }
 
-@@ -366,35 +471,127 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -366,35 +471,136 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }.toList()
  }
 
@@ -60032,8 +60038,7 @@ index 5ae93b3..e57bcdf 100644
 +                coroutineContext.ensureActive()
 +                val landed = synchronized(results) { results.keys.toSet() }
 +                freshCoreWaveResults(live, url, baseline.filterKeys { it !in landed }).forEach { (node, value) -> land(node, value) }
-             }
--            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
++            }
 +        }
 +        val outcome = wave.await()
 +        poller?.cancel()
@@ -60043,7 +60048,8 @@ index 5ae93b3..e57bcdf 100644
 +                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
 +                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() }, pending.size)
 +                else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
-+            }
+             }
+-            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
 +        }
 +        val allFailed = outcome.isFailure
 +        requireCurrentProbe(snapshot.identity)
@@ -60077,6 +60083,15 @@ index 5ae93b3..e57bcdf 100644
 +     * the group wave). At most [RETRY_DELAY_CONCURRENCY_700] in flight, [RETRY_DELAY_TIMEOUT_MS_700]
 +     * each. A node whose retry request itself failed is absent from the result.
 +     */
++    /**
++     * 7.0.0: the one failed-node retry exists for Cloudflare-hosted nodes that cannot reach a
++     * Cloudflare test target. It runs only when the first round used such a URL; Selector
++     * groups without a custom URL already test against gstatic first.
++     */
++    fun retryWorthwhile(group: ProxyGroupUi): Boolean = api.firstRoundUsedCloudflare(
++        if (group.type.equals("Selector", ignoreCase = true)) "" else group.testUrl,
++        group.type.equals("Selector", ignoreCase = true))
++
 +    suspend fun retryDelays(group: ProxyGroupUi, nodes: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
 +        if (nodes.isEmpty()) return@withContext emptyMap()
 +        val url = api.retryDelayUrl(group.testUrl)
@@ -60100,7 +60115,7 @@ index 5ae93b3..e57bcdf 100644
          // The Selector endpoint returns one complete wave. A successful selection
          // or provider update can supersede it without changing the API/settings.
          readCurrentProbe(probeIdentity()) {
-@@ -414,7 +611,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -414,7 +620,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          }
      }
 
@@ -60109,7 +60124,7 @@ index 5ae93b3..e57bcdf 100644
          val snapshot = probeSnapshot()
          val leaf = selectedProxyName(snapshot.proxies, node)
          readCurrentProbe(snapshot) {
-@@ -423,7 +620,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -423,7 +629,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
      suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -60118,7 +60133,7 @@ index 5ae93b3..e57bcdf 100644
          requireCurrentProbe(identity)
          val sites = ProxyLatencyTargets.load(app)
          // Hetu's UID is exempt from transparent Root interception. Explicitly enter
-@@ -444,7 +641,66 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -444,7 +650,66 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          measured
      }
 
@@ -60185,7 +60200,7 @@ index 5ae93b3..e57bcdf 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
          operationApi.updateProxyProvider(name)
-@@ -453,6 +709,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -453,6 +718,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
      suspend fun refreshRuleSet(name: String, ticket: SelectionTicket = captureSelection()): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
@@ -60193,7 +60208,7 @@ index 5ae93b3..e57bcdf 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
          operationApi.updateRuleProvider(name)
-@@ -478,7 +735,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -478,7 +744,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
              try {
                  val code = connection.responseCode
                  coroutineContext.ensureActive()
@@ -60203,7 +60218,7 @@ index 5ae93b3..e57bcdf 100644
              } finally {
                  runCatching { connection.inputStream?.close() }
                  connection.disconnect()
-@@ -564,3 +822,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -564,3 +831,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
  }
@@ -68546,7 +68561,7 @@ index 0000000..2a90902
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..b5a523f 100644
+index 250b8a8..d71e5ea 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -14,13 +14,24 @@ import androidx.compose.runtime.mutableStateOf
@@ -69312,7 +69327,7 @@ index 250b8a8..b5a523f 100644
 +                val first = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
 +                // 7.0.0: first-test false failures. Nodes that came back 0 / timeout / error (or
 +                // not at all) are retested once each through the per-proxy endpoint.
-+                val retryNodes = retryCandidates700(targets, first)
++                val retryNodes = if (repo.retryWorthwhile(group)) retryCandidates700(targets, first) else emptyList()
 +                val retried = if (retryNodes.isEmpty() || !currentRuntimeRequest(request) ||
 +                    groupProbeOwners[group.name] != owner) emptyMap()
 +                else try { repo.retryDelays(group, retryNodes) }

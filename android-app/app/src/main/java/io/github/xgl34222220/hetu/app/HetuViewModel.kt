@@ -1227,7 +1227,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 val first = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
                 // 7.0.0: first-test false failures. Nodes that came back 0 / timeout / error (or
                 // not at all) are retested once each through the per-proxy endpoint.
-                val retryNodes = retryCandidates700(targets, first)
+                val retryNodes = if (repo.retryWorthwhile(group)) retryCandidates700(targets, first) else emptyList()
                 val retried = if (retryNodes.isEmpty() || !currentRuntimeRequest(request) ||
                     groupProbeOwners[group.name] != owner) emptyMap()
                 else try { repo.retryDelays(group, retryNodes) }

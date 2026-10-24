@@ -285,6 +285,12 @@ final class MihomoControllerClient {
 
     /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
     /** 7.0.0: URL for the failed-node retry (gstatic instead of a Cloudflare group URL). */
+    boolean firstRoundUsedCloudflare(String groupUrl,boolean selector){
+        String custom=customDelayUrl();
+        if(!custom.isEmpty())return DelayUrlChoice700.isCloudflareTarget(custom);
+        return !selector&&DelayUrlChoice700.isCloudflareTarget(waveDelayUrl(groupUrl));
+    }
+
     String retryDelayUrl(String groupUrl){
         return DelayUrlChoice700.retryUrl(customDelayUrl(),groupUrl,DEFAULT_DELAY_URLS[0]);
     }

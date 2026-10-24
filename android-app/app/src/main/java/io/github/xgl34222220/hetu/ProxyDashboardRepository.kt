@@ -573,6 +573,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      * the group wave). At most [RETRY_DELAY_CONCURRENCY_700] in flight, [RETRY_DELAY_TIMEOUT_MS_700]
      * each. A node whose retry request itself failed is absent from the result.
      */
+    /**
+     * 7.0.0: the one failed-node retry exists for Cloudflare-hosted nodes that cannot reach a
+     * Cloudflare test target. It runs only when the first round used such a URL; Selector
+     * groups without a custom URL already test against gstatic first.
+     */
+    fun retryWorthwhile(group: ProxyGroupUi): Boolean = api.firstRoundUsedCloudflare(
+        if (group.type.equals("Selector", ignoreCase = true)) "" else group.testUrl,
+        group.type.equals("Selector", ignoreCase = true))
+
     suspend fun retryDelays(group: ProxyGroupUi, nodes: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
         if (nodes.isEmpty()) return@withContext emptyMap()
         val url = api.retryDelayUrl(group.testUrl)
